@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Toast POS Exact Palette Replica */
+  --toast-charcoal: #333333;
+  /* Main Background */
+  --toast-charcoal-dark: #222222;
+  /* Sidebar / Depths */
+  --toast-charcoal-light: #444444;
+  /* Cards / Secondary */
+
+  --toast-orange: #F37021;
+  /* Primary Action (Send/Fire) */
+  --toast-orange-hover: #D65A0F;
+
+  --toast-green: #67B96A;
+  /* Success / Free Table */
+  --toast-green-dark: #4A9C3B;
+
+  --toast-red: #D9463F;
+  /* Danger / Occupied / Void */
+
+  --toast-blue: #0088CC;
+  /* Info / Selection */
+
+  --toast-text-white: #FFFFFF;
+  --toast-text-gray: #CCCCCC;
+
+  /* App Defaults (Forcing Dark Mode) */
+  --background: var(--toast-charcoal);
+  --foreground: var(--toast-text-white);
 }
 
 @theme inline {
+  --color-toast-charcoal: var(--toast-charcoal);
+  --color-toast-charcoal-dark: var(--toast-charcoal-dark);
+  --color-toast-charcoal-light: var(--toast-charcoal-light);
+
+  --color-toast-orange: var(--toast-orange);
+  --color-toast-orange-hover: var(--toast-orange-hover);
+
+  --color-toast-green: var(--toast-green);
+  --color-toast-red: var(--toast-red);
+  --color-toast-blue: var(--toast-blue);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  /* App-like constraints */
 }
