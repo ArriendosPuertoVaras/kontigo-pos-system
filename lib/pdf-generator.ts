@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatCurrency } from './utils'; // Assuming you have a formatter, otherwise we'll define a local one
+// import { formatCurrency } from './utils'; // Removed to fix build error
 import { SalaryResult } from './payroll/chile';
 import { Staff } from './db';
 
@@ -59,13 +59,13 @@ export const generateSalarySettlementPDF = (data: SettlementData): Blob => {
 
     // Box for Totals Reference (Visual only as per image)
     doc.setDrawColor(0);
-    doc.setLineDash([1, 1], 0);
+    (doc as any).setLineDash([1, 1], 0);
     doc.rect(leftX - 2, 66, 90, 15); // Box x, y, w, h
     doc.text("Rta Tributable", leftX, 71);
     doc.text(formatCLP(salary.totalImponible), 70, 71); // Approx placement
     doc.text("Rta Imponible", leftX, 77);
     doc.text(formatCLP(salary.totalImponible), 70, 77);
-    doc.setLineDash([], 0); // Reset dash
+    (doc as any).setLineDash([], 0); // Reset dash
 
     // Right Column
     const rightX = 110;
