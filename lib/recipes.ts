@@ -80,14 +80,14 @@ export function analyzeRecipe(
             // Weight Conversions
             if ((dbUnit === 'kg' || dbUnit === 'kilo') && (recipeUnit === 'g' || recipeUnit === 'gr' || recipeUnit === 'gramos')) {
                 conversionFactor = 0.001;
-            } else if ((dbUnit === 'g' || dbUnit === 'gr') && (dbUnit === 'kg' || dbUnit === 'kilo')) {
+            } else if ((dbUnit === 'g' || dbUnit === 'gr') && (recipeUnit === 'kg' || recipeUnit === 'kilo')) {
                 conversionFactor = 1000;
             }
 
             // Volume Conversions
             else if ((dbUnit === 'lt' || dbUnit === 'l' || dbUnit === 'litro') && (recipeUnit === 'ml' || recipeUnit === 'cc')) {
                 conversionFactor = 0.001;
-            } else if ((dbUnit === 'ml' || dbUnit === 'cc') && (dbUnit === 'lt' || dbUnit === 'l')) {
+            } else if ((dbUnit === 'ml' || dbUnit === 'cc') && (recipeUnit === 'lt' || recipeUnit === 'l' || recipeUnit === 'litro')) {
                 conversionFactor = 1000;
             }
 
