@@ -315,6 +315,12 @@ export interface JournalEntry {
     created_at: Date;
 }
 
+export interface SystemSetting {
+    id?: number;
+    key: string;
+    value: any;
+}
+
 // --- Database Definition ---
 export class KontigoDatabase extends Dexie {
     products!: Table<Product>;
@@ -338,6 +344,7 @@ export class KontigoDatabase extends Dexie {
     // New Accounting Tables
     accounts!: Table<Account>;
     journalEntries!: Table<JournalEntry>;
+    settings!: Table<SystemSetting>;
 
     constructor() {
         super('Kontigo_Final'); // Force final fresh DB
@@ -363,6 +370,10 @@ export class KontigoDatabase extends Dexie {
             jobTitles: '++id, &name, active',
             accounts: '++id, &code, type',
             journalEntries: '++id, date, status, referenceId'
+        });
+
+        this.version(9).stores({
+            settings: '++id, &key'
         });
 
         // Populate if empty

@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { db, Staff } from '@/lib/db';
 import { UtensilsCrossed, Delete, User } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import SetupRestaurantModal from '@/components/SetupRestaurantModal';
+import { getSetting, SettingsKeys, isSystemConfigured } from '@/lib/settings';
+import { Settings2 } from 'lucide-react';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -12,6 +15,24 @@ export default function LoginPage() {
     const [pin, setPin] = useState("");
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [restaurantName, setRestaurantName] = useState("Kontigo POS");
+    const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
+
+    // Check Configuration & Load Name
+    useEffect(() => {
+        const loadSettings = async () => {
+            const name = await getSetting<string>(SettingsKeys.RESTAURANT_NAME, "Kontigo POS");
+            setRestaurantName(name);
+
+            // Auto-open setup if not configured & no staff (fresh install)
+            const configured = await isSystemConfigured();
+            const staffCount = await db.staff.count();
+            if (!configured && staffCount <= 4) { // 4 is default seed count
+                // Optional: Auto open? ensuring manual trigger for now to not be annoying
+            }
+        };
+        loadSettings();
+    }, []);
 
 
     // Initial Seeding Trigger - REMOVED to prevent race condition with Cloud Restore
@@ -105,7 +126,7 @@ export default function LoginPage() {
                 <div className="w-20 h-20 bg-gradient-to-br from-toast-orange to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4">
                     <UtensilsCrossed className="text-white w-10 h-10" />
                 </div>
-                <h1 className="text-3xl font-bold text-white tracking-tight">Kontigo POS</h1>
+                <h1 className="text-3xl font-bold text-white tracking-tight">{restaurantName}</h1>
                 <p className="text-gray-400 text-sm mt-2 uppercase tracking-widest font-bold">
                     {selectedStaff ? `Hola, ${selectedStaff.name.split(' ')[0]}` : '¿Quién eres?'}
                 </p>
@@ -144,6 +165,25 @@ export default function LoginPage() {
                     )}
                 </div>
             )}
+
+            {/* SETUP BUTTON (If no staff or explicitly requested) */}
+            {!selectedStaff && (
+                <div className="fixed top-4 right-4">
+                    <button
+                        onClick={() => setIsSetupModalOpen(true)}
+                        className="text-gray-500 hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full"
+                    >
+                        <Settings2 className="w-4 h-4" />
+                        Configurar Negocio
+                    </button>
+                </div>
+            )}
+
+            <SetupRestaurantModal
+                isOpen={isSetupModalOpen}
+                onClose={() => setIsSetupModalOpen(false)}
+                onComplete={() => window.location.reload()}
+            />
 
             {/* STEP 2: PIN ENTRY */}
             {selectedStaff && (
@@ -206,19 +246,7 @@ export default function LoginPage() {
                 </div>
             )}
 
-            {/* RESTORE DATA BUTTON (For Extension/New Devices) */}
-            <div className="fixed bottom-4 right-4">
-                <button
-                    onClick={() => {
-                        if (confirm("¿Recuperar datos de la nube? Esto reemplazará los datos locales.")) {
-                            import('@/lib/sync_service').then(m => m.syncService.restoreFromCloud(msg => alert(msg)));
-                        }
-                    }}
-                    className="text-[10px] text-gray-600 hover:text-white transition-colors flex items-center gap-1 opacity-50 hover:opacity-100"
-                >
-                    Recuperar Datos desde Nube
-                </button>
-            </div>
         </div>
+
     );
 }
