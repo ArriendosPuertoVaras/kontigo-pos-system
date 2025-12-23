@@ -233,6 +233,13 @@ export default function Sidebar() {
                         <LogOut className="w-5 h-5 mb-0.5" />
                         <span className="w-full text-[9px] font-bold uppercase text-center">Salir</span>
                     </button>
+
+                    {/* BRANDING */}
+                    <div className="pt-4 pb-2 text-center opacity-20 hover:opacity-100 transition-opacity">
+                        <p className="text-[8px] text-gray-500 font-medium tracking-widest uppercase leading-tight">
+                            Kontigo <br /> Lab SpA
+                        </p>
+                    </div>
                 </div>
             </aside >
         </>

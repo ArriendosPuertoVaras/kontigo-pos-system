@@ -246,6 +246,12 @@ export default function LoginPage() {
                 </div>
             )}
 
+            {/* CORPORATE FOOTER */}
+            <div className="fixed bottom-4 text-center opacity-30 hover:opacity-100 transition-opacity">
+                <p className="text-[10px] text-gray-500 font-medium tracking-widest uppercase">
+                    Powered by <span className="font-bold text-gray-400">Kontigo Lab SpA</span>
+                </p>
+            </div>
         </div>
 
     );
