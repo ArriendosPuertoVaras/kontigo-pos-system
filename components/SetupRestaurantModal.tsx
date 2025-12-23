@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { db, seedDatabase } from '@/lib/db';
 import { setSetting, SettingsKeys } from '@/lib/settings';
-import { Store, Cloud, Check, Loader2, ArrowRight, User } from 'lucide-react';
+import { Store, Cloud, Check, Loader2, ArrowRight, User, Lock } from 'lucide-react';
 import { syncService } from '@/lib/sync_service';
 
 interface SetupRestaurantModalProps {
@@ -18,11 +18,19 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
     const [restaurantName, setRestaurantName] = useState("");
     const [adminName, setAdminName] = useState("");
     const [adminPin, setAdminPin] = useState("");
+    const [accessCode, setAccessCode] = useState("");
 
     if (!isOpen) return null;
 
     const handleRegisterNew = async () => {
         if (!restaurantName || !adminName || adminPin.length < 4) return;
+
+        // SECURITY GATE
+        if (accessCode.trim().toUpperCase() !== 'KONTIGO-2025') {
+            alert("⚠️ Código de Acceso Inválido. Contacta a soporte para obtener tu invitación.");
+            return;
+        }
+
         setIsLoading(true);
 
         try {
@@ -114,6 +122,21 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
 
                     {step === 'REGISTER_DETAILS' && (
                         <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
+
+                            {/* ACCESS CODE FIELD */}
+                            <div className="bg-[#e4f229]/5 border border-[#e4f229]/20 p-4 rounded-xl mb-4">
+                                <label className="block text-[#e4f229] text-xs font-bold mb-2 uppercase tracking-widest flex items-center gap-2">
+                                    Código de Invitación <Lock className="w-3 h-3" />
+                                </label>
+                                <input
+                                    type="text"
+                                    value={accessCode}
+                                    onChange={e => setAccessCode(e.target.value.toUpperCase())}
+                                    placeholder="KONTIGO-XXXX"
+                                    className="w-full bg-[#111111] border border-[#e4f229]/30 rounded-lg p-3 text-[#f3f2f0] font-mono text-center tracking-widest focus:ring-1 ring-[#e4f229] outline-none placeholder:text-[#9CA3AF]/30"
+                                />
+                            </div>
+
                             <div>
                                 <label className="block text-[#9CA3AF] text-xs font-bold mb-2 uppercase tracking-widest">Nombre del Restaurante</label>
                                 <input
@@ -162,7 +185,7 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
                                 </button>
                                 <button
                                     onClick={handleRegisterNew}
-                                    disabled={!restaurantName || !adminName || adminPin.length < 4 || isLoading}
+                                    disabled={!restaurantName || !adminName || adminPin.length < 4 || !accessCode || isLoading}
                                     className="flex-1 bg-[#e4f229] text-[#0a0806] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-[#dbe627] hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#e4f229]/10 py-4 text-lg"
                                 >
                                     {isLoading ? <Loader2 className="animate-spin" /> : <>Registrar Negocio <ArrowRight className="w-5 h-5" /></>}
