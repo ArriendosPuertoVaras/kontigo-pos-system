@@ -13,7 +13,12 @@ import ClockOutModal from '@/components/ClockOutModal';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 
+import { usePermission } from '@/hooks/usePermission';
+import { Lock } from 'lucide-react';
+
 export default function Home() {
+  const hasPOSAccess = usePermission('pos:view');
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const tableIdParam = searchParams.get('tableId');
@@ -518,264 +523,281 @@ export default function Home() {
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/*
+        {hasPOSAccess === false ? (
+          <div className="w-full h-full flex items-center justify-center bg-[#2a2a2a] text-white">
+            <div className="flex flex-col items-center gap-4 p-8 bg-white/5 rounded-2xl border border-white/10 max-w-sm text-center">
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                <Lock className="w-8 h-8 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold mb-1">POS Restringido</h2>
+                <p className="text-sm text-gray-400">No tienes permisos para operar el Punto de Venta.</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          */}
+        <>
+          {/* TOP HEADER */}
+          <Header title="Salón Principal" />
 
-        {/* TOP HEADER */}
-        <Header title="Salón Principal" />
+          {/* POS GRID LAYOUT */}
+          <div className="flex-1 p-3 flex flex-col md:grid md:grid-cols-12 gap-3 h-full overflow-hidden bg-[#2a2a2a] relative">
 
-        {/* POS GRID LAYOUT */}
-        <div className="flex-1 p-3 flex flex-col md:grid md:grid-cols-12 gap-3 h-full overflow-hidden bg-[#2a2a2a] relative">
-
-          {/* LEFT: TICKET VIEW (Order Summary) */}
-          {/* Mobile: Hidden by default, shown via state/overlay. Desktop: Always visible col-span-4 */}
-          <div className={`
+            {/* LEFT: TICKET VIEW (Order Summary) */}
+            {/* Mobile: Hidden by default, shown via state/overlay. Desktop: Always visible col-span-4 */}
+            <div className={`
               bg-toast-charcoal flex flex-col h-full rounded-lg shadow-2xl border border-white/5 overflow-hidden
               absolute md:static inset-0 z-40 md:z-auto transition-transform duration-300
               ${showMobileTicket ? 'translate-y-0' : 'translate-y-[110%] md:translate-y-0'}
               md:col-span-4
           `}>
-            {/* Ticket Header */}
+              {/* Ticket Header */}
 
-            <div className="p-4 bg-toast-charcoal-dark border-b border-white/5 flex justify-between items-center shrink-0">
-              <div>
-                <h2 className="font-bold text-lg text-white">
-                  {activeTable ? activeTable.name : 'Venta Rápida'}
-                </h2>
-                <span className="text-xs text-gray-400">
-                  {activeOrder ? `Orden #${activeOrder.id}` : 'Nueva Venta'}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {/* Mobile Close Button */}
-                <button onClick={() => setShowMobileTicket(false)} className="md:hidden p-2 text-white/50 hover:text-white bg-white/10 rounded-lg">
-                  <X className="w-5 h-5" />
-                </button>
-
-                <button onClick={handleCloseTable} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded transition-colors" title="Cerrar Mesa / Cancelar">
-                  <Trash2 className="w-5 h-5" />
-                </button>
-                <button onClick={() => router.push('/tables')} className="text-toast-blue text-sm font-bold uppercase tracking-wide px-3 py-1 hover:bg-white/5 rounded hidden md:block">
-                  Ver Mesas
-                </button>
-              </div>
-            </div>
-
-            {/* Ticket Body */}
-            <div className="flex-1 p-0 overflow-y-auto flex flex-col">
-              {ticket.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-500 gap-2 opacity-50">
-                  <ClipboardList className="w-12 h-12" />
-                  <p className="text-sm">Sin productos</p>
+              <div className="p-4 bg-toast-charcoal-dark border-b border-white/5 flex justify-between items-center shrink-0">
+                <div>
+                  <h2 className="font-bold text-lg text-white">
+                    {activeTable ? activeTable.name : 'Venta Rápida'}
+                  </h2>
+                  <span className="text-xs text-gray-400">
+                    {activeOrder ? `Orden #${activeOrder.id}` : 'Nueva Venta'}
+                  </span>
                 </div>
-              ) : (
-                <div className="flex flex-col">
-                  {ticket.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start p-3 border-b border-white/5 bg-toast-charcoal hover:bg-white/5 transition-colors group">
-                      <div className="flex gap-3 relative group/item">
-                        <div className="w-6 h-6 bg-toast-charcoal-light rounded flex items-center justify-center text-xs font-bold text-white border border-white/10 shrink-0">
-                          {item.quantity}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-semibold text-white text-sm leading-tight truncate">{item.product.name}</p>
+                <div className="flex gap-2">
+                  {/* Mobile Close Button */}
+                  <button onClick={() => setShowMobileTicket(false)} className="md:hidden p-2 text-white/50 hover:text-white bg-white/10 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
 
-                            {/* Add Note Button (Compact) */}
-                            <button
-                              onClick={() => setNoteModal({ index, text: item.notes || '' })}
-                              className="bg-white/5 hover:bg-white/20 rounded-full p-0.5 w-4 h-4 text-yellow-500 hover:text-yellow-400 flex items-center justify-center transition-colors">
-                              <Plus className="w-3 h-3" />
-                            </button>
+                  <button onClick={handleCloseTable} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded transition-colors" title="Cerrar Mesa / Cancelar">
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => router.push('/tables')} className="text-toast-blue text-sm font-bold uppercase tracking-wide px-3 py-1 hover:bg-white/5 rounded hidden md:block">
+                    Ver Mesas
+                  </button>
+                </div>
+              </div>
+
+              {/* Ticket Body */}
+              <div className="flex-1 p-0 overflow-y-auto flex flex-col">
+                {ticket.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-gray-500 gap-2 opacity-50">
+                    <ClipboardList className="w-12 h-12" />
+                    <p className="text-sm">Sin productos</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {ticket.map((item, index) => (
+                      <div key={index} className="flex justify-between items-start p-3 border-b border-white/5 bg-toast-charcoal hover:bg-white/5 transition-colors group">
+                        <div className="flex gap-3 relative group/item">
+                          <div className="w-6 h-6 bg-toast-charcoal-light rounded flex items-center justify-center text-xs font-bold text-white border border-white/10 shrink-0">
+                            {item.quantity}
                           </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-semibold text-white text-sm leading-tight truncate">{item.product.name}</p>
 
-                          {/* Modifiers Display */}
-                          {item.selectedModifiers && item.selectedModifiers.length > 0 && (
-                            <div className="flex flex-col mt-0.5 space-y-0.5">
-                              {item.selectedModifiers.map((mod, midx) => (
-                                <span key={midx} className="text-[10px] text-gray-400 leading-tight block">
-                                  + {mod.name}
-                                </span>
-                              ))}
+                              {/* Add Note Button (Compact) */}
+                              <button
+                                onClick={() => setNoteModal({ index, text: item.notes || '' })}
+                                className="bg-white/5 hover:bg-white/20 rounded-full p-0.5 w-4 h-4 text-yellow-500 hover:text-yellow-400 flex items-center justify-center transition-colors">
+                                <Plus className="w-3 h-3" />
+                              </button>
                             </div>
-                          )}
-                          {/* Note Display */}
-                          {item.notes && (
-                            <span className="text-[10px] text-yellow-400 leading-tight block mt-0.5 flex gap-1">
-                              <MessageSquare className="w-3 h-3" /> {item.notes}
-                            </span>
-                          )}
+
+                            {/* Modifiers Display */}
+                            {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                              <div className="flex flex-col mt-0.5 space-y-0.5">
+                                {item.selectedModifiers.map((mod, midx) => (
+                                  <span key={midx} className="text-[10px] text-gray-400 leading-tight block">
+                                    + {mod.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {/* Note Display */}
+                            {item.notes && (
+                              <span className="text-[10px] text-yellow-400 leading-tight block mt-0.5 flex gap-1">
+                                <MessageSquare className="w-3 h-3" /> {item.notes}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="font-bold text-white text-sm">
+                            {formatPrice((item.product.price + (item.selectedModifiers?.reduce((a, b) => a + b.price, 0) || 0)) * item.quantity)}
+                          </span>
+                          <button
+                            onClick={() => removeFromTicket(index)}
+                            className="text-red-400 text-[10px] uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
+                          >
+                            Eliminar
+                          </button>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="font-bold text-white text-sm">
-                          {formatPrice((item.product.price + (item.selectedModifiers?.reduce((a, b) => a + b.price, 0) || 0)) * item.quantity)}
-                        </span>
-                        <button
-                          onClick={() => removeFromTicket(index)}
-                          className="text-red-400 text-[10px] uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Breakdown */}
+              <div className="bg-[#2e2e2e] p-4 border-t border-white/5 space-y-2 relative z-10 shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
+                {/* SPLIT BILL UI */}
+                {activeOrder?.covers && activeOrder.covers > 1 && (
+                  <div className="flex justify-between items-center text-xs text-blue-300 bg-blue-500/10 p-2 rounded mb-2 border border-blue-500/20">
+                    <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Dividir ({activeOrder.covers})</span>
+                    <span className="font-bold">{formatPrice(total / activeOrder.covers)} / pers</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Neto</span>
+                  <span>{formatPrice(net)}</span>
                 </div>
-              )}
-            </div>
-
-            {/* Breakdown */}
-            <div className="bg-[#2e2e2e] p-4 border-t border-white/5 space-y-2 relative z-10 shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
-              {/* SPLIT BILL UI */}
-              {activeOrder?.covers && activeOrder.covers > 1 && (
-                <div className="flex justify-between items-center text-xs text-blue-300 bg-blue-500/10 p-2 rounded mb-2 border border-blue-500/20">
-                  <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Dividir ({activeOrder.covers})</span>
-                  <span className="font-bold">{formatPrice(total / activeOrder.covers)} / pers</span>
+                <div className="flex justify-between text-xs text-gray-500 border-b border-white/5 pb-2">
+                  <span>IVA (19%)</span>
+                  <span>{formatPrice(iva)}</span>
                 </div>
-              )}
+                <div className="flex justify-between text-sm font-semibold text-gray-300 pt-1">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(subtotal)}</span>
+                </div>
 
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Neto</span>
-                <span>{formatPrice(net)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 border-b border-white/5 pb-2">
-                <span>IVA (19%)</span>
-                <span>{formatPrice(iva)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-semibold text-gray-300 pt-1">
-                <span>Subtotal</span>
-                <span>{formatPrice(subtotal)}</span>
-              </div>
+                {/* TIPS SECTION */}
+                {/* TIPS SECTION - REMOVED LEGACY BUTTONS */}
+                {/* Tip is now handled in PaymentModal per payment */}
+                <div className="flex justify-between text-sm text-toast-green items-center mt-2 pt-2 border-t border-white/5 border-dashed">
+                  <span>Propinas Recaudadas</span>
+                  {/* Show total collected tip from payments */}
+                  <span>{formatPrice(activeOrder?.payments?.reduce((acc, p) => acc + p.tip, 0) || 0)}</span>
+                </div>
 
-              {/* TIPS SECTION */}
-              {/* TIPS SECTION - REMOVED LEGACY BUTTONS */}
-              {/* Tip is now handled in PaymentModal per payment */}
-              <div className="flex justify-between text-sm text-toast-green items-center mt-2 pt-2 border-t border-white/5 border-dashed">
-                <span>Propinas Recaudadas</span>
-                {/* Show total collected tip from payments */}
-                <span>{formatPrice(activeOrder?.payments?.reduce((acc, p) => acc + p.tip, 0) || 0)}</span>
+                <div className="flex justify-between text-xl font-bold text-white mt-1 pt-2 border-t border-white/10">
+                  <span>Total</span>
+                  <span>{formatPrice(total)}</span>
+                </div>
               </div>
 
-              <div className="flex justify-between text-xl font-bold text-white mt-1 pt-2 border-t border-white/10">
-                <span>Total</span>
-                <span>{formatPrice(total)}</span>
+              {/* ACTION BAR */}
+              <div className="p-3 bg-toast-charcoal-dark grid grid-cols-3 gap-3 border-t border-white/10">
+                <ActionButton color="red" label="GUARDAR" onClick={() => handleSaveOrder(true)} />
+                <ActionButton color="gray" label="ENVIAR" onClick={handleMarchar} />
+                <ActionButton color="orange" label="PAGAR" onClick={handlePay} />
               </div>
             </div>
 
-            {/* ACTION BAR */}
-            <div className="p-3 bg-toast-charcoal-dark grid grid-cols-3 gap-3 border-t border-white/10">
-              <ActionButton color="red" label="GUARDAR" onClick={() => handleSaveOrder(true)} />
-              <ActionButton color="gray" label="ENVIAR" onClick={handleMarchar} />
-              <ActionButton color="orange" label="PAGAR" onClick={handlePay} />
-            </div>
-          </div>
+            {/* RIGHT: MENU GRID */}
+            <div className="w-full md:col-span-8 flex flex-col gap-3 h-full overflow-hidden">
+              {/* Breadcrumbs / Categories */}
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {categories?.slice().sort((a, b) => {
+                  const order = ["Entradas", "Platos", "Caracter", "Postres", "Bebidas", "Jugos", "Copete", "Cafe"];
+                  const idxA = order.indexOf(a.name);
+                  const idxB = order.indexOf(b.name);
+                  // If both in list, sort by list index. If not in list (shouldn't happen), push to end.
+                  if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                  if (idxA !== -1) return -1;
+                  if (idxB !== -1) return 1;
+                  return 0;
+                }).map((cat) => (
+                  <CategoryTab
+                    key={cat.id}
+                    label={cat.name}
+                    active={activeCategoryId === cat.id}
+                    onClick={() => setActiveCategoryId(cat.id!)}
+                  />
+                ))}
+                {!categories && <div className="text-white">Cargando categorías...</div>}
+              </div>
 
-          {/* RIGHT: MENU GRID */}
-          <div className="w-full md:col-span-8 flex flex-col gap-3 h-full overflow-hidden">
-            {/* Breadcrumbs / Categories */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {categories?.slice().sort((a, b) => {
-                const order = ["Entradas", "Platos", "Caracter", "Postres", "Bebidas", "Jugos", "Copete", "Cafe"];
-                const idxA = order.indexOf(a.name);
-                const idxB = order.indexOf(b.name);
-                // If both in list, sort by list index. If not in list (shouldn't happen), push to end.
-                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                if (idxA !== -1) return -1;
-                if (idxB !== -1) return 1;
-                return 0;
-              }).map((cat) => (
-                <CategoryTab
-                  key={cat.id}
-                  label={cat.name}
-                  active={activeCategoryId === cat.id}
-                  onClick={() => setActiveCategoryId(cat.id!)}
-                />
-              ))}
-              {!categories && <div className="text-white">Cargando categorías...</div>}
-            </div>
-
-            {/* Items Grid */}
-            <div className="grid grid-cols-2 small:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 h-full pb-[80px] overflow-y-auto pr-1 content-start">
-              {products?.map((item, i) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleProductClick(item)}
-                  onContextMenu={(e) => handleContextMenu(e, item)}
-                  // STOCK VISUAL FEEDBACK
-                  disabled={item.recipe && ingredients && item.recipe.some(r => {
-                    const ing = ingredients.find(i => i.id === r.ingredientId);
-                    return ing && ing.stock < r.quantity;
-                  })}
-                  className={`active:scale-95 transition-all text-white border rounded-md shadow-sm flex flex-col items-center justify-center gap-1 p-2 relative group overflow-hidden h-[100px]
+              {/* Items Grid */}
+              <div className="grid grid-cols-2 small:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 h-full pb-[80px] overflow-y-auto pr-1 content-start">
+                {products?.map((item, i) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleProductClick(item)}
+                    onContextMenu={(e) => handleContextMenu(e, item)}
+                    // STOCK VISUAL FEEDBACK
+                    disabled={item.recipe && ingredients && item.recipe.some(r => {
+                      const ing = ingredients.find(i => i.id === r.ingredientId);
+                      return ing && ing.stock < r.quantity;
+                    })}
+                    className={`active:scale-95 transition-all text-white border rounded-md shadow-sm flex flex-col items-center justify-center gap-1 p-2 relative group overflow-hidden h-[100px]
                             ${item.isAvailable === false
-                      ? 'bg-[#1a1a1a] border-white/5 opacity-60 cursor-not-allowed'
-                      : (item.recipe && ingredients && item.recipe.some(r => {
-                        const ing = ingredients.find(i => i.id === r.ingredientId);
-                        return ing && ing.stock < r.quantity;
-                      }))
-                        ? 'bg-red-900/20 border-red-500/50 cursor-not-allowed grayscale' // No Stock Style
-                        : 'bg-toast-charcoal-light active:bg-white/10 hover:bg-[#4a4a4a] border-white/5'}`}
-                >
-                  {/* OUT OF STOCK OVERLAY */}
-                  {(item.recipe && ingredients && item.recipe.some(r => {
-                    const ing = ingredients.find(i => i.id === r.ingredientId);
-                    return ing && ing.stock < r.quantity;
-                  })) && (
-                      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
-                        <span className="text-red-500 font-bold border-2 border-red-500 px-2 py-1 -rotate-12 bg-black/80 text-xs">SIN STOCK</span>
-                      </div>
+                        ? 'bg-[#1a1a1a] border-white/5 opacity-60 cursor-not-allowed'
+                        : (item.recipe && ingredients && item.recipe.some(r => {
+                          const ing = ingredients.find(i => i.id === r.ingredientId);
+                          return ing && ing.stock < r.quantity;
+                        }))
+                          ? 'bg-red-900/20 border-red-500/50 cursor-not-allowed grayscale' // No Stock Style
+                          : 'bg-toast-charcoal-light active:bg-white/10 hover:bg-[#4a4a4a] border-white/5'}`}
+                  >
+                    {/* OUT OF STOCK OVERLAY */}
+                    {(item.recipe && ingredients && item.recipe.some(r => {
+                      const ing = ingredients.find(i => i.id === r.ingredientId);
+                      return ing && ing.stock < r.quantity;
+                    })) && (
+                        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+                          <span className="text-red-500 font-bold border-2 border-red-500 px-2 py-1 -rotate-12 bg-black/80 text-xs">SIN STOCK</span>
+                        </div>
+                      )}
+
+                    {item.isAvailable === false ? (
+                      <>
+                        <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40">
+                          <span className="text-red-500 font-extrabold text-xl -rotate-12 border-2 border-red-500 px-2 py-1 rounded opacity-80">AGOTADO</span>
+                        </div>
+                        <span className="font-semibold text-md text-center leading-tight z-10 px-1 opacity-40">{item.name}</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <span className="font-semibold text-md text-center leading-tight z-10 px-1">{item.name}</span>
+                        <span className="text-xs text-toast-text-gray font-light z-10">
+                          {formatPrice(item.price)}
+                        </span>
+                      </>
                     )}
+                  </button>
+                ))}
 
-                  {item.isAvailable === false ? (
-                    <>
-                      <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40">
-                        <span className="text-red-500 font-extrabold text-xl -rotate-12 border-2 border-red-500 px-2 py-1 rounded opacity-80">AGOTADO</span>
-                      </div>
-                      <span className="font-semibold text-md text-center leading-tight z-10 px-1 opacity-40">{item.name}</span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                      <span className="font-semibold text-md text-center leading-tight z-10 px-1">{item.name}</span>
-                      <span className="text-xs text-toast-text-gray font-light z-10">
-                        {formatPrice(item.price)}
-                      </span>
-                    </>
-                  )}
-                </button>
-              ))}
+                {!products || products.length === 0 && (
+                  <div className="col-span-full text-center text-gray-500 py-10">Cargando productos...</div>
+                )}
 
-              {!products || products.length === 0 && (
-                <div className="col-span-full text-center text-gray-500 py-10">Cargando productos...</div>
-              )}
-
-              {/* Empty Slots Filler (if not enough products) */}
-              {products && products.length < 12 && [...Array(12 - products.length)].map((_, i) => (
-                <div key={`empty-${i}`} className="bg-transparent border border-white/5 rounded-md border-dashed opacity-20 h-[100px]"></div>
-              ))}
+                {/* Empty Slots Filler (if not enough products) */}
+                {products && products.length < 12 && [...Array(12 - products.length)].map((_, i) => (
+                  <div key={`empty-${i}`} className="bg-transparent border border-white/5 rounded-md border-dashed opacity-20 h-[100px]"></div>
+                ))}
+              </div>
             </div>
+
           </div>
 
-        </div>
-
-        {notification && (
-          <div className="fixed top-20 right-4 bg-gray-800 border border-white/10 text-white px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center gap-4 animate-in fade-in slide-in-from-top-5 duration-300">
-            <Bell className="w-6 h-6 text-toast-orange" />
-            <div>
-              <p className="font-bold text-sm uppercase tracking-wider text-toast-orange">Notificación</p>
-              <p className="font-medium text-sm">{notification}</p>
+          {notification && (
+            <div className="fixed top-20 right-4 bg-gray-800 border border-white/10 text-white px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center gap-4 animate-in fade-in slide-in-from-top-5 duration-300">
+              <Bell className="w-6 h-6 text-toast-orange" />
+              <div>
+                <p className="font-bold text-sm uppercase tracking-wider text-toast-orange">Notificación</p>
+                <p className="font-medium text-sm">{notification}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* MOBILE FLOATING ACTION BUTTON (View Ticket) */}
-        {!showMobileTicket && ticket.length > 0 && (
-          <button
-            onClick={() => setShowMobileTicket(true)}
-            className="md:hidden fixed bottom-4 left-4 right-4 bg-toast-orange text-white py-4 rounded-xl shadow-2xl z-50 flex items-center justify-between px-6 font-bold animate-in slide-in-from-bottom-5"
-          >
-            <span className="bg-white/20 px-2 py-0.5 rounded text-sm">{ticket.reduce((a, b) => a + b.quantity, 0)} items</span>
-            <span>Ver Pedido</span>
-            <span>{formatPrice(total)}</span>
-          </button>
-        )}
+          {/* MOBILE FLOATING ACTION BUTTON (View Ticket) */}
+          {!showMobileTicket && ticket.length > 0 && (
+            <button
+              onClick={() => setShowMobileTicket(true)}
+              className="md:hidden fixed bottom-4 left-4 right-4 bg-toast-orange text-white py-4 rounded-xl shadow-2xl z-50 flex items-center justify-between px-6 font-bold animate-in slide-in-from-bottom-5"
+            >
+              <span className="bg-white/20 px-2 py-0.5 rounded text-sm">{ticket.reduce((a, b) => a + b.quantity, 0)} items</span>
+              <span>Ver Pedido</span>
+              <span>{formatPrice(total)}</span>
+            </button>
+          )}
+        </>
+
       </main>
 
       {/* MODALS */}

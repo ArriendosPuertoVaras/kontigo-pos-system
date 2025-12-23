@@ -16,7 +16,8 @@ import {
     LogOut,
     Briefcase,
     Leaf,
-    ChefHat
+    ChefHat,
+    Upload
 } from 'lucide-react';
 
 import { db } from '@/lib/db';
@@ -70,6 +71,13 @@ export default function Sidebar() {
         return () => document.removeEventListener('click', handleClickOutside);
     }, [showNotifications]);
 
+    const handleLogout = () => {
+        localStorage.removeItem('kontigo_staff_id');
+        localStorage.removeItem('kontigo_staff_name');
+        localStorage.removeItem('kontigo_staff_role');
+        router.push('/login');
+    };
+
     return (
         <>
             {/* OVERLAY for Mobile */}
@@ -97,9 +105,11 @@ export default function Sidebar() {
                     <NavItem href="/?mode=pos" icon={<UtensilsCrossed />} label="POS" isActive={pathname === '/'} />
                     <NavItem href="/orders" icon={<ClipboardList />} label="KDS" isActive={pathname === '/orders'} />
                     <NavItem href="/manager/menu" icon={<ChefHat />} label="Menú" isActive={pathname === '/manager/menu'} />
+                    <NavItem href="/staff/schedule" icon={<ClipboardList />} label="Turnos" isActive={pathname === '/staff/schedule'} />
                     <NavItem href="/inventory" icon={<Package />} label="Inventario" isActive={pathname === '/inventory'} />
                     <NavItem href="/manager" icon={<Briefcase />} label="Admin" isActive={pathname === '/manager'} />
                     <NavItem href="/manager/production" icon={<ClipboardList />} label="Prod." isActive={pathname === '/manager/production'} />
+                    <NavItem href="/manager/admin/data-import" icon={<Upload />} label="Import" isActive={pathname === '/manager/admin/data-import'} />
 
                     <div className="h-px bg-white/10 w-full my-1"></div>
 
@@ -217,7 +227,9 @@ export default function Sidebar() {
                         <span className="w-full text-[9px] font-bold uppercase text-center">Ajustes</span>
                     </button>
 
-                    <button className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all group">
+                    <button
+                        onClick={handleLogout}
+                        className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all group">
                         <LogOut className="w-5 h-5 mb-0.5" />
                         <span className="w-full text-[9px] font-bold uppercase text-center">Salir</span>
                     </button>
@@ -227,7 +239,12 @@ export default function Sidebar() {
     );
 }
 
-function NavItem({ href, icon, label, isActive, danger = false }: { href: string, icon: any, label: string, isActive?: boolean, danger?: boolean }) {
+import { usePermission } from '@/hooks/usePermission';
+
+function NavItem({ href, icon, label, isActive, danger = false, permission }: { href: string, icon: any, label: string, isActive?: boolean, danger?: boolean, permission?: string }) {
+    const hasAccess = permission ? usePermission(permission as any) : true;
+    if (hasAccess === false) return null;
+
     return (
         <Link href={href} className={`relative flex flex-col items-center justify-center w-full py-2.5 rounded-xl transition-all duration-200 group
               ${isActive

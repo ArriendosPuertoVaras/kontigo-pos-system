@@ -10,22 +10,15 @@ export interface RecipeIngredientAnalysis {
     name: string;
     type: IngredientType;
     purchase_unit: string;
+    recipe_unit: string; // New field for clarity
     yield_percent: number; // 0.0 to 1.0 (e.g., 0.85)
     gross_quantity_inventory: number; // The amount deducted from stock (Net / Yield)
     net_quantity_plate: number; // The amount actually consumed/served
     unit_cost_real: number; // Purchase Price / Yield
-    total_line_cost: number; // unit_cost_real * net_quantity_plate ?? No, usually unit_cost_real * gross? 
-    // Wait, let's follow the User's Rule:
-    // "Si el usuario ingresa 'Peso Neto' (lo que va en el plato), debes calcular cuánto 'Peso Bruto' se descuenta del inventario usando el Yield"
-    // So Cost = Cost_Real * Net? Or Cost_Purchase * Gross? They should be equal. 
-    // Cost_Real = Price_Purch / Yield.
-    // Line_Cost = Cost_Real * Net_Quantity.
-    // Check: (Price / Yield) * Net = (Price / Yield) * (Gross * Yield) ?? 
-    // No, Net = Gross * Yield. => Gross = Net / Yield.
-    // Line Cost = Price_Purch * Gross.
-    // Line Cost equivalent = (Price_Purch / Yield) * Net.
-    // YES. Math holds.
+    total_line_cost: number; // unit_cost_real * total usage
 }
+
+
 
 export interface RecipeFinancials {
     total_cost: number;
@@ -71,40 +64,94 @@ export function analyzeRecipe(
                 return;
             }
 
+            // 0. Base Quantity (Hoisted to fix ReferenceError)
+            const netQuantityOriginal = item.quantity;
+
             // 1. Determine Yield
-            // Default to 1.0 if not set. Warn if low.
             const yieldPct = ing.yieldPercent || 1.0;
             if (yieldPct < 0.5) warnings.push(`Alerta: Rendimiento muy bajo (${yieldPct * 100}%) para ${ing.name}. Verificar merma.`);
 
-            // 2. Quantities
-            // The item.quantity in Recipe definition is usually the NET quantity (what goes in the plate), 
-            // unless we decide otherwise. The prompt implies user inputs Net.
-            const netQuantity = item.quantity;
-            const grossQuantity = netQuantity / yieldPct;
+            // 2. Unit Conversion Logic
+            const dbUnit = ing.unit.toLowerCase().trim();
+            const recipeUnit = item.unit ? item.unit.toLowerCase().trim() : dbUnit; // Default to DB unit if missing
 
-            // 3. Costs
-            const purchaseCost = ing.cost || 0; // Cost per unit (e.g. per Kg specific in DB)
-            // Note: DB Ingredient.cost is usually "Cost per Unit". 
-            // We assume ing.cost is Cost per 1 unit of ing.unit.
+            let conversionFactor = 1;
+
+            // Weight Conversions
+            if ((dbUnit === 'kg' || dbUnit === 'kilo') && (recipeUnit === 'g' || recipeUnit === 'gr' || recipeUnit === 'gramos')) {
+                conversionFactor = 0.001;
+            } else if ((dbUnit === 'g' || dbUnit === 'gr') && (dbUnit === 'kg' || dbUnit === 'kilo')) {
+                conversionFactor = 1000;
+            }
+
+            // Volume Conversions
+            else if ((dbUnit === 'lt' || dbUnit === 'l' || dbUnit === 'litro') && (recipeUnit === 'ml' || recipeUnit === 'cc')) {
+                conversionFactor = 0.001;
+            } else if ((dbUnit === 'ml' || dbUnit === 'cc') && (dbUnit === 'lt' || dbUnit === 'l')) {
+                conversionFactor = 1000;
+            }
+
+            // Fallback for Mismatches
+            else if (dbUnit !== recipeUnit) {
+                // Check for Critical "Unit vs Weight" error
+                const isGOrMl = ['g', 'gr', 'gramo', 'gram', 'gramos', 'ml', 'cc', 'mililitro'].includes(recipeUnit);
+                const isUnit = ['un', 'u', 'und', 'unidad'].includes(dbUnit);
+
+                if (isUnit && isGOrMl) {
+                    // KITCHEN STANDARD ASSUMPTION: 
+                    // If buying in "Units" (e.g. 1 Box of Milk) and recipe uses "ml" (e.g. 100ml).
+                    // We ASSUME 1 Unit = 1000 ml/g (1 Litre/Kilo Standard).
+                    if (netQuantityOriginal > 1.0) {
+                        conversionFactor = 0.001;
+                        warnings.push(`ℹ️ Auto-Corrección (${ing.name}): Inventario en 'Unidad', Receta en '${recipeUnit}'. Se asumió 1 Unidad = 1000 ${recipeUnit}.`);
+                    } else {
+                        warnings.push(`⚠️ Ambigüedad en ${ing.name}: Inv='Unidad', Receta='${recipeUnit}'. Se usó factor 1. Verificar.`);
+                    }
+                }
+            }
+
+            // --- HEURISTIC SAFEGUARD (Auto-Correction) ---
+            // Fixes "8 un" walnuts case where Inventory is KG.
+            // If conversionFactor is 1 (No direct conversion found)
+            // AND dbUnit is Mass/Vol (Kg/Lt)
+            // AND Quantity > 2 (implied grams/units mismatch)
+            const isDbMassVol = ['kg', 'kilo', 'kilogramo', 'lt', 'l', 'litro', 'liter'].includes(dbUnit);
+
+            if (conversionFactor === 1 && isDbMassVol && netQuantityOriginal > 2.0) {
+                conversionFactor = 0.001;
+                warnings.push(`ℹ️ Auto-Corrección (${ing.name}): Cantidad ${netQuantityOriginal} es alta para '${dbUnit}'. Se asumió gramos/ml.`);
+            }
+
+            // 3. Quantities
+            const netQuantityNormalized = netQuantityOriginal * conversionFactor; // Converted to Purchase Unit
+            const grossQuantity = netQuantityNormalized / yieldPct;
+
+            // 4. Costs
+            const purchaseCost = ing.cost || 0;
 
             // Real Unit Cost (Impacted by Yield)
-            // Example: Buy at 1000/kg. Yield 0.5. Real Cost = 2000/kg (of net product).
             const realUnitCost = purchaseCost / yieldPct;
 
-            // Line Cost
-            const lineCost = realUnitCost * netQuantity;
+            // Line Cost = Real Cost * Normalized Quantity
+            const lineCost = purchaseCost * grossQuantity;
+
+            // WARN if High Cost (heuristic check for > $15,000 for single line item)
+            if (lineCost > 15000) {
+                warnings.push(`💰 Costo Alto en ${ing.name}: $${lineCost.toFixed(0)}. Verificar unidades.`);
+            }
 
             totalCost += lineCost;
 
             analysisIngredients.push({
                 name: ing.name,
-                type: 'Raw Material', // TODO: Detect sub-recipe types in Phase 2b
+                type: 'Raw Material',
                 purchase_unit: ing.unit || 'un',
+                recipe_unit: recipeUnit || ing.unit || 'un', // Pass the resolved recipe unit
                 yield_percent: yieldPct,
                 gross_quantity_inventory: Number(grossQuantity.toFixed(4)),
-                net_quantity_plate: Number(netQuantity.toFixed(4)),
+                net_quantity_plate: Number(netQuantityOriginal.toFixed(2)), // Show original quantity (e.g. 200) for clarity
                 unit_cost_real: Number(realUnitCost.toFixed(2)),
-                total_line_cost: Number(lineCost.toFixed(2))
+                total_line_cost: Number(lineCost.toFixed(0))
             });
         });
     }

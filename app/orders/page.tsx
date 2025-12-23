@@ -145,7 +145,12 @@ function OrderCard({ order, onStatusChange, viewMode }: { order: any, onStatusCh
     );
 }
 
+import { usePermission } from '@/hooks/usePermission';
+import { Lock } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
+
 export default function OrdersPage() {
+    const hasAccess = usePermission('kds:view');
     const [viewMode, setViewMode] = useState<'kitchen' | 'bar'>('kitchen');
 
     // Healing: Auto-assign drinks to Bar category based on keywords
@@ -228,6 +233,30 @@ export default function OrdersPage() {
     const handleStatusChange = (id: number, status: any) => {
         db.orders.update(id, { status });
     };
+
+    if (hasAccess === false) {
+        return (
+            <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
+                <Sidebar />
+                <div className="flex-1 flex items-center justify-center bg-toast-charcoal text-white">
+                    <div className="flex flex-col items-center gap-4 p-8 bg-white/5 rounded-2xl border border-white/10 max-w-sm text-center">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                            <Lock className="w-8 h-8 text-red-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold mb-1">Acceso Restringido</h2>
+                            <p className="text-sm text-gray-400">No tienes permisos para ver la Pantalla de Cocina (KDS).</p>
+                        </div>
+                        <Link href="/tables">
+                            <button className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors">
+                                Volver
+                            </button>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">

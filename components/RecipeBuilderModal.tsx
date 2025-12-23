@@ -3,14 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Ingredient, Product } from '@/lib/db';
 import { ArrowLeft, ChefHat, Plus, Save, Trash2, RefreshCw, Edit, AlertTriangle, Camera } from 'lucide-react';
-
-
-// ... (RecipeRow - unchanged) ...
-
-
-// --- RECIPE BUILDER ROW COMPONENT ---
-
-
+import { FinancialAnalysisBar } from './FinancialAnalysisBar';
+import { useAutoSync } from '@/components/providers/AutoSyncProvider';
 
 
 // --- RECIPE BUILDER ROW COMPONENT ---
@@ -142,6 +136,9 @@ export function RecipeBuilderModal({
     onClose: () => void,
     onSave: () => void
 }) {
+    // Auto-Sync Hook
+    const { triggerChange } = useAutoSync();
+
     // Dynamic query based on entity type
     const product = useLiveQuery(async () => {
         if (entityType === 'product') return await db.products.get(entityId);
@@ -247,6 +244,7 @@ export function RecipeBuilderModal({
             } else {
                 await db.ingredients.update(entityId, updateData);
             }
+            triggerChange(); // Call AutoSync
             onSave();
         } catch (error) {
             console.error(error);
@@ -287,6 +285,7 @@ export function RecipeBuilderModal({
                 recipe: []
             });
             handleAddIngredient(id as number);
+            triggerChange(); // Call AutoSync
         } catch (e) {
             console.error("Error creating quick ingredient:", e);
             alert("Error al crear ingrediente");
@@ -315,6 +314,7 @@ export function RecipeBuilderModal({
                 isPreparation: editingIngredient.isPreparation
             });
             setEditingIngredient(null);
+            triggerChange(); // Call AutoSync
         } catch (error) {
             console.error("Error creating/updating ingredient:", error);
             alert("Error al actualizar ingrediente");
@@ -724,23 +724,35 @@ export function RecipeBuilderModal({
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-4 border-t border-white/10 bg-black/20 flex justify-between items-center shrink-0">
-                    <div className="text-xs text-gray-500">
-                        Total Items: {recipeItems.length}
-                    </div>
-                    <div className="flex gap-3">
-                        <button onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving}
-                            className="px-8 py-3 bg-toast-orange hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
-                        >
-                            {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                            Guardar Ficha
-                        </button>
+                {/* Footer & Financial Analysis */}
+                <div className="border-t border-white/10 bg-black/20 shrink-0">
+                    <FinancialAnalysisBar
+                        items={recipeItems}
+                        allIngredients={allIngredients}
+                        currentPrice={'price' in product ? (product as any).price : 0}
+                        onApplyPrice={(newPrice) => {
+                            db.products.update(entityId, { price: newPrice });
+                            triggerChange(); // Call AutoSync
+                        }}
+                    />
+
+                    <div className="p-4 flex justify-between items-center border-t border-white/5">
+                        <div className="text-xs text-gray-500">
+                            Total Items: {recipeItems.length}
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="px-8 py-3 bg-toast-orange hover:bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2"
+                            >
+                                {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Guardar Ficha
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

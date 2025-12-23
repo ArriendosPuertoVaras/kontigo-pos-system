@@ -20,7 +20,12 @@ import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
+import { usePermission } from '@/hooks/usePermission';
+import { Lock } from 'lucide-react';
+
 export default function ManagerPage() {
+    const hasAccess = usePermission('admin:view');
+
     // 1. STATE: Date & View Mode
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
@@ -52,6 +57,32 @@ export default function ManagerPage() {
     const lowStockIngredients = useLiveQuery(async () => {
         return db.ingredients.filter(i => i.stock < 10).toArray();
     });
+
+    if (hasAccess === false) {
+        return (
+            <div className="flex h-screen w-full bg-[#1a1a1a] text-white font-sans selection:bg-toast-orange selection:text-white relative">
+                <Sidebar />
+                <div className="flex-1 flex items-center justify-center bg-[#1a1a1a] text-white">
+                    <div className="flex flex-col items-center gap-4 p-8 bg-white/5 rounded-2xl border border-white/10 max-w-sm text-center">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                            <Lock className="w-8 h-8 text-red-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold mb-1">Acceso Restringido</h2>
+                            <p className="text-sm text-gray-400">No tienes permisos para acceder al Panel de Administración.</p>
+                        </div>
+                        <Link href="/tables">
+                            <button className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors">
+                                Volver
+                            </button>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+
 
     // 4. COMPUTED KPI
     const totalSales = selectedOrders?.reduce((sum, o) => sum + o.total, 0) || 0;

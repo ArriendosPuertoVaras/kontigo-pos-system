@@ -2,12 +2,39 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Supplier } from '@/lib/db';
-import { UtensilsCrossed, LayoutGrid, ClipboardList, Package, Bell, Settings, LogOut, Search, Plus, Truck, Mail, Phone, Clock, ArrowLeft } from 'lucide-react';
+import { UtensilsCrossed, LayoutGrid, ClipboardList, Package, Bell, Settings, LogOut, Search, Plus, Truck, Mail, Phone, Clock, ArrowLeft, Lock } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/components/Header';
+import { usePermission } from '@/hooks/usePermission';
+import Sidebar from '@/components/Sidebar';
 
 export default function SuppliersPage() {
+    const hasAccess = usePermission('admin:view');
+
+    const [isFormatModalOpen, setIsFormatModalOpen] = useState(false); // Helper for demo
     const suppliers = useLiveQuery(() => db.suppliers.toArray());
+
+    if (hasAccess === false) {
+        return (
+            <div className="flex h-screen w-full bg-[#1e1e1e]">
+                <Sidebar />
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-white">
+                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
+                        <Lock className="w-10 h-10 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Acceso Restringido</h2>
+                    <p className="text-gray-400 max-w-md mb-8">
+                        No tienes permisos para gestionar proveedores.
+                    </p>
+                    <Link href="/">
+                        <button className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold transition-all">
+                            Volver al Inicio
+                        </button>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState<Partial<Supplier>>({});
 

@@ -21,8 +21,14 @@ function NavItem({ icon, label, active = false, badge = 0, onClick }: { icon: an
     )
 }
 
+import { usePermission } from '@/hooks/usePermission';
+import { Lock } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
+
 export default function InventoryPage() {
+    const hasAccess = usePermission('inventory:view');
     const router = useRouter();
+
     const ingredients = useLiveQuery(() => db.ingredients.toArray());
     const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("");
@@ -38,6 +44,35 @@ export default function InventoryPage() {
 
     const lowStockCount = ingredients?.filter(i => !i.isInfinite && i.stock <= (i.minStock || 5) && i.stock > 0).length || 0;
     const noStockCount = ingredients?.filter(i => !i.isInfinite && i.stock === 0).length || 0;
+
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingIngredient, setEditingIngredient] = useState<any | null>(null);
+
+    const [isActionsOpen, setIsActionsOpen] = useState(false);
+
+    if (hasAccess === false) {
+        return (
+            <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
+                <Sidebar />
+                <div className="flex-1 flex items-center justify-center bg-toast-charcoal text-white">
+                    <div className="flex flex-col items-center gap-4 p-8 bg-white/5 rounded-2xl border border-white/10 max-w-sm text-center">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                            <Lock className="w-8 h-8 text-red-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold mb-1">Acceso Restringido</h2>
+                            <p className="text-sm text-gray-400">No tienes permisos para ver el Inventario.</p>
+                        </div>
+                        <button onClick={() => router.push('/tables')} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors">
+                            Volver
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+
 
     const handleCleanupDuplicates = async (e: React.MouseEvent<HTMLButtonElement>) => {
         if (!ingredients) return;
@@ -81,11 +116,6 @@ export default function InventoryPage() {
     const handleDelete = async (id: number, name: string) => {
         await db.ingredients.delete(id);
     };
-
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [editingIngredient, setEditingIngredient] = useState<any | null>(null);
-
-    const [isActionsOpen, setIsActionsOpen] = useState(false);
 
     const handleGenerateMissingCodes = async () => {
         setIsActionsOpen(false);
@@ -375,7 +405,6 @@ function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () =
             cost: Number(cost),
             purchaseUnit: unit, // Default
             conversionFactor: 1, // Default
-            code: code || generateSKU(name, family),
             code: code || generateSKU(name, family),
             isInfinite,
             minStock: Number(minStock)

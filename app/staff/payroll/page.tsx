@@ -3,9 +3,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { calculateSalary } from '@/lib/payroll/chile';
-import { ArrowLeft, DollarSign, FileText, Download, Printer } from 'lucide-react';
+import { ArrowLeft, DollarSign, FileText, Download, Printer, CloudUpload } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { generateSalarySettlementPDF } from '@/lib/pdf-generator';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export default function PayrollPage() {
     const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -25,6 +28,80 @@ export default function PayrollPage() {
     });
 
     const totalCost = payrollData?.reduce((acc, curr) => acc + curr.sueldoLiquidoEstimado, 0) || 0;
+
+    const handleDownloadPDF = async (item: any) => {
+        const toastId = toast.loading("Generando Liquidación...");
+        try {
+            // 1. Prepare Data
+            const period = {
+                month: selectedMonth.toLocaleString('es-CL', { month: 'long' }),
+                year: selectedMonth.getFullYear(),
+                startDate: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).toISOString(),
+                endDate: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).toISOString()
+            };
+
+            const pdfBlob = generateSalarySettlementPDF({
+                staff: item.staff,
+                salary: item, // item contains calculation result fields
+                period,
+                company: {
+                    name: "Puerto Colono SpA",
+                    rut: "77.163.033-2",
+                    address: "Puerto Varas"
+                }
+            });
+
+            // 2. Trigger Download
+            const url = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Liquidacion_${item.staff.name}_${period.month}_${period.year}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // 3. Upload to Cloud (Optional but requested)
+            // We do this optimistically. If it fails, we just warn.
+            try {
+                const fileName = `${period.year}/${period.month}/${item.staff.id}_${Date.now()}.pdf`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('payroll-docs')
+                    .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage.from('payroll-docs').getPublicUrl(fileName);
+
+                // 4. Save Record in Supabase
+                const { error: dbError } = await supabase.from('salary_settlements').insert({
+                    staff_id: item.staff.id, // Ensure this ID matches BIGINT in Supabase (might need sync check)
+                    period_month: selectedMonth.getMonth() + 1,
+                    period_year: period.year,
+                    base_salary: item.sueldoBase,
+                    gratification: item.gratificacion,
+                    total_imponible: item.totalImponible,
+                    total_descuentos: item.descuentosTrabajador.total,
+                    total_haberes: item.totalImponible + item.haberesNoImponibles.total,
+                    liquid_salary: item.sueldoLiquidoEstimado,
+                    calculation_snapshot: item,
+                    pdf_url: publicUrl,
+                    finalized: true
+                });
+
+                if (dbError) throw dbError;
+
+                toast.success("PDF Descargado y Guardado en Nube ☁️", { id: toastId });
+            } catch (cloudError) {
+                console.error("Cloud Sync Failed", cloudError);
+                toast.success("PDF Descargado (Sin respaldo en nube)", { id: toastId, description: "Verifica tu conexión o configuración." });
+            }
+
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al generar liquidación", { id: toastId });
+        }
+    };
 
     return (
         <div className="min-h-screen bg-[#1e1e1e] text-white font-sans">
@@ -97,7 +174,11 @@ export default function PayrollPage() {
                                         ${item.sueldoLiquidoEstimado.toLocaleString()}
                                     </td>
                                     <td className="p-4 text-center">
-                                        <button className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white" title="Ver Detalle">
+                                        <button
+                                            onClick={() => handleDownloadPDF(item)}
+                                            className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white"
+                                            title="Descargar Liquidación"
+                                        >
                                             <FileText className="w-4 h-4" />
                                         </button>
                                     </td>

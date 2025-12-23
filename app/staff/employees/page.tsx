@@ -1,34 +1,51 @@
 'use client';
 
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { db, Staff } from '@/lib/db';
 import { ArrowLeft, UserPlus, Search, MoreVertical, Briefcase, DollarSign, Calendar } from 'lucide-react';
 import Link from 'next/link';
 
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { useState } from 'react'; // Added useState import
+import { usePermission } from '@/hooks/usePermission';
+import { Lock } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
 
-export default function EmployeeListPage() {
+import { useAutoSync } from '@/components/providers/AutoSyncProvider';
+
+export default function EmployeesPage() {
+    // Auto-Sync
+    const { triggerChange } = useAutoSync();
+
     const router = useRouter();
+    const hasAccess = usePermission('admin:view');
+
     const staffList = useLiveQuery(() => db.staff.toArray());
+    // ...
 
     const handleCreate = async () => {
         try {
             const id = await db.staff.add({
                 name: 'Nuevo Colaborador',
-                role: 'waiter',
-                activeRole: 'waiter',
+                role: 'Garzón',
+                activeRole: 'Garzón',
                 pin: '0000',
                 contractType: '44-hours',
                 contractDuration: 'indefinite',
                 weeklyHoursLimit: 44,
                 salaryType: 'monthly',
-                baseSalary: 529000 // New Minimum Wage Default
+                baseSalary: 529000, // New Minimum Wage Default
+                status: 'active' // CRITICAL: Required for Login visibility
             });
+            triggerChange(); // Auto-Sync
             router.push(`/staff/employees/${id}`);
         } catch (error) {
             console.error("Failed to create staff", error);
         }
     };
+
+    // ...
 
     return (
         <div className="min-h-screen bg-[#1e1e1e] text-white font-sans">
@@ -44,6 +61,7 @@ export default function EmployeeListPage() {
                     </div>
                 </div>
                 <div className="flex gap-3">
+                    {/* Manual Sync Button Removed - AutoSync Active */}
                     <div className="relative">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                         <input

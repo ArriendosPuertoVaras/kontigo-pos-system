@@ -5,9 +5,36 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Category, Product, ModifierTemplate } from '@/lib/db';
 import { ArrowLeft, Plus, Trash2, Edit, Save, X, Package, LayoutGrid, Tag, Layers } from 'lucide-react';
 import Link from 'next/link';
+import { usePermission } from '@/hooks/usePermission';
+import { Lock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function MenuManagerPage() {
+    const hasAccess = usePermission('menu:manage');
+    const router = useRouter();
+
     const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'modifiers'>('categories');
+
+    if (hasAccess === false) {
+        return (
+            <div className="flex h-screen w-full bg-[#2a2a2a] text-white font-sans items-center justify-center">
+                <div className="flex flex-col items-center gap-4 p-8 bg-white/5 rounded-2xl border border-white/10 max-w-sm text-center">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                        <Lock className="w-8 h-8 text-red-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold mb-1">Acceso Restringido</h2>
+                        <p className="text-sm text-gray-400">No tienes permisos para gestionar el menú.</p>
+                    </div>
+                    <Link href="/tables">
+                        <button className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors">
+                            Volver
+                        </button>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen w-full bg-[#2a2a2a] text-white font-sans">
@@ -70,7 +97,12 @@ function NavButton({ active, onClick, icon, label, badge }: any) {
 // --- SUB-VIEWS ---
 
 
+import { useAutoSync } from '@/components/providers/AutoSyncProvider';
+
 function CategoriesView() {
+    // AutoSync
+    const { triggerChange } = useAutoSync();
+
     // FIX: Fetch ALL and sort in memory to handle items without 'order'
     const categories = useLiveQuery(async () => {
         const cats = await db.categories.toArray();
@@ -79,9 +111,11 @@ function CategoriesView() {
 
     const [isEditing, setIsEditing] = useState<number | null>(null);
     const [editName, setEditName] = useState("");
+    const [editDest, setEditDest] = useState<'kitchen' | 'bar'>('kitchen');
 
     // Create Mode
     const [newCatName, setNewCatName] = useState("");
+    const [newCatDest, setNewCatDest] = useState<'kitchen' | 'bar'>('kitchen'); // Destination Selector
 
     // Drag State
     const [draggedId, setDraggedId] = useState<number | null>(null);
@@ -89,16 +123,17 @@ function CategoriesView() {
     const handleAdd = async () => {
         if (!newCatName.trim()) return;
         try {
-            // Get max order safely
+            // Get max order safely to append at end
             const lastCat = await db.categories.orderBy('order').last();
             const nextOrder = (lastCat?.order || 0) + 1;
 
             await db.categories.add({
                 name: newCatName.trim(),
-                destination: 'kitchen',
+                destination: newCatDest,
                 order: nextOrder
             });
             setNewCatName("");
+            triggerChange(); // Auto-Sync
         } catch (error) {
             console.error("Error adding category:", error);
         }
@@ -106,13 +141,18 @@ function CategoriesView() {
 
     const handleUpdate = async (id: number) => {
         if (!editName.trim()) return;
-        await db.categories.update(id, { name: editName.trim() });
+        await db.categories.update(id, {
+            name: editName.trim(),
+            destination: editDest
+        });
         setIsEditing(null);
+        triggerChange(); // Auto-Sync
     };
 
     const handleDelete = async (id: number) => {
         if (confirm("¿Seguro que quieres borrar esta categoría? Los productos quedarán huérfanos.")) {
             await db.categories.delete(id);
+            triggerChange(); // Auto-Sync
         }
     };
 
@@ -142,18 +182,17 @@ function CategoriesView() {
         const [movedItem] = newItems.splice(currentIndex, 1);
         newItems.splice(targetIndex, 0, movedItem);
 
-        // Update DB with new order indices
-        // Using transaction for safety
+        // Update DB with strict sequential ordering
+        // This fixes the "jumping" behavior by forcing a clean 0, 1, 2, 3... order
         await db.transaction('rw', db.categories, async () => {
             for (let i = 0; i < newItems.length; i++) {
-                // Only update if changed (optimization)
-                if (newItems[i].order !== i) {
-                    await db.categories.update(newItems[i].id!, { order: i });
-                }
+                // Always update order to match visual index
+                await db.categories.update(newItems[i].id!, { order: i });
             }
         });
 
         setDraggedId(null);
+        triggerChange(); // Auto-Sync
     };
 
     if (categories === undefined) {
@@ -171,77 +210,148 @@ function CategoriesView() {
                 <h2 className="text-2xl font-bold flex items-center gap-3">
                     <LayoutGrid className="text-toast-orange" /> Categorías
                 </h2>
-                <button
-                    onClick={async (e) => {
-                        const btn = e.currentTarget;
-                        const originalText = btn.innerText;
-                        btn.innerText = "⏳ ...";
-                        btn.disabled = true;
+                <div className="flex gap-2">
+                    <button
+                        onClick={async (e) => {
+                            if (!confirm("⚠️ ¿Detectar y fusionar categorías duplicadas? (Ej: 'Bebidas' repetido 3 veces)")) return;
 
-                        try {
-                            const needed = ["Entradas", "Platos", "Caracter", "Postres", "Bebidas", "Jugos", "Copete", "Cafe"];
-                            const existing = await db.categories.toArray();
-                            const existingNames = new Set(existing.map(c => c.name.toLowerCase().trim()));
+                            const btn = e.currentTarget;
+                            const originalText = btn.innerText;
+                            btn.innerText = "⏳ Procesando...";
+                            btn.disabled = true;
 
-                            // Find max order to append new ones at the end
-                            let maxOrder = existing.reduce((max, c) => Math.max(max, c.order || 0), 0);
-                            let added = 0;
-                            let fixed = 0;
+                            try {
+                                const allCats = await db.categories.toArray();
+                                const groups = new Map<string, Category[]>();
 
-                            // 1. ADD MISSING
-                            for (const name of needed) {
-                                if (!existingNames.has(name.toLowerCase())) {
-                                    maxOrder++;
-                                    const dest = (name === "Bebidas" || name === "Jugos" || name === "Copete" || name === "Cafe") ? 'bar' : 'kitchen';
-                                    await db.categories.add({
-                                        name,
-                                        destination: dest,
-                                        order: maxOrder
-                                    });
-                                    added++;
+                                // 1. Group by normalized name
+                                for (const c of allCats) {
+                                    const key = c.name.trim().toLowerCase();
+                                    if (!groups.has(key)) groups.set(key, []);
+                                    groups.get(key)!.push(c);
                                 }
-                            }
 
-                            // 2. FIX MISSING ORDERS (The "Invisible Item" Bug)
-                            for (const c of existing) {
-                                if (c.order === undefined || c.order === null) {
-                                    maxOrder++;
-                                    await db.categories.update(c.id!, { order: maxOrder });
-                                    fixed++;
+                                let mergedCount = 0;
+                                let productsUpdated = 0;
+
+                                // 2. Process Groups
+                                await db.transaction('rw', db.categories, db.products, async () => {
+                                    for (const [name, list] of groups.entries()) {
+                                        if (list.length > 1) {
+                                            // Sort to keep the "best" one
+                                            list.sort((a, b) => (a.id || 999999) - (b.id || 999999));
+
+                                            const winner = list[0];
+                                            const losers = list.slice(1);
+
+                                            for (const loser of losers) {
+                                                // Repoint products
+                                                const affectedProducts = await db.products.where('categoryId').equals(loser.id!).toArray();
+                                                for (const p of affectedProducts) {
+                                                    await db.products.update(p.id!, { categoryId: winner.id });
+                                                    productsUpdated++;
+                                                }
+                                                // Kill the clone
+                                                await db.categories.delete(loser.id!);
+                                                mergedCount++;
+                                            }
+                                        }
+                                    }
+                                });
+
+                                // 3. Sync Logic handled via triggerChange if we were in context or manual sync
+                                // For bulk operations, manual push is still safer immediate feedback
+                                if (mergedCount > 0) {
+                                    const { syncService } = await import('@/lib/sync_service');
+                                    await syncService.pushAll(); // Force immediate sync for cleanup
+
+                                    alert(`✅ Limpieza Completa:\n- Fusionadas: ${mergedCount} categorías\n- Productos movidos: ${productsUpdated}`);
+                                } else {
+                                    alert("👍 No se encontraron duplicados.");
                                 }
+
+                            } catch (err) {
+                                console.error(err);
+                                alert("❌ Error al procesar");
                             }
 
-                            if (added > 0 || fixed > 0) {
-                                btn.innerText = `✅ +${added} / 🔧 ${fixed}`;
-                            } else {
-                                btn.innerText = "👍 Todo OK";
-                            }
-                        } catch (err) {
-                            console.error(err);
-                            btn.innerText = "❌ Error";
-                        }
-
-                        setTimeout(() => {
                             btn.innerText = originalText;
                             btn.disabled = false;
-                        }, 2000);
-                    }}
-                    className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-2 rounded-lg font-bold text-xs border border-blue-500/20 transition-all">
-                    🔄 Restaurar
-                </button>
+                        }}
+                        className="bg-toast-orange/10 hover:bg-toast-orange/20 text-toast-orange px-3 py-2 rounded-lg font-bold text-xs border border-toast-orange/20 transition-all">
+                        ⚡ Consolidar Duplicados
+                    </button>
+
+                    {/* Basic Restore Button - Kept plain for emergencies */}
+                    <button
+                        onClick={async (e) => {
+                            const btn = e.currentTarget;
+                            btn.innerText = "⏳ ...";
+                            try {
+                                const needed = ["Entradas", "Platos", "Caracter", "Postres", "Bebidas", "Jugos", "Copete", "Cafe"];
+                                const existing = await db.categories.toArray();
+                                const existingNames = new Set(existing.map(c => c.name.toLowerCase().trim()));
+                                let maxOrder = existing.reduce((max, c) => Math.max(max, c.order || 0), 0);
+                                let added = 0;
+
+                                for (const name of needed) {
+                                    if (!existingNames.has(name.toLowerCase())) {
+                                        maxOrder++;
+                                        const dest = (name === "Bebidas" || name === "Jugos" || name === "Copete" || name === "Cafe" || name === "Bebidas y Jugos") ? 'bar' : 'kitchen';
+                                        await db.categories.add({
+                                            name, destination: dest, order: maxOrder
+                                        });
+                                        added++;
+                                    }
+                                }
+                                if (added > 0) {
+                                    const { syncService } = await import('@/lib/sync_service');
+                                    await syncService.pushAll();
+                                    alert(`✅ Restauradas ${added} categorías básicas`);
+                                } else {
+                                    alert("👍 Categorías básicas OK (Si falta 'Platos', intenta renombrar alguna vacía o crearla de nuevo)");
+                                }
+                            } catch (e) { console.error(e); }
+                            btn.innerText = "🔄 Restaurar";
+                        }}
+                        className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-2 rounded-lg font-bold text-xs border border-blue-500/20 transition-all">
+                        🔄 Básicos
+                    </button>
+                </div>
             </div>
 
-            {/* ADD NEW */}
-            <div className="bg-white/5 p-4 rounded-xl border border-white/10 mb-6 flex gap-2">
-                <input
-                    type="text"
-                    value={newCatName}
-                    onChange={e => setNewCatName(e.target.value)}
-                    placeholder="Nueva Categoría (ej. Entradas)"
-                    className="flex-1 bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-toast-orange"
-                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                />
-                <button onClick={handleAdd} className="bg-toast-orange hover:bg-orange-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+            {/* ADD NEW + DESTINATION SELECTOR */}
+            <div className="bg-white/5 p-4 rounded-xl border border-white/10 mb-6 flex flex-col md:flex-row gap-3">
+                <div className="flex-1 flex gap-2">
+                    <input
+                        type="text"
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        placeholder="Nueva Categoría (ej. Entradas)"
+                        className="flex-1 bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-toast-orange"
+                        onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                    />
+                </div>
+
+                {/* DESTINATION TOGGLE */}
+                <div className="flex bg-black/30 p-1 rounded-lg shrink-0 h-[42px] self-start">
+                    <button
+                        onClick={() => setNewCatDest('kitchen')}
+                        className={`px-4 rounded-md text-sm font-bold transition-all ${newCatDest === 'kitchen' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-white'
+                            }`}
+                    >
+                        Cocina
+                    </button>
+                    <button
+                        onClick={() => setNewCatDest('bar')}
+                        className={`px-4 rounded-md text-sm font-bold transition-all ${newCatDest === 'bar' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+                            }`}
+                    >
+                        Bar
+                    </button>
+                </div>
+
+                <button onClick={handleAdd} className="bg-toast-orange hover:bg-orange-500 text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 h-[42px]">
                     <Plus className="w-4 h-4" /> Agregar
                 </button>
             </div>
@@ -261,16 +371,30 @@ function CategoriesView() {
                         `}
                     >
                         {isEditing === cat.id ? (
-                            <div className="flex-1 flex gap-2 mr-4">
+                            <div className="flex-1 flex flex-col md:flex-row gap-2 mr-4 items-center">
                                 <input
                                     autoFocus
                                     type="text"
                                     value={editName}
                                     onChange={e => setEditName(e.target.value)}
-                                    className="flex-1 bg-black/40 border border-toast-orange rounded px-2 py-1 text-white"
+                                    className="flex-1 bg-black/40 border border-toast-orange rounded px-2 py-2 text-white w-full"
                                 />
-                                <button onClick={() => handleUpdate(cat.id!)} className="text-green-500 hover:text-green-400"><Save className="w-4 h-4" /></button>
-                                <button onClick={() => setIsEditing(null)} className="text-red-500 hover:text-red-400"><X className="w-4 h-4" /></button>
+                                {/* EDIT DESTINATION TOGGLE */}
+                                <div className="flex bg-black/30 p-1 rounded-lg">
+                                    <button
+                                        onClick={() => setEditDest('kitchen')}
+                                        className={`px-3 py-1 rounded text-xs font-bold ${editDest === 'kitchen' ? 'bg-white text-black' : 'text-gray-500'}`}
+                                    >COC</button>
+                                    <button
+                                        onClick={() => setEditDest('bar')}
+                                        className={`px-3 py-1 rounded text-xs font-bold ${editDest === 'bar' ? 'bg-blue-500 text-white' : 'text-gray-500'}`}
+                                    >BAR</button>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleUpdate(cat.id!)} className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded"><Save className="w-4 h-4" /></button>
+                                    <button onClick={() => setIsEditing(null)} className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded"><X className="w-4 h-4" /></button>
+                                </div>
                             </div>
                         ) : (
                             <div className="flex items-center gap-3 flex-1 cursor-grab active:cursor-grabbing">
@@ -279,25 +403,35 @@ function CategoriesView() {
                                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
                                 </div>
                                 <span className="font-bold text-lg">{cat.name}</span>
-                                {cat.destination === 'bar' && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">BAR</span>}
-                                {process.env.NODE_ENV === 'development' && <span className="text-xs text-gray-600">Order: {cat.order ?? '-'}</span>}
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ml-2 ${cat.destination === 'bar'
+                                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/20'
+                                        : 'bg-orange-500/10 text-orange-400 border-orange-500/10'
+                                    }`}>
+                                    {cat.destination === 'bar' ? 'BAR' : 'COCINA'}
+                                </span>
                             </div>
                         )}
 
-                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                                onClick={() => { setIsEditing(cat.id!); setEditName(cat.name); }}
-                                className="p-2 hover:bg-white/10 rounded-lg text-blue-400"
-                            >
-                                <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => handleDelete(cat.id!)}
-                                className="p-2 hover:bg-red-500/10 rounded-lg text-red-500"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
+                        {isEditing !== cat.id && (
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={() => {
+                                        setIsEditing(cat.id!);
+                                        setEditName(cat.name);
+                                        setEditDest(cat.destination || 'kitchen');
+                                    }}
+                                    className="p-2 hover:bg-white/10 rounded-lg text-blue-400"
+                                >
+                                    <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(cat.id!)}
+                                    className="p-2 hover:bg-red-500/10 rounded-lg text-red-500"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 ))}
                 {categories.length === 0 && (

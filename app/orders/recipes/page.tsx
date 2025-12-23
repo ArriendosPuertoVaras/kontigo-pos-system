@@ -2,17 +2,26 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { ArrowLeft, ChefHat, Search, Clock, Scale, Plus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChefHat, Search, Clock, Scale, Plus, Edit, Trash2, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { RecipeBuilderModal } from '@/components/RecipeBuilderModal';
+import { usePermission } from '@/hooks/usePermission';
+
+import { useAutoSync } from '@/components/providers/AutoSyncProvider';
 
 export default function KitchenRecipesPage() {
+    // Auto-Sync
+    const { triggerChange } = useAutoSync();
+
     const products = useLiveQuery(() => db.products.toArray());
     const ingredients = useLiveQuery(() => db.ingredients.toArray());
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [search, setSearch] = useState("");
 
     const [productionQty, setProductionQty] = useState(1);
+
+    // Permission Check
+    const canViewRecipes = usePermission('kds:view_recipes');
 
     // Modal State
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
@@ -32,11 +41,21 @@ export default function KitchenRecipesPage() {
         if (!selectedProduct || !selectedProduct.recipe || !ingredients) return [];
         return selectedProduct.recipe.map(item => {
             const ing = ingredients.find(i => i.id === item.ingredientId);
-            const unit = item.unit || ing?.unit || 'un';
+            // Improved Unit Logic: Prioritize Recipe Unit > Ingredient Unit > Default 'un'
+            let finalUnit = item.unit || ing?.unit || 'un';
+
+            // HEURISTIC FIX: If unit is 'un' but ingredient uses 'kg'/'lt' and quantity is suspiciously high (>1)
+            // It likely means it's grams/ml but was saved with wrong unit label.
+            if (finalUnit === 'un' && ing?.unit && ['kg', 'lt', 'kilo', 'litro'].includes(ing.unit.toLowerCase())) {
+                if (item.quantity > 1) {
+                    finalUnit = ing.unit === 'kg' ? 'gr' : 'ml';
+                }
+            }
+
             return {
                 name: ing?.name || "Ingrediente Desconocido",
                 quantity: item.quantity * productionQty,
-                unit: unit
+                unit: finalUnit
             };
         });
     }, [selectedProduct, ingredients, productionQty]);
@@ -46,6 +65,7 @@ export default function KitchenRecipesPage() {
         if (confirm("¿Estás seguro de borrar este plato?")) {
             await db.products.delete(id);
             if (selectedProductId === id) setSelectedProductId(null);
+            triggerChange(); // Auto-Sync
         }
     };
 
@@ -73,6 +93,7 @@ export default function KitchenRecipesPage() {
         setNewDishName("");
         setSelectedProductId(id as number);
         setIsBuilderOpen(true); // Open builder immediately
+        triggerChange(); // Auto-Sync
     };
 
     return (
@@ -88,13 +109,15 @@ export default function KitchenRecipesPage() {
                             <ChefHat className="text-toast-orange shrink-0" />
                             <span className="truncate">Fichas</span>
                         </h1>
-                        <button
-                            onClick={() => setIsCreateOpen(true)}
-                            className="bg-toast-orange hover:bg-orange-600 text-white p-2 rounded-lg shadow-lg shadow-orange-500/20 transition-all shrink-0"
-                            title="Agregar Plato"
-                        >
-                            <Plus className="w-5 h-5" />
-                        </button>
+                        {canViewRecipes && (
+                            <button
+                                onClick={() => setIsCreateOpen(true)}
+                                className="bg-toast-orange hover:bg-orange-600 text-white p-2 rounded-lg shadow-lg shadow-orange-500/20 transition-all shrink-0"
+                                title="Agregar Plato"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
+                        )}
                     </div>
 
                     <div className="relative">
@@ -127,28 +150,30 @@ export default function KitchenRecipesPage() {
                                 {selectedProductId === p.id && <ChefHat className="absolute -right-2 -bottom-2 w-16 h-16 text-white/20 rotate-12" />}
                             </button>
 
-                            {/* ACTION BUTTONS */}
-                            <div className={`absolute right-1 lg:right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-20 
-                                ${selectedProductId === p.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedProductId(p.id!);
-                                        setIsBuilderOpen(true);
-                                    }}
-                                    className={`p-1.5 rounded-lg ${selectedProductId === p.id ? 'hover:bg-white/20 text-white' : 'hover:bg-white/20 text-gray-400 hover:text-white'}`}
-                                    title="Editar Ficha"
-                                >
-                                    <Edit className="w-3 h-3 lg:w-4 lg:h-4" />
-                                </button>
-                                <button
-                                    onClick={(e) => handleDelete(e, p.id!)}
-                                    className={`p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-500`}
-                                    title="Eliminar Plato"
-                                >
-                                    <Trash2 className="w-3 h-3 lg:w-4 lg:h-4" />
-                                </button>
-                            </div>
+                            {/* ACTION BUTTONS (Only if permitted) */}
+                            {canViewRecipes && (
+                                <div className={`absolute right-1 lg:right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-20 
+                                    ${selectedProductId === p.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedProductId(p.id!);
+                                            setIsBuilderOpen(true);
+                                        }}
+                                        className={`p-1.5 rounded-lg ${selectedProductId === p.id ? 'hover:bg-white/20 text-white' : 'hover:bg-white/20 text-gray-400 hover:text-white'}`}
+                                        title="Editar Ficha"
+                                    >
+                                        <Edit className="w-3 h-3 lg:w-4 lg:h-4" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleDelete(e, p.id!)}
+                                        className={`p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-500`}
+                                        title="Eliminar Plato"
+                                    >
+                                        <Trash2 className="w-3 h-3 lg:w-4 lg:h-4" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                     {filteredProducts.length === 0 && (
@@ -230,12 +255,14 @@ export default function KitchenRecipesPage() {
                                     </div>
 
                                     {/* MANAGER EDIT BUTTON IN MAIN VIEW TOO */}
-                                    <button
-                                        onClick={() => setIsBuilderOpen(true)}
-                                        className="bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-lg border border-white/10 flex items-center gap-2 transition-colors lg:ml-2 text-xs md:text-sm font-bold"
-                                    >
-                                        <Edit className="w-4 h-4" /> Editar
-                                    </button>
+                                    {canViewRecipes && (
+                                        <button
+                                            onClick={() => setIsBuilderOpen(true)}
+                                            className="bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-lg border border-white/10 flex items-center gap-2 transition-colors lg:ml-2 text-xs md:text-sm font-bold"
+                                        >
+                                            <Edit className="w-4 h-4" /> Editar
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -253,62 +280,76 @@ export default function KitchenRecipesPage() {
                         </div>
 
                         {/* CARD BODY */}
-                        <div className="bg-[#222] rounded-b-3xl border-x border-b border-white/10 p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
+                        <div className="bg-[#222] rounded-b-3xl border-x border-b border-white/10 p-6 md:p-8">
+                            {canViewRecipes ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
+                                    {/* INGREDIENTS */}
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white border-b border-white/10 pb-4 mb-6 flex items-center gap-2">
+                                            <Scale className="text-toast-orange" />
+                                            Ingredientes & Mise en Place
+                                        </h3>
 
-                            {/* INGREDIENTS */}
-                            <div>
-                                <h3 className="text-xl font-bold text-white border-b border-white/10 pb-4 mb-6 flex items-center gap-2">
-                                    <Scale className="text-toast-orange" />
-                                    Ingredientes & Mise en Place
-                                </h3>
-
-                                {recipeDetails.length > 0 ? (
-                                    <ul className="space-y-0">
-                                        {recipeDetails.map((ing, idx) => (
-                                            <li key={idx} className="flex justify-between items-center py-3 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 rounded-lg transition-colors">
-                                                <span className="font-medium text-gray-200 text-sm md:text-base">{ing.name}</span>
-                                                <span className="font-mono font-bold text-toast-orange bg-toast-orange/10 px-2 py-1 rounded text-xs md:text-sm whitespace-nowrap ml-2">
-                                                    {ing.quantity} {ing.unit}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="p-6 bg-white/5 rounded-xl text-center text-gray-500 italic">
-                                        No hay ingredientes definidos para este plato.
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* STEPS (MOCK FOR NOW) */}
-                            <div>
-                                <h3 className="text-xl font-bold text-white border-b border-white/10 pb-4 mb-6 flex items-center gap-2">
-                                    <ChefHat className="text-toast-orange" />
-                                    Preparación y Montaje
-                                </h3>
-
-                                <div className="space-y-6">
-                                    {(selectedProduct.instructions && selectedProduct.instructions.length > 0) ? (
-                                        selectedProduct.instructions.map((step, idx) => (
-                                            <div key={idx} className="flex gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-white shrink-0 text-sm">{idx + 1}</div>
-                                                <div>
-                                                    <p className="text-gray-300 leading-relaxed text-sm md:text-base">{step}</p>
-                                                </div>
+                                        {recipeDetails.length > 0 ? (
+                                            <ul className="space-y-0">
+                                                {recipeDetails.map((ing, idx) => (
+                                                    <li key={idx} className="flex justify-between items-center py-3 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 rounded-lg transition-colors">
+                                                        <span className="font-medium text-gray-200 text-sm md:text-base">{ing.name}</span>
+                                                        <span className="font-mono font-bold text-toast-orange bg-toast-orange/10 px-2 py-1 rounded text-xs md:text-sm whitespace-nowrap ml-2">
+                                                            {ing.quantity} {ing.unit}
+                                                        </span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <div className="p-6 bg-white/5 rounded-xl text-center text-gray-500 italic">
+                                                No hay ingredientes definidos para este plato.
                                             </div>
-                                        ))
-                                    ) : (
-                                        <div className="text-gray-500 italic text-sm">No hay pasos de preparación registrados.</div>
-                                    )}
+                                        )}
+                                    </div>
 
-                                    {selectedProduct.chefNote && (
-                                        <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-xl">
-                                            <p className="text-yellow-500 text-xs font-bold uppercase mb-1">Nota del Chef</p>
-                                            <p className="text-yellow-200/80 text-sm">{selectedProduct.chefNote}</p>
+                                    {/* STEPS */}
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white border-b border-white/10 pb-4 mb-6 flex items-center gap-2">
+                                            <ChefHat className="text-toast-orange" />
+                                            Preparación y Montaje
+                                        </h3>
+
+                                        <div className="space-y-6">
+                                            {(selectedProduct.instructions && selectedProduct.instructions.length > 0) ? (
+                                                selectedProduct.instructions.map((step, idx) => (
+                                                    <div key={idx} className="flex gap-4">
+                                                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-white shrink-0 text-sm">{idx + 1}</div>
+                                                        <div>
+                                                            <p className="text-gray-300 leading-relaxed text-sm md:text-base">{step}</p>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-gray-500 italic text-sm">No hay pasos de preparación registrados.</div>
+                                            )}
+
+                                            {selectedProduct.chefNote && (
+                                                <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-xl">
+                                                    <p className="text-yellow-500 text-xs font-bold uppercase mb-1">Nota del Chef</p>
+                                                    <p className="text-yellow-200/80 text-sm">{selectedProduct.chefNote}</p>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="py-20 flex flex-col items-center justify-center text-center opacity-50">
+                                    <div className="bg-white/5 p-6 rounded-full mb-4">
+                                        <Lock className="w-16 h-16 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white mb-2">Acceso Restringido</h3>
+                                    <p className="text-gray-400 max-w-md">
+                                        No tienes permisos para ver las fichas técnicas y costos de este producto. <br />
+                                        Solicita acceso a tu administrador.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                     </div>

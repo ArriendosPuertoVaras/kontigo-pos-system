@@ -136,7 +136,33 @@ export function calculateSalary(staff: Staff, shifts: Shift[] = [], month: Date 
         cesantiaMonto = Math.round(totalImponible * CESANTIA_INDEFINIDO_TRAB); // 0.6%
     }
 
-    const totalDescuentos = afpMonto + saludMonto + cesantiaMonto;
+    // 4. Impuesto Único de Segunda Categoría (2025 Ref)
+    // Base Tributable = Imponible - (AFP + Salud + Cesantía)
+    const baseTributable = totalImponible - (afpMonto + saludMonto + cesantiaMonto);
+    let impuestoUnico = 0;
+
+    // Monthly Tax Table (UTA/UTM Ref Feb 2025 approx)
+    // Factor is marginal rate, Rebaja is generic deduction
+    const UTA_FACTOR = 1; // Simplified for CLP ranges directly (Source: SII 2024/2025 Estimations)
+    // Ranges based on generic UTM ~64.000
+    if (baseTributable <= 870000) {
+        impuestoUnico = 0;
+    } else if (baseTributable <= 1930000) {
+        impuestoUnico = (baseTributable * 0.04) - 34800;
+    } else if (baseTributable <= 3220000) {
+        impuestoUnico = (baseTributable * 0.08) - 112000;
+    } else if (baseTributable <= 4500000) {
+        impuestoUnico = (baseTributable * 0.135) - 289100;
+    } else if (baseTributable <= 5800000) {
+        impuestoUnico = (baseTributable * 0.23) - 716600;
+    } else {
+        impuestoUnico = (baseTributable * 0.304) - 1145800; // Cap for now
+    }
+
+    // Ensure non-negative
+    impuestoUnico = Math.round(Math.max(0, impuestoUnico));
+
+    const totalDescuentos = afpMonto + saludMonto + cesantiaMonto + impuestoUnico;
 
     // E. NO IMPONIBLES
     const colacion = staff.colacion || 0;
@@ -171,7 +197,7 @@ export function calculateSalary(staff: Staff, shifts: Shift[] = [], month: Date 
             afpNombre: staff.afp || 'Modelo',
             saludMonto,
             cesantiaMonto,
-            impuestoUnico: 0,
+            impuestoUnico,
             total: totalDescuentos
         },
 

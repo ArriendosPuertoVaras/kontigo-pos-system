@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Toaster } from "sonner";
+import { AutoSyncProvider } from "@/components/providers/AutoSyncProvider";
 
 export const metadata: Metadata = {
   title: "Toast POS Replica",
@@ -15,7 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <body suppressHydrationWarning={true} className="bg-toast-charcoal text-toast-text-white antialiased h-screen w-screen overflow-hidden">
-        {children}
+        <AutoSyncProvider>
+          {children}
+          <Toaster position="top-right" richColors />
+        </AutoSyncProvider>
       </body>
     </html>
   );

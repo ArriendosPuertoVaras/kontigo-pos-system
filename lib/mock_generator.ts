@@ -4,7 +4,7 @@ import { addDays, subDays, setHours, setMinutes, getDay } from 'date-fns';
 /**
  * MOCK DATA GENERATOR 🧪
  * Populates the DB with:
- * 1. Extra Staff (2 Cooks, 1 Barman, 1 Waiter)
+ * 1. Extra Staff (2 Cooks, 1 Barman, 1 Garzón)
  * 2. 30 Days of Sales History following "Google Maps" popularity curves.
  */
 
@@ -13,10 +13,10 @@ export async function generateMockData(baseDate: Date = new Date()) {
 
     // 1. ADD MOCK STAFF
     const mockStaff: Partial<Staff>[] = [
-        { name: "Cocinero Mock 1", role: "kitchen", activeRole: "kitchen", pin: "1111", salaryType: 'hourly', baseSalary: 5000, contractType: "part-time", weeklyHoursLimit: 30 },
-        { name: "Cocinero Mock 2", role: "kitchen", activeRole: "kitchen", pin: "2222", salaryType: 'hourly', baseSalary: 5000, contractType: "44-hours", weeklyHoursLimit: 44 },
-        { name: "Barman Estrella", role: "bar", activeRole: "bar", pin: "3333", salaryType: 'hourly', baseSalary: 5500, contractType: "44-hours", weeklyHoursLimit: 44 },
-        { name: "Garzón Refuerzo", role: "waiter", activeRole: "waiter", pin: "4444", salaryType: 'hourly', baseSalary: 4500, contractType: "part-time", weeklyHoursLimit: 20 },
+        { name: "Cocinero Mock 1", role: "Cocina", activeRole: "Cocina", pin: "1111", salaryType: 'hourly', baseSalary: 5000, contractType: "part-time", weeklyHoursLimit: 30 },
+        { name: "Cocinero Mock 2", role: "Cocina", activeRole: "Cocina", pin: "2222", salaryType: 'hourly', baseSalary: 5000, contractType: "44-hours", weeklyHoursLimit: 44 },
+        { name: "Barman Estrella", role: "Barra", activeRole: "Barra", pin: "3333", salaryType: 'hourly', baseSalary: 5500, contractType: "44-hours", weeklyHoursLimit: 44 },
+        { name: "Garzón Refuerzo", role: "Garzón", activeRole: "Garzón", pin: "4444", salaryType: 'hourly', baseSalary: 4500, contractType: "part-time", weeklyHoursLimit: 20 },
     ];
 
     const staffToAdd: Staff[] = [];

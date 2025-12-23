@@ -1,17 +1,46 @@
 'use client';
 
-import { useState } from 'react';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import { generateMockData } from '@/lib/mock_generator';
 import { db } from '@/lib/db';
 import { Trash2, Database, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { usePermission } from '@/hooks/usePermission';
+import { useEffect, useState } from 'react';
 
 export default function SettingsPage() {
     const router = useRouter();
+    const canAccess = usePermission('admin:settings');
     const [isSimulating, setIsSimulating] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        if (canAccess === false) { // Check explicitly for false (loading is undefined)
+            // router.push('/'); // Uncomment to strict redirect, for now just hiding content
+        }
+    }, [canAccess]);
+
+    if (canAccess === false) {
+        return (
+            <div className="flex h-screen w-full bg-[#1a1a1a] text-white font-sans relative">
+                <Sidebar />
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-white">
+                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
+                        <AlertTriangle className="w-10 h-10 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Acceso Restringido</h2>
+                    <p className="text-gray-400 max-w-md mb-8">No tienes permisos para ver esta sección.</p>
+                    <button
+                        onClick={() => router.push('/')}
+                        className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold transition-all"
+                    >
+                        Volver al Inicio
+                    </button>
+                </div>
+            </div>
+        )
+    }
 
     const handleSimulate = async () => {
         setIsSimulating(true);

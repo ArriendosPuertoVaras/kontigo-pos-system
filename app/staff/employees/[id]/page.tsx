@@ -3,11 +3,16 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Staff } from '@/lib/db';
 import { calculateSalary } from '@/lib/payroll/chile';
-import { ArrowLeft, User, CreditCard, Save, Calculator, AlertTriangle, Info, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, CreditCard, Save, Calculator, AlertTriangle, Info, Trash2, Settings, Plus, X, ChevronRight, ChevronDown, Download } from 'lucide-react';
+import { PERMISSIONS_LIST } from '@/lib/permissions';
+
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { generateSalarySettlementPDF } from '@/lib/pdf-generator';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 // Helper to format RUT
 function formatRut(rut: string) {
@@ -46,6 +51,51 @@ export default function EmployeeDetailPage() {
     const [formData, setFormData] = useState<Partial<Staff>>({});
     const [isSaving, setIsSaving] = useState(false);
 
+    // Dynamic Role Management
+    const jobTitles = useLiveQuery(() => db.jobTitles.toArray())?.filter(t => t.active) || [];
+    const [showRoleManager, setShowRoleManager] = useState(false);
+    const [newRoleName, setNewRoleName] = useState("");
+
+    // Permission Management State
+    const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<number | null>(null);
+    const selectedJobTitle = jobTitles.find(t => t.id === selectedRoleForPermissions);
+
+    // Toggle Permission Helper
+    const togglePermission = async (roleId: number, permissionId: string) => {
+        const role = jobTitles.find(t => t.id === roleId);
+        if (!role) return;
+
+        const currentPermissions = role.permissions || [];
+        const newPermissions = currentPermissions.includes(permissionId)
+            ? currentPermissions.filter(p => p !== permissionId)
+            : [...currentPermissions, permissionId];
+
+        await db.jobTitles.update(roleId, { permissions: newPermissions });
+    };
+
+    const handleAddRole = async () => {
+        if (!newRoleName.trim()) return;
+        try {
+            await db.jobTitles.add({ name: newRoleName.trim(), active: true });
+            setNewRoleName("");
+
+            // Auto-sync
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pushAll();
+        } catch (e) { alert("Error al crear cargo o sincronizar"); }
+    };
+
+    const handleDeleteRole = async (id?: number) => {
+        if (!id) return;
+        if (confirm("¿Seguro que deseas eliminar este cargo?")) {
+            await db.jobTitles.delete(id);
+            // Auto-sync
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pushAll();
+        }
+    };
+
+
     // Sync formData when staff loads
     useEffect(() => {
         if (staff) setFormData(staff);
@@ -56,6 +106,15 @@ export default function EmployeeDetailPage() {
         try {
             if (id && formData) {
                 await db.staff.update(id, formData);
+
+                // Auto-sync
+                try {
+                    const { syncService } = await import('@/lib/sync_service');
+                    await syncService.pushAll();
+                } catch (syncErr) {
+                    console.error("Auto-sync failed", syncErr);
+                }
+
                 // Redirect to list instead of alert
                 router.push('/staff/employees');
             }
@@ -98,10 +157,96 @@ export default function EmployeeDetailPage() {
     // Live Calculation Salary
     const sim = calculateSalary({ ...formData, estimatedTips: currentTips } as Staff, [], new Date());
 
+    const handleDownloadPDF = async () => {
+        if (!id || !formData.rut) {
+            toast.error("Faltan datos mínimos (RUT)");
+            return;
+        }
+
+        const toastId = toast.loading("Generando PDF...");
+        try {
+            const now = new Date();
+            const period = {
+                month: now.toLocaleString('es-CL', { month: 'long' }),
+                year: now.getFullYear(),
+                startDate: startOfMonth(now).toISOString(),
+                endDate: endOfMonth(now).toISOString()
+            };
+
+            // Generate Blob
+            const pdfBlob = generateSalarySettlementPDF({
+                staff: { ...staff, ...formData } as Staff,
+                salary: sim,
+                period,
+                company: {
+                    name: "Puerto Colono SpA",
+                    rut: "77.163.033-2",
+                    address: "Puerto Varas"
+                }
+            });
+
+            // Sanitize Filename (Robust for Browsers)
+            const sanitizedName = (formData.name || 'Colaborador').replace(/[^a-zA-Z0-9]/g, '_');
+            const fileNameString = `Liquidacion_${sanitizedName}_${period.month}_${period.year}.pdf`;
+
+            // Trigger Download (With Cleanup Delay)
+            const url = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileNameString;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            // DELAY REVOCATION to allow browser to start download (Fix "Can't open file")
+            setTimeout(() => URL.revokeObjectURL(url), 500);
+
+            // Cloud Upload (Updating existing file if needed)
+            try {
+                // Consistent Path: YEAR/MONTH/STAFF_ID.pdf
+                const cloudFilePath = `${period.year}/${period.month}/${id}.pdf`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('payroll-docs')
+                    .upload(cloudFilePath, pdfBlob, { contentType: 'application/pdf', upsert: true });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage.from('payroll-docs').getPublicUrl(cloudFilePath);
+
+                // Upsert Record in Supabase (Update if exists)
+                await supabase.from('salary_settlements').upsert({
+                    staff_id: id,
+                    period_month: now.getMonth() + 1,
+                    period_year: period.year,
+                    base_salary: sim.sueldoBase,
+                    gratification: sim.gratificacion,
+                    total_imponible: sim.totalImponible,
+                    total_descuentos: sim.descuentosTrabajador.total,
+                    total_haberes: sim.totalImponible + sim.haberesNoImponibles.total,
+                    liquid_salary: sim.sueldoLiquidoEstimado,
+                    calculation_snapshot: sim,
+                    pdf_url: publicUrl,
+                    finalized: true
+                }, { onConflict: 'staff_id, period_month, period_year' });
+
+                toast.success("Liquidación guardada en nube ☁️", { id: toastId });
+
+            } catch (cloudErr) {
+                console.error(cloudErr);
+                toast.success("PDF Descargado (Sin Nube)", { id: toastId });
+            }
+
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al generar", { id: toastId });
+        }
+    };
+
     if (!staff) return <div className="min-h-screen bg-[#1e1e1e] flex items-center justify-center text-white">Cargando...</div>;
 
     return (
-        <div className="min-h-screen bg-[#1e1e1e] text-white font-sans p-4 pb-20">
+        <div className="min-h-screen h-full bg-[#1e1e1e] text-white font-sans p-4 pb-48 overflow-y-auto">
             {/* Header */}
             <div className="max-w-7xl mx-auto mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -152,19 +297,27 @@ export default function EmployeeDetailPage() {
                             </div>
 
                             <div className="col-span-3 md:col-span-3">
-                                <label className="block text-[10px] uppercase font-bold text-gray-500 mb-0.5">Cargo</label>
+                                <div className="flex justify-between items-center mb-0.5">
+                                    <label className="block text-[10px] uppercase font-bold text-gray-500">Cargo</label>
+                                    <button onClick={() => setShowRoleManager(true)} className="text-toast-orange hover:bg-white/10 p-1 rounded transition-colors" title="Gestionar Cargos">
+                                        <Settings className="w-3 h-3" />
+                                    </button>
+                                </div>
                                 <select
                                     className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-white text-sm focus:border-toast-orange outline-none appearance-none"
-                                    value={formData.role || 'waiter'}
-                                    onChange={e => setFormData({ ...formData, role: e.target.value as any, activeRole: e.target.value as any })}
+                                    value={formData.role || ''}
+                                    onChange={e => setFormData({ ...formData, role: e.target.value, activeRole: e.target.value })}
                                 >
-                                    <option value="manager">Administrador</option>
-                                    <option value="waiter">Garzón</option>
-                                    <option value="kitchen">Cocina</option>
-                                    <option value="bar">Barra</option>
-                                    <option value="steward">Copero</option>
-                                    <option value="cleaning">Aseo</option>
+                                    <option value="">Seleccione...</option>
+                                    {jobTitles.map(title => (
+                                        <option key={title.id} value={title.name}>{title.name}</option>
+                                    ))}
+                                    {/* Fallback for legacy values not in DB */}
+                                    {!jobTitles.find(t => t.name === formData.role) && formData.role && (
+                                        <option value={formData.role}>{formData.role}</option>
+                                    )}
                                 </select>
+
                             </div>
 
                             <div className="col-span-3 md:col-span-2">
@@ -459,9 +612,18 @@ export default function EmployeeDetailPage() {
                 {/* COL 3: SIMULATION CARD (Span 5/12) */}
                 <div className="lg:col-span-5">
                     <div className="bg-gradient-to-b from-[#2a2a2a] to-[#202020] p-6 rounded-2xl border border-white/10 shadow-2xl sticky top-6">
-                        <div className="flex items-center gap-2 text-blue-400 mb-4">
-                            <Calculator className="w-5 h-5" />
-                            <h2 className="font-bold text-lg">Simulacíon Legal 2025</h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2 text-blue-400">
+                                <Calculator className="w-5 h-5" />
+                                <h2 className="font-bold text-lg">Simulacíon Legal 2025</h2>
+                            </div>
+                            <button
+                                onClick={handleDownloadPDF}
+                                className="flex items-center gap-2 text-xs bg-green-500/20 hover:bg-green-500/30 text-green-300 px-3 py-1.5 rounded-lg transition-colors border border-green-500/20 font-bold"
+                            >
+                                <Download className="w-3 h-3" />
+                                GUARDAR (FIX)
+                            </button>
                         </div>
 
                         {/* ALERTS */}
@@ -536,7 +698,113 @@ export default function EmployeeDetailPage() {
                     </div>
                 </div>
             </div>
-        </div>
+
+
+            {/* ROLE MANAGER MODAL */}
+            {
+                showRoleManager && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-in fade-in">
+                        <div className="bg-[#252525] rounded-xl border border-white/10 w-full max-w-sm shadow-2xl p-6 relative">
+                            <button
+                                onClick={() => setShowRoleManager(false)}
+                                className="absolute top-4 right-4 text-gray-500 hover:text-white"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+
+                            <h3 className="text-lg font-bold text-white mb-1">Gestionar Cargos</h3>
+                            <p className="text-xs text-gray-400 mb-4">Agrega o elimina cargos disponibles para el personal.</p>
+
+                            {/* List of Roles */}
+                            {!selectedRoleForPermissions ? (
+                                <div className="space-y-2 mb-4 max-h-[60vh] overflow-y-auto pr-2">
+                                    {jobTitles.map(title => (
+                                        <div key={title.id}
+                                            onClick={() => setSelectedRoleForPermissions(title.id!)}
+                                            className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5 cursor-pointer hover:bg-white/5 transition-colors group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-2 h-2 rounded-full bg-toast-orange/50 group-hover:bg-toast-orange" />
+                                                <span className="text-sm font-medium">{title.name}</span>
+                                            </div>
+                                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                selectedJobTitle && (
+                                    <div className="mb-4 animate-in slide-in-from-right-4">
+                                        <button
+                                            onClick={() => setSelectedRoleForPermissions(null)}
+                                            className="flex items-center gap-1 text-xs text-toast-orange mb-3 hover:underline"
+                                        >
+                                            <ArrowLeft className="w-3 h-3" /> Volver a lista
+                                        </button>
+
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-lg font-bold text-white">{selectedJobTitle.name}</h3>
+                                            <button
+                                                onClick={() => handleDeleteRole(selectedJobTitle.id)}
+                                                className="text-red-500 hover:bg-red-500/10 p-2 rounded-md transition-colors"
+                                                title="Eliminar cargo"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        <p className="text-[10px] uppercase font-bold text-gray-500 mb-2">Permisos y Accesos</p>
+
+                                        <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-4">
+                                            {PERMISSIONS_LIST.map((category) => (
+                                                <div key={category.category} className="bg-black/20 rounded-lg p-3 border border-white/5">
+                                                    <p className="text-xs font-bold text-gray-300 mb-2">{category.category}</p>
+                                                    <div className="space-y-1.5">
+                                                        {category.items.map((perm) => {
+                                                            const isChecked = (selectedJobTitle.permissions || []).includes(perm.id);
+                                                            return (
+                                                                <label key={perm.id} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white cursor-pointer select-none">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="rounded border-white/20 bg-black/40 text-toast-orange focus:ring-0 checked:bg-toast-orange"
+                                                                        checked={isChecked}
+                                                                        onChange={() => togglePermission(selectedJobTitle.id!, perm.id)}
+                                                                    />
+                                                                    {perm.label}
+                                                                </label>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )
+                            )}
+
+                            {/* Add New (Only show on main list) */}
+                            {!selectedRoleForPermissions && (
+                                <div className="flex gap-2 pt-2 border-t border-white/10">
+                                    <input
+                                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 text-sm focus:border-toast-orange outline-none"
+                                        placeholder="Nuevo Cargo (ej. Repartidor)"
+                                        value={newRoleName}
+                                        onChange={e => setNewRoleName(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleAddRole()}
+                                    />
+                                    <button
+                                        onClick={handleAddRole}
+                                        disabled={!newRoleName.trim()}
+                                        className="bg-toast-orange text-white p-2 rounded-lg hover:brightness-110 disabled:opacity-50"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 

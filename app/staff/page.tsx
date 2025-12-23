@@ -6,11 +6,18 @@ import Link from 'next/link';
 import { db, Staff, Shift } from '@/lib/db';
 import { getStaffingForecast } from '@/lib/ai/staffing';
 import { getOvertimeStatus } from '@/lib/compliance/rules';
-import { ArrowLeft, Clock, Users, BrainCircuit, AlertTriangle, ShieldCheck, UserPlus, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
+import { Clock, Users, BrainCircuit, AlertTriangle, ShieldCheck, UserPlus, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
 import Header from '@/components/Header';
 import ClockInModal from '@/components/ClockInModal';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+
+import { usePermission } from '@/hooks/usePermission';
+import { Lock } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
 
 export default function StaffPage() {
+    const hasAccess = usePermission('admin:view');
     const [forecast, setForecast] = useState<any[]>([]);
     const [loadingForecast, setLoadingForecast] = useState(true);
     const [isClockInOpen, setIsClockInOpen] = useState(false);
@@ -39,6 +46,29 @@ export default function StaffPage() {
         });
     }, []);
 
+    if (hasAccess === false) {
+        return (
+            <div className="flex h-screen w-full bg-[#1e1e1e]">
+                <Sidebar />
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-white">
+                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
+                        <Lock className="w-10 h-10 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Acceso Restringido</h2>
+                    <p className="text-gray-400 max-w-md mb-8">
+                        Esta sección contiene información sensible de RRHH y métricas financieras.
+                        Solo gerentes y administradores pueden acceder.
+                    </p>
+                    <Link href="/staff/schedule">
+                        <button className="bg-toast-orange hover:brightness-110 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-orange-500/20">
+                            Ver Mi Horario
+                        </button>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     const formatTime = (date: Date) => {
         return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
@@ -46,16 +76,16 @@ export default function StaffPage() {
     return (
         <div className="min-h-screen bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white pb-20">
             {/* Header */}
-            <Header title="Control de Personal">
+            <Header title="Control de Personal" backHref="/">
 
                 <div className="flex flex-wrap gap-3 w-full justify-center md:justify-start">
                     <Link href="/staff/employees" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
                         <Users className="w-4 h-4" />
                         Colaboradores
                     </Link>
-                    <Link href="/staff/planner" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
+                    <Link href="/staff/schedule" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
                         <Clock className="w-4 h-4" />
-                        Planificador
+                        Ver Horarios
                     </Link>
                     <button
                         onClick={() => setIsClockInOpen(true)}
@@ -135,7 +165,6 @@ export default function StaffPage() {
 }
 
 // Sub-component for Accordion Logic
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // --- KPI MICRO COMPONENT ---
 function LaborKPIs() {

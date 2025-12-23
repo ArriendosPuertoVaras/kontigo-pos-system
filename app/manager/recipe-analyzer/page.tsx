@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Product, Ingredient } from '@/lib/db';
 import { analyzeRecipe, RecipeAnalysisResult } from '@/lib/recipes';
-import { ArrowLeft, RefreshCw, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, ChefHat, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, ChefHat, Plus, Save, Trash2, Calculator } from 'lucide-react';
 import { RecipeBuilderModal } from '@/components/RecipeBuilderModal';
 import Link from 'next/link';
 
@@ -12,6 +12,7 @@ export default function RecipeAnalyzerPage() {
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [analysis, setAnalysis] = useState<RecipeAnalysisResult | null>(null);
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+    const [targetCostPercentage, setTargetCostPercentage] = useState(30); // Default target 30%
 
     // Fetch Ingredients Map for efficient lookup
     const ingredientsMap = useLiveQuery(async () => {
@@ -38,7 +39,7 @@ export default function RecipeAnalyzerPage() {
     const formatPrice = (amount: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount);
 
     return (
-        <div className="min-h-screen bg-[#1a1a1a] text-white p-8">
+        <div className="h-screen overflow-y-auto bg-[#1a1a1a] text-white p-8">
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-8">
@@ -154,6 +155,59 @@ export default function RecipeAnalyzerPage() {
                                     {analysis.financials.profitability_status === 'Critical' && 'Pérdida Crítica'}
                                 </div>
                             </div>
+
+                            {/* PRICE SIMULATOR CARD */}
+                            <div className="bg-[#2a2a2a] p-6 rounded-2xl border border-white/10 shadow-lg mb-8">
+                                <div className="flex items-center gap-2 mb-4 border-b border-white/5 pb-2">
+                                    <Calculator className="w-5 h-5 text-toast-orange" />
+                                    <h3 className="font-bold text-sm text-gray-300 uppercase tracking-widest">Simulador de Precios</h3>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">Food Cost Objetivo (%)</label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white font-bold focus:border-toast-orange outline-none"
+                                                value={targetCostPercentage}
+                                                onChange={(e) => setTargetCostPercentage(Number(e.target.value))}
+                                                min={15} max={100}
+                                            />
+                                            <span className="text-gray-400 font-bold">%</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-black/20 p-3 rounded-lg space-y-2">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Precio Sugerido (Neto)</span>
+                                            <span className="font-mono font-bold text-white">
+                                                {formatPrice(Math.ceil((analysis.financials.total_cost / (targetCostPercentage / 100)) / 10) * 10)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Precio Sugerido (Carta)</span>
+                                            <span className="font-mono font-bold text-toast-orange">
+                                                {formatPrice(Math.ceil(((analysis.financials.total_cost / (targetCostPercentage / 100)) * 1.19) / 10) * 10)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={async () => {
+                                            if (!selectedProductId) return;
+                                            const newNet = Math.ceil((analysis.financials.total_cost / (targetCostPercentage / 100)) / 10) * 10;
+                                            if (confirm(`¿Actualizar precio del producto a ${formatPrice(newNet)} (Neto)?`)) {
+                                                await db.products.update(selectedProductId, { price: newNet });
+                                                alert("Precio actualizado correctamente");
+                                            }
+                                        }}
+                                        className="w-full bg-white/5 hover:bg-toast-orange hover:text-white text-gray-300 py-2 rounded-lg font-bold text-xs transition-all flex justify-center items-center gap-2 border border-white/5 hover:border-transparent"
+                                    >
+                                        <Save className="w-4 h-4" /> Aplicar Precio Sugerido
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         {/* RIGHT: INGREDIENT BREAKDOWN */}
@@ -180,14 +234,26 @@ export default function RecipeAnalyzerPage() {
                                     <tbody className="divide-y divide-white/5">
                                         {analysis.ingredients.map((ing, idx) => (
                                             <tr key={idx} className="hover:bg-white/5 transition-colors group">
-                                                <td className="px-6 py-4 font-medium text-white">{ing.name}</td>
+                                                <td className="px-6 py-4 font-medium text-white">
+                                                    {ing.name}
+                                                    {ing.gross_quantity_inventory !== ing.net_quantity_plate && (
+                                                        <span className="block text-[10px] text-gray-500">
+                                                            Inv: {ing.gross_quantity_inventory} {ing.purchase_unit}
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <span className={`px-2 py-1 rounded text-xs font-bold ${ing.yield_percent < 0.8 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
                                                         {(ing.yield_percent * 100).toFixed(0)}%
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-right text-gray-300 font-mono text-sm">
-                                                    {ing.gross_quantity_inventory} {ing.purchase_unit}
+                                                <td className="px-6 py-4 text-right text-toast-orange font-mono text-sm font-bold">
+                                                    {ing.net_quantity_plate} {ing.recipe_unit}
+                                                    {ing.recipe_unit !== ing.purchase_unit && (
+                                                        <span className="block text-[10px] text-gray-500 font-normal">
+                                                            ({ing.gross_quantity_inventory} {ing.purchase_unit})
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 text-right text-gray-400 font-mono text-xs">
                                                     {formatPrice(ing.unit_cost_real)}/{ing.purchase_unit}
@@ -224,7 +290,7 @@ export default function RecipeAnalyzerPage() {
 
                 {/* NEW: QUICK DETAILS LIST BELOW CARDS */}
                 {analysis && selectedProductId && (
-                    <div className="mt-8">
+                    <div className="mt-8 pb-32"> {/* Added ample padding for scrolling */}
                         <h3 className="text-gray-500 uppercase tracking-widest text-xs font-bold mb-4">Detalle del Producto</h3>
                         <div className="bg-[#1e1e1e] border border-white/5 rounded-lg overflow-hidden divide-y divide-white/5">
                             <div className="flex items-center text-xs text-gray-500 font-bold bg-white/5 px-6 py-3 uppercase tracking-wider">

@@ -173,11 +173,18 @@ export interface Order {
     closedAt?: Date;
 }
 
+export interface JobTitle {
+    id?: number;
+    name: string;
+    active: boolean;
+    permissions?: string[]; // Array of Permission IDs
+}
+
 export interface Staff {
     id?: number;
     name: string;
     pin: string;
-    role: 'manager' | 'waiter' | 'kitchen' | 'bar' | 'steward' | 'cleaning' | 'Universal';
+    role: string; // Changed from enum to string for dynamic roles
     avatarColor?: string;
     phone?: string;
     email?: string;
@@ -185,11 +192,12 @@ export interface Staff {
     contractDuration: 'indefinite' | 'fixed';
     startDate?: Date;
     weeklyHoursLimit: number;
-    activeRole: 'manager' | 'waiter' | 'kitchen' | 'bar' | 'steward' | 'cleaning';
+    activeRole: string; // Changed from enum to string
     rut?: string;
     nationality?: string;
     birthDate?: Date;
-    address?: string;
+    address?: string; // Standard address field
+    status?: 'active' | 'inactive'; // New Status field
     salaryType?: 'monthly' | 'hourly';
     baseSalary?: number;
     gratification?: boolean;
@@ -325,6 +333,7 @@ export class KontigoDatabase extends Dexie {
     dtes!: Table<DTE>;
     cashCounts!: Table<CashCount>;
     dailyCloses!: Table<DailyClose>;
+    jobTitles!: Table<JobTitle>; // New Table
 
     // New Accounting Tables
     accounts!: Table<Account>;
@@ -334,7 +343,7 @@ export class KontigoDatabase extends Dexie {
         super('Kontigo_Final'); // Force final fresh DB
         console.log("--> INITIALIZING KONTIGO DATABASE: Kontigo_Final");
 
-        this.version(5).stores({
+        this.version(8).stores({ // Bump to v8
             products: '++id, categoryId, name',
             categories: '++id, name, order',
             ingredients: '++id, name, supplierId, code',
@@ -344,14 +353,15 @@ export class KontigoDatabase extends Dexie {
             customers: '++id, name, phone, email',
             restaurantTables: '++id, status',
             orders: '++id, tableId, status, createdAt',
-            staff: '++id, name, pin, role',
+            staff: '++id, name, pin, role, status', // Added status index
             shifts: '++id, staffId, startTime',
             printers: '++id, name',
             modifierTemplates: '++id, name',
             dtes: '++id, type, folio, date',
             cashCounts: '++id, date',
             dailyCloses: '++id, date',
-            accounts: '++id, &code, type', // Unique Index Confirmed
+            jobTitles: '++id, &name, active',
+            accounts: '++id, &code, type',
             journalEntries: '++id, date, status, referenceId'
         });
 
@@ -369,22 +379,162 @@ export async function seedDatabase() {
 
         // ONLY Seed Emergency Admin if absolutely empty (Critical for Login)
         if (staffCount === 0) {
-            console.log("🦁 Nexus: Seeding Emergency Admin (0000)...");
-            await db.staff.add({
-                name: "Admin",
-                pin: "0000",
-                role: "manager",
-                activeRole: "manager",
-                contractType: "art-22",
-                contractDuration: "indefinite",
-                weeklyHoursLimit: 45,
-                salaryType: "monthly",
-                baseSalary: 0,
-                estimatedTips: 0
-            });
+            console.log("🦁 Nexus: Seeding Default Staff...");
+            await db.staff.bulkAdd([
+                {
+                    name: "Admin",
+                    pin: "0000",
+                    role: "manager",
+                    activeRole: "manager",
+                    contractType: "art-22",
+                    contractDuration: "indefinite",
+                    weeklyHoursLimit: 45,
+                    salaryType: "monthly",
+                    baseSalary: 0,
+                    estimatedTips: 0,
+                    status: 'active'
+                },
+                {
+                    name: "Cocinero",
+                    pin: "1111",
+                    role: "Cocina",
+                    activeRole: "Cocina",
+                    contractType: "44-hours",
+                    contractDuration: "indefinite",
+                    weeklyHoursLimit: 45,
+                    salaryType: "monthly",
+                    baseSalary: 500000,
+                    estimatedTips: 50000,
+                    status: 'active',
+                    avatarColor: "bg-red-500"
+                },
+                {
+                    name: "Garzón",
+                    pin: "2222",
+                    role: "Garzón",
+                    activeRole: "Garzón",
+                    contractType: "part-time",
+                    contractDuration: "indefinite",
+                    weeklyHoursLimit: 30,
+                    salaryType: "hourly",
+                    baseSalary: 2500,
+                    estimatedTips: 150000,
+                    status: 'active',
+                    avatarColor: "bg-blue-500"
+                },
+                {
+                    name: "Barra",
+                    pin: "3333",
+                    role: "Barra",
+                    activeRole: "Barra",
+                    contractType: "44-hours",
+                    contractDuration: "indefinite",
+                    weeklyHoursLimit: 45,
+                    salaryType: "monthly",
+                    baseSalary: 550000,
+                    estimatedTips: 100000,
+                    status: 'active',
+                    avatarColor: "bg-purple-500"
+                }
+            ]);
         }
 
-    } catch (error) {
-        console.error("Database Check Failed:", error);
+    } catch (e) {
+        console.error("Database Check Failed:", e);
+    }
+
+    // MIGRATION: Ensure all staff have 'status' (Fix for "Loading..." issue)
+    try {
+        const legacyStaff = await db.staff.filter(s => !s.status).toArray();
+        if (legacyStaff.length > 0) {
+            console.log(`Migrating ${legacyStaff.length} staff members to active status...`);
+            await db.staff.bulkPut(legacyStaff.map(s => ({ ...s, status: 'active' })));
+        }
+    } catch (e) { console.error("Migration Failed:", e); }
+
+    // MIGRATION: Fix "waiter" role to "Garzón" (Language Standardization)
+    try {
+        const waiterStaff = await db.staff.filter(s => s.role === 'waiter' || s.activeRole === 'waiter').toArray();
+        if (waiterStaff.length > 0) {
+            console.log(`🦁 Nexus: Migrating ${waiterStaff.length} staff from 'waiter' to 'Garzón'...`);
+            const updates = waiterStaff.map(s => ({
+                ...s,
+                role: s.role === 'waiter' ? 'Garzón' : s.role,
+                activeRole: s.activeRole === 'waiter' ? 'Garzón' : s.activeRole
+            }));
+            await db.staff.bulkPut(updates as any); // Type cast if needed
+        }
+    } catch (e) { console.error("Role Migration Failed:", e); }
+
+    // Seed Job Titles if empty
+    try {
+        const titleCount = await db.jobTitles.count();
+        if (titleCount === 0) {
+            console.log("Seeding Default Job Titles...");
+            await db.jobTitles.bulkAdd([
+                { name: 'Administrador', active: true },
+                { name: 'Garzón', active: true },
+                { name: 'Cocina', active: true },
+                { name: 'Barra', active: true },
+                { name: 'Copero', active: true },
+                { name: 'Aseo', active: true },
+                { name: 'Manager', active: true } // Legacy fallback
+            ]);
+        }
+    } catch (e) { console.error("Job Title Seed Failed", e); }
+
+    // CHECK: Enable Default Staff if missing (e.g. only Admin exists)
+    try {
+        const cookExists = await db.staff.where('role').equals('Cocina').count();
+        if (cookExists === 0) {
+            console.log("🦁 Nexus: Seeding Missing Default Staff...");
+            await db.staff.bulkAdd([
+                {
+                    name: "Cocinero",
+                    pin: "1111",
+                    role: "Cocina",
+                    activeRole: "Cocina",
+                    contractType: "44-hours",
+                    contractDuration: "indefinite",
+                    weeklyHoursLimit: 45,
+                    salaryType: "monthly",
+                    baseSalary: 500000,
+                    estimatedTips: 50000,
+                    status: 'active',
+                    avatarColor: "bg-red-500"
+                },
+                {
+                    name: "Garzón",
+                    pin: "2222",
+                    role: "Garzón",
+                    activeRole: "Garzón",
+                    contractType: "part-time",
+                    contractDuration: "indefinite",
+                    weeklyHoursLimit: 30,
+                    salaryType: "hourly",
+                    baseSalary: 2500,
+                    estimatedTips: 150000,
+                    status: 'active',
+                    avatarColor: "bg-blue-500"
+                },
+                {
+                    name: "Barra",
+                    pin: "3333",
+                    role: "Barra",
+                    activeRole: "Barra",
+                    contractType: "44-hours",
+                    contractDuration: "indefinite",
+                    weeklyHoursLimit: 45,
+                    salaryType: "monthly",
+                    baseSalary: 550000,
+                    estimatedTips: 100000,
+                    status: 'active',
+                    avatarColor: "bg-purple-500"
+                }
+            ]);
+        }
+    } catch (e) {
+        console.error("Staff Seed Check Failed:", e);
     }
 }
+

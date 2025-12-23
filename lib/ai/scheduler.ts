@@ -41,14 +41,14 @@ export async function generateOptimalSchedule(startDate: Date, daysToGenerate: n
 
         // HEURISTIC: "Skeleton Crew" needed every day
         // We iterate Roles and try to assign the Standard Pattern
-        const rolesToFill = ['kitchen', 'waiter'];
+        const rolesToFill = ['cocina', 'garzón'];
 
         // Boost for Fri/Sat (Double the crew?)
         const isPeak = ['friday', 'saturday'].includes(dayName);
         const crewSizeMultiplier = isPeak ? 2 : 1;
 
         for (const role of rolesToFill) {
-            const neededCount = (role === 'kitchen' ? 1 : 1) * crewSizeMultiplier; // Min 1
+            const neededCount = (role === 'cocina' ? 1 : 1) * crewSizeMultiplier; // Min 1
 
             let filledCount = 0;
             const candidates = staffList.filter(s => s.role.toLowerCase() === role || s.role === 'Universal');
@@ -78,12 +78,12 @@ export async function generateOptimalSchedule(startDate: Date, daysToGenerate: n
                 // Waiter: 12-[17] Break [18]-23
                 let shiftsToAdd: { start: number, end: number }[] = [];
 
-                if (role === 'kitchen') {
+                if (role === 'cocina') {
                     shiftsToAdd = [
                         { start: 10, end: 16 }, // 6h
                         { start: 19, end: 23 }  // 4h (Total 10h)
                     ];
-                } else { // Waiter
+                } else { // Garzón
                     shiftsToAdd = [
                         { start: 12, end: 17 }, // 5h
                         { start: 18, end: 23 }  // 5h (Total 10h)

@@ -1,0 +1,19 @@
+{
+    "manifest_version": 3,
+    "name": "Kontigo POS Launcher",
+    "version": "1.0",
+    "description": "Launcher for Kontigo POS System",
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_icon": {
+            "16": "vercel.svg",
+            "48": "vercel.svg",
+            "128": "vercel.svg"
+        }
+    },
+    "permissions": [
+        "tabs"
+    ]
+}
