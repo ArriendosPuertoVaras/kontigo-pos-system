@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { db } from '@/lib/db';
-import { ArrowLeft, Download, Upload, CheckCircle, AlertTriangle, FileText, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Download, Upload, CheckCircle, AlertTriangle, FileText, Loader2, Save, Cloud, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { parseExcel } from '@/lib/import-utils';
 import { saveTemplateToDesktop } from '@/app/actions/download-template';
 import { ImportType } from '@/lib/types';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { syncService } from '@/lib/sync_service';
 
 const STEPS = [
     { id: 'categories', label: '1. Categorías', icon: FileText },
@@ -22,6 +23,38 @@ export default function DataImportPage() {
     const [previewData, setPreviewData] = useState<any[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    // --- Cloud Sync Handlers ---
+    const handlePushToCloud = async () => {
+        if (!confirm("⚠️ ¿Estás seguro de SUBIR tus datos a la nube? Esto sobrescribirá lo que haya en la nube.")) return;
+        setIsSyncing(true);
+        setLogs(prev => [...prev, "☁️ Iniciando subida a la nube..."]);
+        try {
+            await syncService.pushAll((msg) => setLogs(prev => [...prev, `📤 ${msg}`]));
+            setLogs(prev => [...prev, "✅ Subida completada con éxito."]);
+        } catch (e: any) {
+            console.error(e);
+            setLogs(prev => [...prev, `❌ Error en subida: ${e.message}`]);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handlePullFromCloud = async () => {
+        if (!confirm("⚠️ ¿Estás seguro de DESCARGAR datos de la nube? Esto borrará tus datos locales actuales.")) return;
+        setIsSyncing(true);
+        setLogs(prev => [...prev, "☁️ Iniciando descarga desde la nube..."]);
+        try {
+            await syncService.restoreFromCloud((msg) => setLogs(prev => [...prev, `📥 ${msg}`]));
+            setLogs(prev => [...prev, "✅ Descarga completada."]);
+        } catch (e: any) {
+            console.error(e);
+            setLogs(prev => [...prev, `❌ Error en descarga: ${e.message}`]);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     // --- Handlers ---
 
@@ -210,6 +243,31 @@ export default function DataImportPage() {
                         <p className="text-xs text-orange-300/80 leading-relaxed">
                             Sigue el orden numérico (1 al 5) para evitar errores de dependencias (ej: crear un plato sin tener su categoría creada).
                         </p>
+                    </div>
+
+                    {/* CLOUD SYNC SECTION */}
+                    <div className="mt-8 pt-8 border-t border-white/10">
+                        <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <Cloud className="w-4 h-4" /> Nube
+                        </h3>
+                        <div className="grid gap-2">
+                            <button
+                                onClick={handlePushToCloud}
+                                disabled={isSyncing}
+                                className="w-full flex items-center gap-2 px-4 py-3 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-xl transition-all disabled:opacity-50"
+                            >
+                                <Upload className={`w-4 h-4 ${isSyncing ? 'animate-bounce' : ''}`} />
+                                <span className="text-xs font-bold">Subir a Nube</span>
+                            </button>
+                            <button
+                                onClick={handlePullFromCloud}
+                                disabled={isSyncing}
+                                className="w-full flex items-center gap-2 px-4 py-3 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-xl transition-all disabled:opacity-50"
+                            >
+                                <Download className={`w-4 h-4 ${isSyncing ? 'animate-bounce' : ''}`} />
+                                <span className="text-xs font-bold">Bajar de Nube</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
