@@ -1,6 +1,6 @@
 'use client';
 // --- COMPONENTS ---
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { LayoutGrid, UtensilsCrossed, ClipboardList, Settings, LogOut, Bell, Wifi, X, Check, Package, Truck, ShoppingCart, Trash2, Users, Plus, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -16,7 +16,7 @@ import Header from '@/components/Header';
 import { usePermission } from '@/hooks/usePermission';
 import { Lock } from 'lucide-react';
 
-export default function Home() {
+function POSContent() {
   const hasPOSAccess = usePermission('pos:view');
 
   const searchParams = useSearchParams();
@@ -837,6 +837,14 @@ export default function Home() {
         onClose={() => setShowClockOut(false)}
       />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-[#1a1a1a] text-white">Cargando Punto de Venta...</div>}>
+      <POSContent />
+    </Suspense>
   );
 }
 
