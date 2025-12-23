@@ -71,13 +71,13 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-[#1a1a1a] w-full max-w-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-[#111111]/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-[#111111] w-full max-w-2xl rounded-3xl shadow-2xl border border-[#f3f2f0]/10 overflow-hidden flex flex-col font-sans">
 
                 {/* HEADER */}
-                <div className="p-8 bg-gradient-to-r from-orange-600/20 to-transparent border-b border-white/5">
-                    <h2 className="text-3xl font-bold text-white mb-2">Bienvenido a Kontigo POS</h2>
-                    <p className="text-gray-400">Configuremos tu sistema para empezar.</p>
+                <div className="p-8 bg-gradient-to-br from-[#e4f229]/5 to-transparent border-b border-[#f3f2f0]/5">
+                    <h2 className="text-3xl font-bold text-[#f3f2f0] mb-2 tracking-tight">Bienvenido a Kontigo POS</h2>
+                    <p className="text-[#9CA3AF]">Configuremos tu sistema para empezar.</p>
                 </div>
 
                 {/* CONTENT */}
@@ -86,27 +86,27 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
                         <div className="grid md:grid-cols-2 gap-4">
                             <button
                                 onClick={() => setStep('REGISTER_DETAILS')}
-                                className="group relative bg-[#252525] hover:bg-[#333] border border-white/10 hover:border-orange-500/50 p-8 rounded-xl flex flex-col items-center gap-4 transition-all text-center"
+                                className="group relative bg-[#1A1A1A] hover:bg-[#222222] border border-[#f3f2f0]/5 hover:border-[#e4f229] p-8 rounded-2xl flex flex-col items-center gap-6 transition-all duration-300 text-center shadow-lg hover:shadow-[#e4f229]/10"
                             >
-                                <div className="w-16 h-16 bg-orange-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <Store className="w-8 h-8 text-orange-500" />
+                                <div className="w-16 h-16 bg-[#e4f229]/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <Store className="w-8 h-8 text-[#e4f229]" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white">Soy Negocio Nuevo</h3>
-                                    <p className="text-sm text-gray-500 mt-1">Quiero registrar el nombre de mi restaurante y crear mi usuario administrador.</p>
+                                    <h3 className="text-lg font-bold text-[#f3f2f0]">Soy Negocio Nuevo</h3>
+                                    <p className="text-sm text-[#9CA3AF] mt-2 leading-relaxed">Quiero registrar el nombre de mi restaurante y crear mi usuario administrador.</p>
                                 </div>
                             </button>
 
                             <button
                                 onClick={handleRestore}
-                                className="group relative bg-[#252525] hover:bg-[#333] border border-white/10 hover:border-blue-500/50 p-8 rounded-xl flex flex-col items-center gap-4 transition-all text-center"
+                                className="group relative bg-[#1A1A1A] hover:bg-[#222222] border border-[#f3f2f0]/5 hover:border-blue-500 p-8 rounded-2xl flex flex-col items-center gap-6 transition-all duration-300 text-center shadow-lg hover:shadow-blue-500/10"
                             >
                                 <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                                     <Cloud className="w-8 h-8 text-blue-500" />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-white">Ya tengo Cuenta</h3>
-                                    <p className="text-sm text-gray-500 mt-1">Quiero descargar mi configuración, personal y menú desde la nube.</p>
+                                    <h3 className="text-lg font-bold text-[#f3f2f0]">Ya tengo Cuenta</h3>
+                                    <p className="text-sm text-[#9CA3AF] mt-2 leading-relaxed">Quiero descargar mi configuración, personal y menú desde la nube.</p>
                                 </div>
                             </button>
                         </div>
@@ -115,55 +115,55 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
                     {step === 'REGISTER_DETAILS' && (
                         <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
                             <div>
-                                <label className="block text-gray-400 text-sm font-bold mb-2 uppercase tracking-wider">Nombre del Restaurante</label>
+                                <label className="block text-[#9CA3AF] text-xs font-bold mb-2 uppercase tracking-widest">Nombre del Restaurante</label>
                                 <input
                                     type="text"
                                     value={restaurantName}
                                     onChange={e => setRestaurantName(e.target.value)}
                                     placeholder="Ej: La Picá del Puerto"
-                                    className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-white text-lg focus:ring-2 ring-orange-500 outline-none"
+                                    className="w-full bg-[#1A1A1A] border border-[#f3f2f0]/10 rounded-xl p-4 text-[#f3f2f0] text-lg focus:ring-1 ring-[#e4f229] focus:border-[#e4f229] outline-none transition-all placeholder:text-[#9CA3AF]/30"
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-gray-400 text-sm font-bold mb-2 uppercase tracking-wider">Tu Nombre (Admin)</label>
+                                    <label className="block text-[#9CA3AF] text-xs font-bold mb-2 uppercase tracking-widest">Tu Nombre (Admin)</label>
                                     <input
                                         type="text"
                                         value={adminName}
                                         onChange={e => setAdminName(e.target.value)}
                                         placeholder="Ej: Ricardo"
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-white text-lg focus:ring-2 ring-orange-500 outline-none"
+                                        className="w-full bg-[#1A1A1A] border border-[#f3f2f0]/10 rounded-xl p-4 text-[#f3f2f0] text-lg focus:ring-1 ring-[#e4f229] focus:border-[#e4f229] outline-none transition-all placeholder:text-[#9CA3AF]/30"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-gray-400 text-sm font-bold mb-2 uppercase tracking-wider">Crea un PIN (4 dígitos)</label>
+                                    <label className="block text-[#9CA3AF] text-xs font-bold mb-2 uppercase tracking-widest">PIN (4 dígitos)</label>
                                     <input
                                         type="text"
                                         maxLength={4}
                                         value={adminPin}
                                         onChange={e => setAdminPin(e.target.value.replace(/\D/g, ''))}
                                         placeholder="0000"
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-white text-lg font-mono text-center tracking-widest focus:ring-2 ring-orange-500 outline-none"
+                                        className="w-full bg-[#1A1A1A] border border-[#f3f2f0]/10 rounded-xl p-4 text-[#e4f229] text-xl font-mono text-center tracking-[1em] focus:ring-1 ring-[#e4f229] focus:border-[#e4f229] outline-none transition-all placeholder:text-[#9CA3AF]/30 placeholder:tracking-normal"
                                     />
                                 </div>
                             </div>
 
-                            <p className="text-xs text-gray-500 bg-orange-500/5 border border-orange-500/10 p-3 rounded-lg">
-                                ℹ️ Al registrar, se borrarán los usuarios de demostración (Cocinero, Garzón, Barra) para dejar tu sistema limpio.
+                            <p className="text-xs text-[#9CA3AF] bg-[#e4f229]/5 border border-[#e4f229]/20 p-4 rounded-xl flex gap-2">
+                                <span className="text-[#e4f229]">ℹ️</span> Al registrar, se borrarán los usuarios de demostración (Cocinero, Garzón, Barra) para dejar tu sistema limpio.
                             </p>
 
                             <div className="flex gap-4 pt-4">
                                 <button
                                     onClick={() => setStep('CHOICE')}
-                                    className="px-6 py-4 rounded-xl text-gray-400 hover:text-white font-bold transition-colors"
+                                    className="px-6 py-4 rounded-xl text-[#9CA3AF] hover:text-[#f3f2f0] font-bold transition-colors text-sm uppercase tracking-wide"
                                 >
                                     Volver
                                 </button>
                                 <button
                                     onClick={handleRegisterNew}
                                     disabled={!restaurantName || !adminName || adminPin.length < 4 || isLoading}
-                                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20"
+                                    className="flex-1 bg-[#e4f229] text-[#0a0806] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-[#dbe627] hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#e4f229]/10 py-4 text-lg"
                                 >
                                     {isLoading ? <Loader2 className="animate-spin" /> : <>Registrar Negocio <ArrowRight className="w-5 h-5" /></>}
                                 </button>
@@ -174,8 +174,8 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
                     {step === 'RESTORING' && (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
                             <Cloud className="w-16 h-16 text-blue-500 animate-bounce mb-4" />
-                            <h3 className="text-xl font-bold text-white mb-2">Descargando Configuración...</h3>
-                            <p className="text-gray-500">Estamos trayendo tu menú, personal y mesas desde la nube.</p>
+                            <h3 className="text-xl font-bold text-[#f3f2f0] mb-2">Descargando Configuración...</h3>
+                            <p className="text-[#9CA3AF]">Estamos trayendo tu menú, personal y mesas desde la nube.</p>
                         </div>
                     )}
                 </div>
