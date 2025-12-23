@@ -67,6 +67,12 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
     };
 
     const handleRestore = async () => {
+        // SECURITY GATE
+        if (accessCode.trim().toUpperCase() !== 'KONTIGO-2025') {
+            alert("⚠️ Código de Acceso Inválido. Ingresa el código correcto para restaurar.");
+            return;
+        }
+
         setStep('RESTORING');
         try {
             await syncService.restoreFromCloud((msg) => console.log(msg));
@@ -91,51 +97,65 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
                 {/* CONTENT */}
                 <div className="p-8">
                     {step === 'CHOICE' && (
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <button
-                                onClick={() => setStep('REGISTER_DETAILS')}
-                                className="group relative bg-[#1A1A1A] hover:bg-[#222222] border border-[#f3f2f0]/5 hover:border-[#e4f229] p-8 rounded-2xl flex flex-col items-center gap-6 transition-all duration-300 text-center shadow-lg hover:shadow-[#e4f229]/10"
-                            >
-                                <div className="w-16 h-16 bg-[#e4f229]/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <Store className="w-8 h-8 text-[#e4f229]" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-[#f3f2f0]">Soy Negocio Nuevo</h3>
-                                    <p className="text-sm text-[#9CA3AF] mt-2 leading-relaxed">Quiero registrar el nombre de mi restaurante y crear mi usuario administrador.</p>
-                                </div>
-                            </button>
+                        <div className="space-y-6">
+                            {/* SHARED ACCESS CODE INPUT FOR BOTH PATHS */}
+                            <div className="bg-[#1A1A1A] p-4 rounded-xl border border-[#f3f2f0]/5">
+                                <label className="block text-xs font-bold text-[#f3f2f0] uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <Lock className="w-3 h-3 text-[#e4f229]" />
+                                    Código de Acceso
+                                </label>
+                                <input
+                                    type="text"
+                                    value={accessCode}
+                                    onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+                                    placeholder="KONTIGO-XXXX"
+                                    className="w-full bg-[#111111] border border-[#f3f2f0]/10 rounded-lg px-4 py-3 text-[#f3f2f0] placeholder:text-[#9CA3AF]/50 focus:outline-none focus:border-[#e4f229] transition-colors text-center font-mono tracking-widest text-lg"
+                                />
+                                <p className="text-[10px] text-center text-[#9CA3AF] mt-2">
+                                    Este código es requerido para registrar o restaurar una copia de seguridad.
+                                </p>
+                            </div>
 
-                            <button
-                                onClick={handleRestore}
-                                className="group relative bg-[#1A1A1A] hover:bg-[#222222] border border-[#f3f2f0]/5 hover:border-blue-500 p-8 rounded-2xl flex flex-col items-center gap-6 transition-all duration-300 text-center shadow-lg hover:shadow-blue-500/10"
-                            >
-                                <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <Cloud className="w-8 h-8 text-blue-500" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-[#f3f2f0]">Ya tengo Cuenta</h3>
-                                    <p className="text-sm text-[#9CA3AF] mt-2 leading-relaxed">Quiero descargar mi configuración, personal y menú desde la nube.</p>
-                                </div>
-                            </button>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => {
+                                        if (accessCode.trim().toUpperCase() !== 'KONTIGO-2025') {
+                                            alert("Ingresa el código de acceso primero.");
+                                            return;
+                                        }
+                                        setStep('REGISTER_DETAILS');
+                                    }}
+                                    className="group relative bg-[#1A1A1A] hover:bg-[#222222] border border-[#f3f2f0]/5 hover:border-[#e4f229] p-6 rounded-2xl flex flex-col items-center gap-4 transition-all duration-300 text-center shadow-lg hover:shadow-[#e4f229]/10"
+                                >
+                                    <div className="w-12 h-12 bg-[#e4f229]/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <Store className="w-6 h-6 text-[#e4f229]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-bold text-[#f3f2f0]">Soy Negocio Nuevo</h3>
+                                        <p className="text-xs text-[#9CA3AF] mt-1">Registrar nombre y administrador.</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={handleRestore}
+                                    className="group relative bg-[#1A1A1A] hover:bg-[#222222] border border-[#f3f2f0]/5 hover:border-blue-500 p-6 rounded-2xl flex flex-col items-center gap-4 transition-all duration-300 text-center shadow-lg hover:shadow-blue-500/10"
+                                >
+                                    <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <Cloud className="w-6 h-6 text-blue-500" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-bold text-[#f3f2f0]">Ya tengo Cuenta</h3>
+                                        <p className="text-xs text-[#9CA3AF] mt-1">Restaurar copia desde la nube.</p>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     )}
 
                     {step === 'REGISTER_DETAILS' && (
                         <div className="space-y-6 animate-in slide-in-from-right-8 fade-in">
 
-                            {/* ACCESS CODE FIELD */}
-                            <div className="bg-[#e4f229]/5 border border-[#e4f229]/20 p-4 rounded-xl mb-4">
-                                <label className="block text-[#e4f229] text-xs font-bold mb-2 uppercase tracking-widest flex items-center gap-2">
-                                    Código de Invitación <Lock className="w-3 h-3" />
-                                </label>
-                                <input
-                                    type="text"
-                                    value={accessCode}
-                                    onChange={e => setAccessCode(e.target.value.toUpperCase())}
-                                    placeholder="KONTIGO-XXXX"
-                                    className="w-full bg-[#111111] border border-[#e4f229]/30 rounded-lg p-3 text-[#f3f2f0] font-mono text-center tracking-widest focus:ring-1 ring-[#e4f229] outline-none placeholder:text-[#9CA3AF]/30"
-                                />
-                            </div>
+                            {/* Code input moved to previous step */}
 
                             <div>
                                 <label className="block text-[#9CA3AF] text-xs font-bold mb-2 uppercase tracking-widest">Nombre del Restaurante</label>
