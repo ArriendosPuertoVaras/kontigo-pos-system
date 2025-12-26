@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import { AutoSyncProvider } from "@/components/providers/AutoSyncProvider";
 
 export const metadata: Metadata = {
-  title: "Toast POS Replica",
+  title: "KONTIGO - POS",
   description: "Offline-first Restaurant POS System",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0", // Critical for touch POS
 };
