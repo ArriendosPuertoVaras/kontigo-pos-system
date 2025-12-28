@@ -76,7 +76,7 @@ export interface RecipeItem {
 export interface Category {
     id?: number;
     name: string;
-    destination?: 'kitchen' | 'bar';
+    destination?: string; // Changed from union to string for custom areas
     course?: 'starter' | 'main' | 'dessert' | 'beverage';
     order?: number;
 }

@@ -20,7 +20,7 @@ function NavItem({ icon, label, active = false, onClick }: { icon: any, label: s
     )
 }
 
-function OrderCard({ order, onStatusChange, viewMode }: { order: any, onStatusChange: (id: number, status: any) => void, viewMode: 'kitchen' | 'bar' }) {
+function OrderCard({ order, onStatusChange, viewMode }: { order: any, onStatusChange: (id: number, status: any) => void, viewMode: string }) {
     // 1. Filter Items based on View Mode
     const displayedItems = order.itemsWithCategory?.filter((item: any) => {
         const dest = item.category?.destination || 'kitchen'; // Default to kitchen
@@ -151,24 +151,27 @@ import Sidebar from '@/components/Sidebar';
 
 export default function OrdersPage() {
     const hasAccess = usePermission('kds:view');
-    const [viewMode, setViewMode] = useState<'kitchen' | 'bar'>('kitchen');
+    const [viewMode, setViewMode] = useState<string>('kitchen');
 
     // Healing: Logic Removed to prevent Zombie Categories
     // useEffect(() => { ... }, []);
 
-    const orders = useLiveQuery(async () => {
+    const data = useLiveQuery(async () => {
         const activeOrders = await db.orders.where('status').equals('open').toArray();
         const tables = await db.restaurantTables.toArray();
+        const categories = await db.categories.toArray();
+
+        // Extract Unique Destinations for Tabs
+        const destinations = Array.from(new Set(categories.map(c => c.destination || 'kitchen')));
+        const tabs = destinations.filter(Boolean).map(d => d!.trim());
+        if (tabs.length === 0) tabs.push('kitchen');
 
         // Deep fetch for items -> product -> category
         const enrichedOrders = await Promise.all(activeOrders.map(async (o) => {
             const itemsWithCategory = await Promise.all(o.items.map(async (item) => {
-                // Item stores 'product' snapshot, but let's ensure we get latest category info
-                // Check if product snapshot has categoryId, otherwise fetch fresh
-                let category = null;
-                if (item.product.categoryId) {
-                    category = await db.categories.get(item.product.categoryId);
-                }
+                let category = item.product.categoryId
+                    ? categories.find(c => c.id === item.product.categoryId)
+                    : null;
                 return { ...item, category };
             }));
 
@@ -179,8 +182,11 @@ export default function OrdersPage() {
             };
         }));
 
-        return enrichedOrders;
+        return { orders: enrichedOrders, tabs };
     });
+
+    const orders = data?.orders;
+    const availableTabs = data?.tabs || ['kitchen'];
 
     const handleStatusChange = (id: number, status: any) => {
         db.orders.update(id, { status });
@@ -228,24 +234,20 @@ export default function OrdersPage() {
 
             {/* CONTENT */}
             <main className="flex-1 flex flex-col h-full bg-[#2a2a2a] overflow-hidden">
-                <Header title={viewMode === 'kitchen' ? 'KDS Cocina' : 'Pedidos en Barra'}>
-                    <div className="flex flex-wrap items-center gap-3 md:gap-4 w-full justify-center md:justify-start">
-                        {/* TABS */}
-                        <div className="flex bg-black/20 p-1 rounded-lg gap-1">
-                            <button
-                                onClick={() => setViewMode('kitchen')}
-                                className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-2
-                                ${viewMode === 'kitchen' ? 'bg-toast-orange text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-                                <ChefHat className="w-4 h-4" />
-                                Cocina
-                            </button>
-                            <button
-                                onClick={() => setViewMode('bar')}
-                                className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-2
-                                ${viewMode === 'bar' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-                                <Martini className="w-4 h-4" />
-                                Bar
-                            </button>
+                <Header title={`KDS: ${viewMode === 'kitchen' ? 'Cocina' : (viewMode === 'bar' ? 'Barra' : viewMode)}`}>
+                    <div className="flex flex-col md:flex-row items-center gap-3 w-full justify-start overflow-x-auto pb-2 scrollbar-hide">
+                        {/* DYNAMIC TABS */}
+                        <div className="flex bg-black/20 p-1 rounded-lg gap-1 shrink-0">
+                            {availableTabs.sort().sort((a, b) => a === 'kitchen' ? -1 : (b === 'kitchen' ? 1 : 0)).map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setViewMode(tab)}
+                                    className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-2 whitespace-nowrap
+                                    ${viewMode === tab ? 'bg-toast-orange text-white shadow-lg' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+                                    {tab.toLowerCase().includes('bar') ? <Martini className="w-4 h-4" /> : <ChefHat className="w-4 h-4" />}
+                                    {tab === 'kitchen' ? 'Cocina' : (tab === 'bar' ? 'Bar' : tab)}
+                                </button>
+                            ))}
                         </div>
 
                         {/* ACTIONS */}

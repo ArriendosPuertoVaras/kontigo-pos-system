@@ -111,11 +111,11 @@ function CategoriesView() {
 
     const [isEditing, setIsEditing] = useState<number | null>(null);
     const [editName, setEditName] = useState("");
-    const [editDest, setEditDest] = useState<'kitchen' | 'bar'>('kitchen');
+    const [editDest, setEditDest] = useState<string>('kitchen');
 
     // Create Mode
     const [newCatName, setNewCatName] = useState("");
-    const [newCatDest, setNewCatDest] = useState<'kitchen' | 'bar'>('kitchen'); // Destination Selector
+    const [newCatDest, setNewCatDest] = useState<string>('kitchen'); // Destination Selector
 
     // Drag State
     const [draggedId, setDraggedId] = useState<number | null>(null);
@@ -133,10 +133,12 @@ function CategoriesView() {
 
             await db.categories.add({
                 name: newCatName.trim(),
-                destination: newCatDest,
+                destination: newCatDest.trim() || 'kitchen',
                 order: nextOrder
             });
             setNewCatName("");
+            // Keep previous dest or reset? Reset to kitchen is safer default
+            // setNewCatDest('kitchen'); 
             triggerChange(); // Auto-Sync
             // toast.success("Categoría cread"); // Optional: if you have toast imported, otherwise just relying on UI update
         } catch (error) {
@@ -394,22 +396,26 @@ function CategoriesView() {
                     />
                 </div>
 
-                {/* DESTINATION TOGGLE */}
-                <div className="flex bg-black/30 p-1 rounded-lg shrink-0 h-[42px] self-start">
-                    <button
-                        onClick={() => setNewCatDest('kitchen')}
-                        className={`px-4 rounded-md text-sm font-bold transition-all ${newCatDest === 'kitchen' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-white'
-                            }`}
-                    >
-                        Cocina
-                    </button>
-                    <button
-                        onClick={() => setNewCatDest('bar')}
-                        className={`px-4 rounded-md text-sm font-bold transition-all ${newCatDest === 'bar' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-400 hover:text-white'
-                            }`}
-                    >
-                        Bar
-                    </button>
+                {/* DESTINATION SELECTOR (Dynamic) */}
+                <div className="flex items-center gap-2 bg-black/30 p-1 px-3 rounded-lg shrink-0 h-[42px] self-start border border-white/5">
+                    <span className="text-xs text-gray-500 font-bold uppercase mr-1">Area:</span>
+                    <input
+                        list="destinations-list"
+                        type="text"
+                        value={newCatDest}
+                        onChange={(e) => setNewCatDest(e.target.value)}
+                        className="bg-transparent text-sm font-bold text-white focus:outline-none w-32 placeholder-gray-600"
+                        placeholder="ej. Cocina"
+                    />
+                    <datalist id="destinations-list">
+                        <option value="kitchen">Cocina (General)</option>
+                        <option value="bar">Barra (General)</option>
+                        <option value="Cocina Fria" />
+                        <option value="Cocina Caliente" />
+                        <option value="Postres" />
+                        <option value="Barra 1" />
+                        <option value="Barra 2" />
+                    </datalist>
                 </div>
 
                 <button onClick={handleAdd} className="bg-toast-orange hover:bg-orange-500 text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 h-[42px]">
@@ -451,16 +457,16 @@ function CategoriesView() {
                                     onChange={e => setEditName(e.target.value)}
                                     className="flex-1 bg-black/40 border border-toast-orange rounded px-2 py-2 text-white w-full"
                                 />
-                                {/* EDIT DESTINATION TOGGLE */}
-                                <div className="flex bg-black/30 p-1 rounded-lg">
-                                    <button
-                                        onClick={() => setEditDest('kitchen')}
-                                        className={`px-3 py-1 rounded text-xs font-bold ${editDest === 'kitchen' ? 'bg-white text-black' : 'text-gray-500'}`}
-                                    >COC</button>
-                                    <button
-                                        onClick={() => setEditDest('bar')}
-                                        className={`px-3 py-1 rounded text-xs font-bold ${editDest === 'bar' ? 'bg-blue-500 text-white' : 'text-gray-500'}`}
-                                    >BAR</button>
+                                {/* EDIT DESTINATION SELECTOR */}
+                                <div className="flex bg-black/30 p-1 rounded-lg items-center px-2">
+                                    <span className="text-[10px] text-gray-500 font-bold uppercase mr-2">Area</span>
+                                    <input
+                                        list="destinations-list"
+                                        type="text"
+                                        value={editDest}
+                                        onChange={(e) => setEditDest(e.target.value)}
+                                        className="bg-transparent text-xs font-bold text-white focus:outline-none w-24"
+                                    />
                                 </div>
 
                                 <div className="flex gap-2">
@@ -480,11 +486,11 @@ function CategoriesView() {
                                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
                                 </div>
                                 <span className="font-bold text-lg">{cat.name}</span>
-                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ml-2 ${cat.destination === 'bar'
+                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ml-2 ${cat.destination === 'bar' || cat.destination?.toLowerCase().includes('bar')
                                     ? 'bg-blue-500/20 text-blue-400 border-blue-500/20'
                                     : 'bg-orange-500/10 text-orange-400 border-orange-500/10'
                                     }`}>
-                                    {cat.destination === 'bar' ? 'BAR' : 'COCINA'}
+                                    {cat.destination === 'kitchen' ? 'COCINA' : (cat.destination === 'bar' ? 'BARRA' : (cat.destination || '').toUpperCase())}
                                 </span>
                             </div>
                         )}
