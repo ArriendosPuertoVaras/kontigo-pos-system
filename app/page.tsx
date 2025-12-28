@@ -624,9 +624,33 @@ function POSContent() {
 
               <div className="p-4 bg-toast-charcoal-dark border-b border-white/5 flex justify-between items-center shrink-0">
                 <div>
-                  <h2 className="font-bold text-lg text-white">
-                    {activeTable ? activeTable.name : 'Venta Rápida'}
-                  </h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-bold text-lg text-white">
+                      {activeTable ? activeTable.name : 'Venta Rápida'}
+                    </h2>
+                    {/* READY STATUS INDICATOR */}
+                    {activeOrder?.status === 'ready' && !(activeOrder as any).isDelivered && (
+                      <button
+                        onClick={async () => {
+                          if (activeOrder?.id) {
+                            await db.orders.update(activeOrder.id, { isDelivered: true } as any);
+                          }
+                        }}
+                        className={`w-6 h-6 rounded-full animate-pulse shadow-lg border-2 border-white/20 
+                          ${activeOrder.items.some(i => {
+                          const cat = categories?.find(c => c.id === i.product.categoryId);
+                          return cat?.destination === 'bar';
+                        }) && !activeOrder.items.some(i => {
+                          const cat = categories?.find(c => c.id === i.product.categoryId);
+                          return cat?.destination !== 'bar';
+                        })
+                            ? 'bg-blue-500 shadow-blue-500/50' // Only Bar items -> Blue
+                            : 'bg-yellow-500 shadow-yellow-500/50' // Kitchen or Mixed -> Yellow
+                          }`}
+                        title="Pedido Listo! Clic para confirmar entrega"
+                      />
+                    )}
+                  </div>
                   <span className="text-xs text-gray-400">
                     {activeOrder ? `Orden #${activeOrder.id}` : 'Nueva Venta'}
                   </span>

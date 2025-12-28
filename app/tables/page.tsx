@@ -40,7 +40,7 @@ export default function TablesPage() {
         o.forEach(ord => map.set(ord.id!, ord));
 
         // Category Map for Destination Lookup
-        const catMap = new Map<number, 'kitchen' | 'bar'>();
+        const catMap = new Map<number, string>();
         c.forEach(cat => catMap.set(cat.id!, cat.destination || 'kitchen'));
 
         return { tables: t, orderMap: map, catMap };
@@ -96,17 +96,6 @@ export default function TablesPage() {
             setSelectedTableForGuestCount(table);
             setGuestCount(2);
         } else {
-            // Check for Ready Delivery First
-            const order = orderMap?.get(table.currentOrderId!);
-            if (order && order.status === 'ready' && !(order as any).isDelivered) {
-                // WAITER CONFIRMS DELIVERY
-                // We use a custom field "isDelivered" on the order object.
-                // Since Dexie is schema-less for objects, we can add it.
-                await db.orders.update(order.id!, { isDelivered: true } as any);
-                // Don't navigate yet, just confirm delivery.
-                return;
-            }
-
             // Navigate to Order
             router.push(`/?tableId=${table.id}`);
         }
@@ -222,8 +211,14 @@ export default function TablesPage() {
                                         if (order.status === 'ready' && !(order as any).isDelivered) {
                                             // Determine destinations based on categories
                                             if (catMap) {
-                                                const hasKitchenItem = order.items.some(i => catMap.get(i.product.categoryId) !== 'bar'); // Assume kitchen default
-                                                const hasBarItem = order.items.some(i => catMap.get(i.product.categoryId) === 'bar');
+                                                const hasKitchenItem = order.items.some(i => {
+                                                    const dest = catMap.get(i.product.categoryId);
+                                                    return !dest || !dest.toLowerCase().includes('bar');
+                                                });
+                                                const hasBarItem = order.items.some(i => {
+                                                    const dest = catMap.get(i.product.categoryId);
+                                                    return dest && dest.toLowerCase().includes('bar');
+                                                });
 
                                                 if (hasKitchenItem) hasKitchenReady = true;
                                                 if (hasBarItem) hasBarReady = true;
