@@ -419,7 +419,7 @@ function CategoriesView() {
 
             {/* LIST */}
             <div className="flex flex-col gap-3">
-                {categories.map((cat: Category) => (
+                {categories.map((cat: Category, index: number) => (
                     <div
                         key={cat.id}
                         draggable={isEditing !== cat.id}
@@ -428,11 +428,20 @@ function CategoriesView() {
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, cat.id!)}
                         className={`
-                            bg-white/5 p-4 rounded-xl border flex items-center justify-between group transition-all
-                            ${draggedId === cat.id ? 'opacity-50 border-toast-orange border-dashed' : 'border-white/5 hover:border-white/20'}
-                            ${dragOverId === cat.id && draggedId !== cat.id ? 'border-t-4 border-toast-orange bg-white/10' : ''} 
+                            relative bg-white/5 p-4 rounded-xl border flex items-center justify-between group transition-all
+                            ${draggedId === cat.id ? 'opacity-30' : 'border-white/5 hover:border-white/20'}
+                            ${dragOverId === cat.id && draggedId !== cat.id ? 'border-toast-orange bg-white/10 ring-1 ring-toast-orange' : ''} 
                         `}
                     >
+                        {/* DRAG PREVIEW OVERLAY */}
+                        {dragOverId === cat.id && draggedId !== cat.id && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10 rounded-xl backdrop-blur-sm pointer-events-none">
+                                <span className="text-toast-orange font-bold text-lg">
+                                    📍 Soltar para ser #{index + 1}
+                                </span>
+                            </div>
+                        )}
+
                         {isEditing === cat.id ? (
                             <div className="flex-1 flex flex-col md:flex-row gap-2 mr-4 items-center">
                                 <input
@@ -460,9 +469,14 @@ function CategoriesView() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-3 flex-1 cursor-grab active:cursor-grabbing">
+                            <div className="flex items-center gap-4 flex-1 cursor-grab active:cursor-grabbing">
+                                {/* VISIBLE NUMBER */}
+                                <div className="flex flex-col items-center justify-center w-8 h-8 rounded bg-white/5 border border-white/10">
+                                    <span className="text-gray-400 font-mono text-xs font-bold">#{index + 1}</span>
+                                </div>
+
                                 {/* Drag Handle */}
-                                <div className="text-gray-600 hover:text-white cursor-move p-1">
+                                <div className="text-gray-600 hover:text-white cursor-move">
                                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
                                 </div>
                                 <span className="font-bold text-lg">{cat.name}</span>
