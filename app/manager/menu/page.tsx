@@ -119,6 +119,7 @@ function CategoriesView() {
 
     // Drag State
     const [draggedId, setDraggedId] = useState<number | null>(null);
+    const [dragOverId, setDragOverId] = useState<number | null>(null);
 
     const handleAdd = async () => {
         if (!newCatName.trim()) {
@@ -168,14 +169,23 @@ function CategoriesView() {
         // Ghost image usually automatic
     };
 
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: number) => {
         e.preventDefault(); // Necessary to allow dropping
         e.dataTransfer.dropEffect = "move";
+        if (draggedId !== id) {
+            setDragOverId(id);
+        }
     };
+
+    const handleDragLeave = () => {
+        setDragOverId(null);
+    }
 
     const handleDrop = async (e: React.DragEvent<HTMLDivElement>, targetId: number) => {
         e.preventDefault();
         setDraggedId(null);
+        setDragOverId(null);
+
         if (draggedId === null || draggedId === targetId) return;
 
         try {
@@ -391,11 +401,13 @@ function CategoriesView() {
                         key={cat.id}
                         draggable={isEditing !== cat.id}
                         onDragStart={(e) => handleDragStart(e, cat.id!)}
-                        onDragOver={handleDragOver}
+                        onDragOver={(e) => handleDragOver(e, cat.id!)}
+                        onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, cat.id!)}
                         className={`
                             bg-white/5 p-4 rounded-xl border flex items-center justify-between group transition-all
                             ${draggedId === cat.id ? 'opacity-50 border-toast-orange border-dashed' : 'border-white/5 hover:border-white/20'}
+                            ${dragOverId === cat.id && draggedId !== cat.id ? 'border-t-4 border-toast-orange bg-white/10' : ''} 
                         `}
                     >
                         {isEditing === cat.id ? (
@@ -462,13 +474,14 @@ function CategoriesView() {
                         )}
                     </div>
                 ))}
-                {categories.length === 0 && (
-                    <div className="text-center py-10 text-gray-500 border border-dashed border-white/10 rounded-xl">
-                        No hay categorías creadas.
-                    </div>
-                )}
             </div>
+            {categories.length === 0 && (
+                <div className="text-center py-10 text-gray-500 border border-dashed border-white/10 rounded-xl">
+                    No hay categorías creadas.
+                </div>
+            )}
         </div>
+
     )
 }
 
