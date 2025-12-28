@@ -175,29 +175,34 @@ function CategoriesView() {
 
     const handleDrop = async (e: React.DragEvent<HTMLDivElement>, targetId: number) => {
         e.preventDefault();
-        if (draggedId === null || draggedId === targetId || !categories) return;
-
-        // Reorder Logic
-        const currentIndex = categories.findIndex(c => c.id === draggedId);
-        const targetIndex = categories.findIndex(c => c.id === targetId);
-
-        if (currentIndex === -1 || targetIndex === -1) return;
-
-        const newItems = [...categories];
-        const [movedItem] = newItems.splice(currentIndex, 1);
-        newItems.splice(targetIndex, 0, movedItem);
-
-        // Update DB with strict sequential ordering
-        // This fixes the "jumping" behavior by forcing a clean 0, 1, 2, 3... order
-        await db.transaction('rw', db.categories, async () => {
-            for (let i = 0; i < newItems.length; i++) {
-                // Always update order to match visual index
-                await db.categories.update(newItems[i].id!, { order: i });
-            }
-        });
-
         setDraggedId(null);
-        triggerChange(); // Auto-Sync
+        if (draggedId === null || draggedId === targetId) return;
+
+        try {
+            await db.transaction('rw', db.categories, async () => {
+                // 1. Fetch fresh list to avoid UI stale state
+                const allCats = await db.categories.toArray();
+                const sorted = allCats.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+                const currentIndex = sorted.findIndex(c => c.id === draggedId);
+                const targetIndex = sorted.findIndex(c => c.id === targetId);
+
+                if (currentIndex === -1 || targetIndex === -1) return;
+
+                // 2. Move Item
+                const [movedItem] = sorted.splice(currentIndex, 1);
+                sorted.splice(targetIndex, 0, movedItem);
+
+                // 3. Re-index EVERYTHING to 0, 1, 2, 3...
+                for (let i = 0; i < sorted.length; i++) {
+                    await db.categories.update(sorted[i].id!, { order: i });
+                }
+            });
+            triggerChange(); // Auto-Sync
+        } catch (error) {
+            console.error("Reorder failed:", error);
+            alert("Error al reordenar. Intente nuevamente.");
+        }
     };
 
     if (categories === undefined) {
