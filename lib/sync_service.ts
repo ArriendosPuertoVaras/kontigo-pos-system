@@ -423,9 +423,45 @@ class SyncService {
 
             let mergedCount = 0;
 
-            // 2. Process Groups
+            // --- SPECIAL FIX: MERGE 'BEBIDAS' INTO 'BEBIDAS Y JUGOS' ---
+            const bebidas = groups.get('bebidas');
+            const bebidasYJugos = groups.get('bebidas y jugos');
+
+            if (bebidas && bebidas.length > 0) {
+                console.log("[Sync] Detected legacy 'Bebidas' category. Merging into 'Bebidas y Jugos'...");
+
+                let targetCategory;
+
+                if (bebidasYJugos && bebidasYJugos.length > 0) {
+                    targetCategory = bebidasYJugos[0];
+                } else {
+                    // Rename the first 'Bebidas' to 'Bebidas y Jugos'
+                    const firstBebidas = bebidas[0];
+                    await db.categories.update(firstBebidas.id!, { name: "Bebidas y Jugos" });
+                    targetCategory = firstBebidas;
+                    bebidas.shift(); // Remove from processing list as it's now the target
+                }
+
+                if (targetCategory) {
+                    for (const b of bebidas) {
+                        const affectedProducts = await db.products.where('categoryId').equals(b.id!).toArray();
+                        for (const p of affectedProducts) {
+                            await db.products.update(p.id!, { categoryId: targetCategory.id });
+                        }
+                        await db.categories.delete(b.id!);
+                        mergedCount++;
+                    }
+                }
+                // Update groups map to reflect changes if needed, but we proceed to standard dedupe for others
+            }
+            // -------------------------------------------------------------
+
+            // 2. Process Groups (Standard Dedupe)
             await db.transaction('rw', db.categories, db.products, async () => {
                 for (const [name, list] of groups.entries()) {
+                    // Skip 'bebidas' key as we handled it, but check others
+                    if (name === 'bebidas') continue;
+
                     if (list.length > 1) {
                         // Sort: Keep the one with lowest ID (usually oldest)
                         list.sort((a, b) => (a.id || 999999) - (b.id || 999999));

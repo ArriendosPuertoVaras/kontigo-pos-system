@@ -16,7 +16,7 @@ const TEMPLATES: Record<ImportType, any[]> = {
     ],
     categories: [
         { Nombre: "Entradas", Destino: "Cocina" },
-        { Nombre: "Bebidas", Destino: "Barra" },
+        { Nombre: "Bebidas y Jugos", Destino: "Barra" },
         { Nombre: "Abarrotes", Destino: "Bodega" }
     ],
     inventory: [
@@ -25,7 +25,7 @@ const TEMPLATES: Record<ImportType, any[]> = {
     ],
     products: [
         { Producto: "Lomo a lo Pobre", Categoria: "Fondos", Precio: "12990" },
-        { Producto: "Pisco Sour", Categoria: "Bebidas", Precio: "4500" }
+        { Producto: "Pisco Sour", Categoria: "Bebidas y Jugos", Precio: "4500" }
     ],
     recipes: [
         { Plato: "Lomo a lo Pobre", Insumo: "Lomo Liso", Cantidad: "0.300", Unidad: "kg" },
