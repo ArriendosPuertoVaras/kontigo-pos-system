@@ -146,15 +146,55 @@ function OrderCard({ order, onStatusChange, viewMode }: { order: any, onStatusCh
 }
 
 import { usePermission } from '@/hooks/usePermission';
-import { Lock } from 'lucide-react';
+import { Lock, Settings, X, Save } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 
 export default function OrdersPage() {
     const hasAccess = usePermission('kds:view');
     const [viewMode, setViewMode] = useState<string>('kitchen');
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [stationFilter, setStationFilter] = useState<string[]>([]);
+    const [tempFilter, setTempFilter] = useState<string[]>([]);
 
-    // Healing: Logic Removed to prevent Zombie Categories
-    // useEffect(() => { ... }, []);
+    // Load Settings from LocalStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('kds_station_filter');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                setStationFilter(parsed);
+                // Set initial view mode if possible
+                if (parsed.length > 0 && !parsed.includes(viewMode)) {
+                    setViewMode(parsed[0]);
+                }
+            } catch (e) {
+                console.error("Failed to parse station filter", e);
+            }
+        }
+    }, []);
+
+    const handleOpenSettings = () => {
+        setTempFilter([...stationFilter]);
+        setIsSettingsOpen(true);
+    };
+
+    const handleSaveSettings = () => {
+        setStationFilter(tempFilter);
+        localStorage.setItem('kds_station_filter', JSON.stringify(tempFilter));
+        setIsSettingsOpen(false);
+        // Ensure viewMode is valid
+        if (tempFilter.length > 0 && !tempFilter.includes(viewMode)) {
+            setViewMode(tempFilter[0]);
+        }
+    };
+
+    const toggleFilter = (tab: string) => {
+        if (tempFilter.includes(tab)) {
+            setTempFilter(tempFilter.filter(t => t !== tab));
+        } else {
+            setTempFilter([...tempFilter, tab]);
+        }
+    };
 
     const data = useLiveQuery(async () => {
         const activeOrders = await db.orders.where('status').equals('open').toArray();
@@ -163,8 +203,9 @@ export default function OrdersPage() {
 
         // Extract Unique Destinations for Tabs
         const destinations = Array.from(new Set(categories.map(c => c.destination || 'kitchen')));
-        const tabs = destinations.filter(Boolean).map(d => d!.trim());
-        if (tabs.length === 0) tabs.push('kitchen');
+        // Normalize strings
+        const distinctTabs = destinations.filter(Boolean).map(d => d!.trim());
+        if (distinctTabs.length === 0) distinctTabs.push('kitchen');
 
         // Deep fetch for items -> product -> category
         const enrichedOrders = await Promise.all(activeOrders.map(async (o) => {
@@ -178,15 +219,28 @@ export default function OrdersPage() {
             return {
                 ...o,
                 tableName: tables.find(t => t.id === o.tableId)?.name || 'Mesa ?',
-                itemsWithCategory // Pass this new array to the card
+                itemsWithCategory
             };
         }));
 
-        return { orders: enrichedOrders, tabs };
+        return { orders: enrichedOrders, tabs: distinctTabs };
     });
 
     const orders = data?.orders;
-    const availableTabs = data?.tabs || ['kitchen'];
+    const allTabs = data?.tabs || ['kitchen'];
+
+    // FILTER TABS BASED ON STATION SETTINGS
+    const visibleTabs = stationFilter.length > 0
+        ? allTabs.filter(t => stationFilter.includes(t))
+        : allTabs; // If no filter, show all
+
+    // If current ViewMode becomes invisible, switch to first visible
+    useEffect(() => {
+        if (visibleTabs.length > 0 && !visibleTabs.includes(viewMode)) {
+            setViewMode(visibleTabs[0]);
+        }
+    }, [visibleTabs, viewMode]);
+
 
     const handleStatusChange = (id: number, status: any) => {
         db.orders.update(id, { status });
@@ -229,6 +283,13 @@ export default function OrdersPage() {
                     <Link href="/tables">
                         <NavItem icon={<ArrowLeft />} label="Volver" />
                     </Link>
+                    <div className="h-px bg-white/10 my-2 w-full"></div>
+                    <NavItem
+                        icon={<Settings />}
+                        label="Config"
+                        onClick={handleOpenSettings}
+                        active={isSettingsOpen}
+                    />
                 </nav>
             </aside>
 
@@ -236,9 +297,9 @@ export default function OrdersPage() {
             <main className="flex-1 flex flex-col h-full bg-[#2a2a2a] overflow-hidden">
                 <Header title={`KDS: ${viewMode === 'kitchen' ? 'Cocina' : (viewMode === 'bar' ? 'Barra' : viewMode)}`}>
                     <div className="flex flex-col md:flex-row items-center gap-3 w-full justify-start overflow-x-auto pb-2 scrollbar-hide">
-                        {/* DYNAMIC TABS */}
+                        {/* DYNAMIC TABS (FILTERED) */}
                         <div className="flex bg-black/20 p-1 rounded-lg gap-1 shrink-0">
-                            {availableTabs.sort().sort((a, b) => a === 'kitchen' ? -1 : (b === 'kitchen' ? 1 : 0)).map(tab => (
+                            {visibleTabs.sort().sort((a, b) => a === 'kitchen' ? -1 : (b === 'kitchen' ? 1 : 0)).map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setViewMode(tab)}
@@ -248,25 +309,68 @@ export default function OrdersPage() {
                                     {tab === 'kitchen' ? 'Cocina' : (tab === 'bar' ? 'Bar' : tab)}
                                 </button>
                             ))}
-                        </div>
-
-                        {/* ACTIONS */}
-                        <div className="flex items-center gap-2">
-                            <Link href="/manager/production">
-                                <button className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors border border-white/10">
-                                    <ChefHat className="w-4 h-4" />
-                                    Producción
-                                </button>
-                            </Link>
-                            <Link href="/orders/recipes">
-                                <button className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors border border-white/10">
-                                    <ClipboardList className="w-4 h-4" />
-                                    Fichas Técnicas
-                                </button>
-                            </Link>
+                            {visibleTabs.length === 0 && (
+                                <div className="px-4 py-1.5 text-xs text-gray-500 italic">
+                                    Ninguna área seleccionada
+                                </div>
+                            )}
                         </div>
                     </div>
                 </Header>
+
+                {/* STATION SETTINGS MODAL */}
+                {isSettingsOpen && (
+                    <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="bg-toast-charcoal-dark w-full max-w-md rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden animate-in zoom-in-95">
+                            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-toast-charcoal">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <Settings className="w-5 h-5 text-toast-orange" />
+                                    Configuración de Estación
+                                </h3>
+                                <button onClick={() => setIsSettingsOpen(false)}><X className="text-gray-400 hover:text-white" /></button>
+                            </div>
+                            <div className="p-6">
+                                <p className="text-sm text-gray-400 mb-4">
+                                    Selecciona las áreas que debe mostrar ESTA pantalla. La configuración se guardará solo en este dispositivo.
+                                </p>
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                    {allTabs.map(tab => (
+                                        <label key={tab} className="flex items-center gap-3 p-3 rounded-lg border border-white/5 hover:bg-white/5 cursor-pointer bg-black/20">
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors
+                                                ${tempFilter.includes(tab) ? 'bg-toast-orange border-toast-orange text-white' : 'border-gray-500'}`}>
+                                                {tempFilter.includes(tab) && <Check className="w-3 h-3" />}
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                className="hidden"
+                                                checked={tempFilter.includes(tab)}
+                                                onChange={() => toggleFilter(tab)}
+                                            />
+                                            <span className="text-sm font-bold text-white capitalize">
+                                                {tab === 'kitchen' ? 'Cocina' : (tab === 'bar' ? 'Bar' : tab)}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="p-4 border-t border-white/10 bg-toast-charcoal flex justify-end gap-3">
+                                <button
+                                    onClick={() => setTempFilter([])}
+                                    className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider"
+                                >
+                                    Mostrar Todo
+                                </button>
+                                <button
+                                    onClick={handleSaveSettings}
+                                    className="px-6 py-2 bg-toast-green hover:bg-green-600 text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-green-900/20"
+                                >
+                                    <Save className="w-4 h-4" />
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 p-4 overflow-y-auto">
                     {!orders || orders.length === 0 ? (
