@@ -32,43 +32,47 @@ export default function TablesPage() {
     // Fetched Data
     const data = useLiveQuery(async () => {
         const t = await db.restaurantTables.toArray();
-        const o = await db.orders.where('status').equals('open').toArray();
+        // Fetch both OPEN (active) and READY (waiting for delivery) orders
+        const o = await db.orders.where('status').anyOf('open', 'ready').toArray();
+        const c = await db.categories.toArray();
+
         const map = new Map<number, Order>();
         o.forEach(ord => map.set(ord.id!, ord));
-        return { tables: t, orderMap: map };
-    }, [now]); // Re-fetch/Re-render when 'now' changes
+
+        // Category Map for Destination Lookup
+        const catMap = new Map<number, 'kitchen' | 'bar'>();
+        c.forEach(cat => catMap.set(cat.id!, cat.destination || 'kitchen'));
+
+        return { tables: t, orderMap: map, catMap };
+    }, [now]);
 
     const tables = data?.tables;
     const orderMap = data?.orderMap;
+    const catMap = data?.catMap;
 
-    // DB Initialization removed to prevent auto-seeding
-    // useEffect(() => {
-    //    seedDatabase();
-    // }, []);
-
+    // ... (Stats Logic Unchanged) ...
     // Quick Stats
     const totalTables = tables?.length || 0;
     const occupiedTables = tables?.filter(t => t.status === 'occupied').length || 0;
     const availableTables = tables?.filter(t => t.status === 'available').length || 0;
 
-    // Guest Count Modal State
+    // ... (Guest Count Logic Unchanged) ...
     const [selectedTableForGuestCount, setSelectedTableForGuestCount] = useState<RestaurantTable | null>(null);
     const [guestCount, setGuestCount] = useState(2);
     const [showClockOut, setShowClockOut] = useState(false);
 
-    // LISTEN FOR SIDEBAR CLOCK-OUT EVENT
+    // ... (Effect Unchanged) ...
     useEffect(() => {
         const handleClockOut = () => setShowClockOut(true);
         window.addEventListener('open-clock-out', handleClockOut);
         return () => window.removeEventListener('open-clock-out', handleClockOut);
     }, []);
 
-    // --- TABLE MANAGEMENT ---
+    // ... (Table Management Logic Unchanged) ...
     const [isEditMode, setIsEditMode] = useState(false);
 
     const handleAddTable = async () => {
         const nextNumber = (tables?.length || 0) + 1;
-        // Direct Action (No Popup)
         await db.restaurantTables.add({
             name: `Mesa ${nextNumber}`,
             status: 'available',
@@ -83,32 +87,27 @@ export default function TablesPage() {
         }
     };
 
-    // --- ALERT LOGIC (Moved from Order Page) ---
+    // --- ALERT LOGIC (Removed Global Toast in favor of Per-Table Blinking) ---
+    // (Keeping generic notification state if needed for other things, but disabling the auto-toast for Ready)
     const [notification, setNotification] = useState<string | null>(null);
-    const readyOrders = useLiveQuery(() => db.orders.where('status').equals('ready').toArray());
-    const prevReadyRef = useRef(0);
-
-    useEffect(() => {
-        if (!readyOrders) return;
-
-        // If count increases, show alert
-        if (readyOrders.length > prevReadyRef.current) {
-            const latest = readyOrders.sort((a, b) => (b.id || 0) - (a.id || 0))[0];
-            if (latest) {
-                setNotification(`¡Pedido Listo! (Mesa ${latest.tableId || '?'})`);
-                setTimeout(() => setNotification(null), 5000); // Simple 5s toast
-            }
-        }
-        prevReadyRef.current = readyOrders.length;
-    }, [readyOrders]);
 
     const handleTableClick = async (table: RestaurantTable) => {
         if (table.status === 'available') {
-            // OPEN MODAL INSTEAD OF DIRECT CREATE
             setSelectedTableForGuestCount(table);
             setGuestCount(2);
         } else {
-            // Already occupied, go to order
+            // Check for Ready Delivery First
+            const order = orderMap?.get(table.currentOrderId!);
+            if (order && order.status === 'ready' && !(order as any).isDelivered) {
+                // WAITER CONFIRMS DELIVERY
+                // We use a custom field "isDelivered" on the order object.
+                // Since Dexie is schema-less for objects, we can add it.
+                await db.orders.update(order.id!, { isDelivered: true } as any);
+                // Don't navigate yet, just confirm delivery.
+                return;
+            }
+
+            // Navigate to Order
             router.push(`/?tableId=${table.id}`);
         }
     };
@@ -117,7 +116,6 @@ export default function TablesPage() {
         if (!selectedTableForGuestCount) return;
 
         try {
-            // 1. Create Order
             const orderId = await db.orders.add({
                 tableId: selectedTableForGuestCount.id!,
                 items: [],
@@ -126,20 +124,18 @@ export default function TablesPage() {
                 tip: 0,
                 total: 0,
                 createdAt: new Date(),
-                covers: count // SAVE SELECTED COVERS
+                covers: count
             });
 
-            // 2. Update Table
             await db.restaurantTables.update(selectedTableForGuestCount.id!, {
                 status: 'occupied',
                 currentOrderId: orderId as number
             });
 
-            // 3. Redirect
             router.push(`/?tableId=${selectedTableForGuestCount.id}`);
 
         } catch (e) {
-            console.error("Error creating order with covers:", e);
+            console.error("Error creating order:", e);
         } finally {
             setSelectedTableForGuestCount(null);
         }
@@ -148,7 +144,6 @@ export default function TablesPage() {
     return (
         <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
 
-            {/* GUEST COUNT MODAL */}
             <GuestCountModal
                 isOpen={!!selectedTableForGuestCount}
                 onClose={() => setSelectedTableForGuestCount(null)}
@@ -156,17 +151,12 @@ export default function TablesPage() {
                 tableName={selectedTableForGuestCount?.name || ''}
             />
 
-            {/* UNIFIED SIDEBAR */}
             <Sidebar />
 
-            {/* MAIN CONTENT */}
             <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#2a2a2a]">
 
-                {/* Header */}
                 <Header title="Mapa de Mesas">
                     <div className="flex items-center gap-6 w-full justify-between">
-                        {/* Stats Pills */}
-                        {/* Stats Pills - Hidden on small screens */}
                         <div className="hidden lg:flex gap-3">
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
@@ -178,10 +168,7 @@ export default function TablesPage() {
                             </div>
                         </div>
 
-                        {/* Search & Filter */}
                         <div className="flex items-center gap-4">
-
-                            {/* EDIT MODE TOGGLE */}
                             <button
                                 onClick={() => setIsEditMode(!isEditMode)}
                                 className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg
@@ -221,29 +208,41 @@ export default function TablesPage() {
                                 let waitTime = 0;
                                 let waitTimeLabel = "";
 
+                                // Ready Flags
+                                let hasKitchenReady = false;
+                                let hasBarReady = false;
+
                                 if (table.status === 'occupied') {
-                                    // Calculate Wait Time
                                     const order = orderMap?.get(table.currentOrderId!);
                                     if (order) {
                                         waitTime = getOrderWaitTime(order.createdAt);
                                         waitTimeLabel = getOrderWaitTimeFormatted(order.createdAt);
+
+                                        // CHECK FOR READY STATUS & DELIVERY
+                                        if (order.status === 'ready' && !(order as any).isDelivered) {
+                                            // Determine destinations based on categories
+                                            if (catMap) {
+                                                const hasKitchenItem = order.items.some(i => catMap.get(i.product.categoryId) !== 'bar'); // Assume kitchen default
+                                                const hasBarItem = order.items.some(i => catMap.get(i.product.categoryId) === 'bar');
+
+                                                if (hasKitchenItem) hasKitchenReady = true;
+                                                if (hasBarItem) hasBarReady = true;
+                                            }
+                                        }
                                     }
                                     const status = getWaitStatus(waitTime);
 
                                     label = 'Ocupada';
 
                                     if (status === 'critical') {
-                                        // > 20 min -> RED
-                                        containerClass = 'bg-red-500/10 border-red-500/50 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.3)] animate-pulse';
+                                        containerClass = 'bg-red-500/10 border-red-500/50 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]'; // Removed pulse, used for ready
                                         iconClass = 'bg-red-600 text-white border-red-500 shadow-lg';
                                         textClass = 'text-red-400 font-bold';
                                     } else if (status === 'warning') {
-                                        // > 10 min -> YELLOW
                                         containerClass = 'bg-yellow-500/10 border-yellow-500/50 hover:bg-yellow-500/20 shadow-[0_0_15px_rgba(234,179,8,0.2)]';
                                         iconClass = 'bg-yellow-500 text-black border-yellow-400 shadow-md';
                                         textClass = 'text-yellow-400 font-bold';
                                     } else {
-                                        // < 10 min -> GREEN (All good)
                                         containerClass = 'bg-green-500/10 border-green-500/50 hover:bg-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.2)]';
                                         iconClass = 'bg-green-600 text-white border-green-500 shadow-md';
                                         textClass = 'text-green-400 font-bold';
@@ -266,6 +265,16 @@ export default function TablesPage() {
                                             onClick={() => handleTableClick(table)}
                                             className={`w-full aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 transition-all overflow-hidden ${containerClass} ${isEditMode ? 'animate-pulse' : ''}`}
                                         >
+                                            {/* READY INDICATORS (BLINKING) */}
+                                            <div className="absolute top-2 left-2 flex gap-1">
+                                                {hasKitchenReady && (
+                                                    <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)] animate-[ping_1s_ease-in-out_infinite]" title="Cocina Lista"></div>
+                                                )}
+                                                {hasBarReady && (
+                                                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] animate-[ping_1s_ease-in-out_infinite] delay-150" title="Bar Listo"></div>
+                                                )}
+                                            </div>
+
                                             {/* Table Icon / Number */}
                                             <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border-2 mb-1 transition-transform group-hover:scale-110 ${iconClass}`}>
                                                 {table.name.replace('Mesa ', '')}
