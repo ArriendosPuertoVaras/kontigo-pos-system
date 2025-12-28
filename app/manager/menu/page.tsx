@@ -106,7 +106,7 @@ function CategoriesView() {
     // FIX: Fetch ALL and sort in memory to handle items without 'order'
     const categories = useLiveQuery(async () => {
         const cats = await db.categories.toArray();
-        return cats.sort((a, b) => (a.order || 999) - (b.order || 999));
+        return cats.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     });
 
     const [isEditing, setIsEditing] = useState<number | null>(null);
@@ -194,7 +194,7 @@ function CategoriesView() {
             await db.transaction('rw', db.categories, async () => {
                 // 1. Fetch fresh list
                 const allCats = await db.categories.toArray();
-                const sorted = allCats.sort((a, b) => (a.order || 0) - (b.order || 0));
+                const sorted = allCats.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
                 const currentIndex = sorted.findIndex(c => c.id === draggedId);
                 // If moving to end (-1), target doesn't exist in list
