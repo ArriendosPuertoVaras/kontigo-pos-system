@@ -78,7 +78,10 @@ export default function Header({ title, children, backHref }: HeaderProps) {
                                 <ArrowLeft className="w-5 h-5" />
                             </Link>
                         )}
-                        <h1 className="text-lg md:text-xl font-bold tracking-tight text-white/90 truncate">{title}</h1>
+                        <h1 className="text-lg md:text-xl font-bold tracking-tight text-white/90 truncate flex items-center gap-2">
+                            {title}
+                            <span className="px-2 py-0.5 rounded bg-toast-orange text-[10px] text-white font-bold tracking-wider">v2.0 SECURE</span>
+                        </h1>
                         {status === 'offline' ? (
                             <span className="flex items-center gap-1.5 bg-red-500/10 text-red-500 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-red-500/20 hidden sm:flex animate-pulse">
                                 <WiFiOff className="w-3 h-3" /> OFFLINE

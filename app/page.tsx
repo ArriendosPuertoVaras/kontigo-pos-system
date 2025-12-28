@@ -417,6 +417,14 @@ function POSContent() {
   const handlePay = async () => {
     if (ticket.length === 0) return;
 
+    // SECURITY CHECK: ACTIVE CASH SESSION
+    const activeSession = await db.dailyCloses.where('status').equals('open').first();
+    if (!activeSession) {
+      setNotification("⛔ Caja Cerrada: Debes realizar la Apertura de Caja");
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
     // Ensure order is saved before paying
     const saved = await handleSaveOrder(false);
     if (!saved) return;

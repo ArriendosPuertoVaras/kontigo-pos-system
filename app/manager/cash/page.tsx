@@ -152,7 +152,58 @@ export default function CashDashboardPage() {
                     </div>
                 </div>
 
+                {/* DIAGNOSTIC TOOLS (GHOST BUSTER) */}
+                <div className="mt-8 border-t border-white/5 pt-8">
+                    <h3 className="text-sm font-bold text-red-500 mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" /> Zona de Diagnóstico
+                    </h3>
+
+                    <GhostSessionDetector />
+                </div>
             </main>
         </div>
     );
+}
+
+function GhostSessionDetector() {
+    // BRUTE FORCE: Fetch ALL to avoid index issues
+    const allSessions = useLiveQuery(() => db.dailyCloses.toArray()) || [];
+
+    // Safety: Filter logic ensuring we catch anything looking like an open session
+    const ghosts = allSessions.filter(s => s.status === 'open');
+
+    if (ghosts.length === 0) {
+        return <div className="text-xs text-green-500 font-mono">✅ Sistema Limpio: No se detectaron sesiones fantasmas.</div>;
+    }
+
+    const forceClose = async (id: number) => {
+        if (!confirm("¿SEGURO? Esto forzará el cierre de esta sesión corrupta.")) return;
+        await db.dailyCloses.update(id, {
+            status: 'closed',
+            date: new Date(),
+            closedBy: 'ADMIN_FORCE_FIX'
+        });
+        window.location.reload();
+    };
+
+    return (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-3">
+            <p className="text-xs text-red-300 font-bold">
+                ⚠️ Se detectaron {ghosts.length} sesiones abiertas. Si el botón "Cierre de Caja" no funciona, usa estos botones para limpiar el sistema.
+            </p>
+            {ghosts.map(session => (
+                <div key={session.id} className="flex justify-between items-center bg-black/40 p-2 rounded gap-4">
+                    <div className="text-xs text-gray-300 font-mono">
+                        ID: {session.id} | Inicio: {session.startTime ? new Date(session.startTime).toLocaleString() : 'S/F'} | Status: {session.status}
+                    </div>
+                    <button
+                        onClick={() => session.id && forceClose(session.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-bold uppercase transition-colors"
+                    >
+                        Forzar Cierre
+                    </button>
+                </div>
+            ))}
+        </div>
+    )
 }

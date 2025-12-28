@@ -223,6 +223,7 @@ export interface Shift {
     isOvertime?: boolean;
     managerApproval?: 'pending' | 'approved' | 'rejected';
     autoClockOut?: boolean;
+    status?: 'open' | 'closed';
 }
 
 export interface Printer {

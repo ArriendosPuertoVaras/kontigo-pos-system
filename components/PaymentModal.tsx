@@ -19,8 +19,13 @@ function formatPrice(amount: number) {
     return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount);
 }
 
+import { useLiveQuery } from 'dexie-react-hooks';
+
 export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess }: PaymentModalProps) {
     if (!isOpen || !order) return null;
+
+    // SECURITY: Live Check for Open Session
+    const activeSession = useLiveQuery(() => db.dailyCloses.where('status').equals('open').first());
 
     // Derived State from Order
     // Calculate total paid and tips from existing payments
@@ -97,6 +102,18 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
 
     const handlePayment = async () => {
         setErrorMessage(null); // Clear previous errors
+
+        // SECURITY CHECK: ACTIVE CASH SESSION (FINAL GATE)
+        const activeSession = await db.dailyCloses.where('status').equals('open').first();
+
+        // DEBUG: Force user to see what the system sees
+        console.log("DEBUG CHECK:", activeSession);
+
+        if (!activeSession) {
+            setErrorMessage("⛔ ACCESO DENEGADO: Caja Cerrada. Realiza la Apertura de Caja primero.");
+            return;
+        }
+
         if (!amountToPay || isNaN(amountToPay) || amountToPay <= 0) {
             setErrorMessage("El monto a pagar no es válido.");
             return;
@@ -495,16 +512,21 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                                 CANCELAR
                             </button>
                             <button
-                                disabled={isProcessing || totalCharge <= 0}
+                                disabled={isProcessing || totalCharge <= 0 || !activeSession}
                                 onClick={handlePayment}
                                 className={`flex-1 py-2.5 rounded-xl font-bold text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2
-                                ${isProcessing || totalCharge <= 0
+                                ${isProcessing || totalCharge <= 0 || !activeSession
                                         ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                                         : 'bg-gradient-to-r from-toast-orange to-orange-600 text-white hover:brightness-110 active:scale-95 shadow-orange-500/20'}`}
                             >
-                                {isProcessing ? 'Generando DTE...' : 'CONFIRMAR PAGO'}
+                                {!activeSession ? '⛔ CAJA CERRADA' : (isProcessing ? 'Generando DTE...' : 'CONFIRMAR PAGO')}
                             </button>
                         </div>
+                        {!activeSession && (
+                            <div className="mt-2 text-[10px] text-red-500 text-center font-bold bg-red-500/10 p-2 rounded border border-red-500/20 animate-pulse">
+                                DEBES ABRIR CAJA PARA PODER COBRAR
+                            </div>
+                        )}
                     </div>
                 </div>
 
