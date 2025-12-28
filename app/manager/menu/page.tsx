@@ -591,6 +591,8 @@ function ProductsView() {
         setIsModalOpen(true);
     };
 
+    const { triggerChange } = useAutoSync(); // Hook for auto-save
+
     const handleSave = async () => {
         if (!formData.name || !formData.price || !formData.categoryId) return alert("Nombre, precio y categoría son obligatorios");
         if (isSubmitting) return;
@@ -611,6 +613,7 @@ function ProductsView() {
             } else {
                 await db.products.add(payload as Product);
             }
+            triggerChange(); // 🚀 TRIGGER AUTO-SYNC
             setIsModalOpen(false);
         } catch (error) {
             console.error("Error saving product:", error);
@@ -622,7 +625,10 @@ function ProductsView() {
     const handleDelete = async (e: React.MouseEvent, id: number) => {
         e.preventDefault();
         e.stopPropagation();
-        await db.products.delete(id);
+        if (confirm("¿Borrar producto?")) {
+            await db.products.delete(id);
+            triggerChange(); // 🚀 TRIGGER AUTO-SYNC
+        }
     };
 
     // Filtered Products
