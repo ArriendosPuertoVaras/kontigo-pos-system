@@ -186,33 +186,47 @@ function CategoriesView() {
         setDraggedId(null);
         setDragOverId(null);
 
-        if (draggedId === null || draggedId === targetId) return;
+        if (draggedId === null) return;
+        // If targetId is same as dragged, and not moving to end (-1), ignore
+        if (draggedId === targetId && targetId !== -1) return;
 
         try {
             await db.transaction('rw', db.categories, async () => {
-                // 1. Fetch fresh list to avoid UI stale state
+                // 1. Fetch fresh list
                 const allCats = await db.categories.toArray();
                 const sorted = allCats.sort((a, b) => (a.order || 0) - (b.order || 0));
 
                 const currentIndex = sorted.findIndex(c => c.id === draggedId);
-                const targetIndex = sorted.findIndex(c => c.id === targetId);
+                // If moving to end (-1), target doesn't exist in list
+                const targetIndex = targetId === -1 ? sorted.length : sorted.findIndex(c => c.id === targetId);
 
-                if (currentIndex === -1 || targetIndex === -1) return;
+                if (currentIndex === -1) return;
+                // If targetId was real but not found, abort
+                if (targetId !== -1 && targetIndex === -1) return;
 
-                // 2. Calculate correct insertion index
-                // If dragging DOWN (index 0 -> 2), the target (2) shifts to 1 after removal.
-                // We want to insert AT that new position to be "before" it.
-                // If dragging UP (index 2 -> 0), the target (0) stays at 0.
-                let insertionIndex = targetIndex;
-                if (currentIndex < targetIndex) {
-                    insertionIndex -= 1;
+                // 2. Logic Separator
+                const [movedItem] = sorted.splice(currentIndex, 1);
+
+                if (targetId === -1) {
+                    // APPEND TO END
+                    sorted.push(movedItem);
+                } else {
+                    // INSERT BEFORE TARGET
+                    // Recalculate insertion index because splice shifted things
+                    let insertionIndex = targetIndex;
+                    // If we dragged from BEFORE the target, the target shifted down by 1.
+                    // But wait, the TargetIndex was calculated BEFORE splice.
+                    // If currentIndex (0) < targetIndex (2). Splice removes 0. Old index 2 becomes index 1.
+                    // We want to insert 'before' old index 2.
+                    // So we insert at 1?
+                    // sorted now has length N-1.
+                    if (currentIndex < targetIndex) {
+                        insertionIndex -= 1;
+                    }
+                    sorted.splice(insertionIndex, 0, movedItem);
                 }
 
-                // 3. Move Item
-                const [movedItem] = sorted.splice(currentIndex, 1);
-                sorted.splice(insertionIndex, 0, movedItem);
-
-                // 4. Re-index EVERYTHING to 0, 1, 2, 3...
+                // 3. Re-index EVERYTHING
                 for (let i = 0; i < sorted.length; i++) {
                     await db.categories.update(sorted[i].id!, { order: i });
                 }
@@ -483,6 +497,26 @@ function CategoriesView() {
                         )}
                     </div>
                 ))}
+
+
+                {/* Global Drop Zone for "Last Position" */}
+                {draggedId !== null && (
+                    <div
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            setDragOverId(-1);
+                        }}
+                        onDragLeave={() => setDragOverId(null)}
+                        onDrop={(e) => handleDrop(e, -1)}
+                        className={`
+                            h-16 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center text-sm font-bold text-gray-400 transition-all
+                            ${dragOverId === -1 ? 'border-toast-orange bg-toast-orange/10 text-toast-orange' : 'hover:border-white/20'}
+                        `}
+                    >
+                        ⬇️ Mover al Final
+                    </div>
+                )}
             </div>
             {categories.length === 0 && (
                 <div className="text-center py-10 text-gray-500 border border-dashed border-white/10 rounded-xl">
