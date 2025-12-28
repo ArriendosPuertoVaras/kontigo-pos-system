@@ -199,11 +199,20 @@ function CategoriesView() {
 
                 if (currentIndex === -1 || targetIndex === -1) return;
 
-                // 2. Move Item
-                const [movedItem] = sorted.splice(currentIndex, 1);
-                sorted.splice(targetIndex, 0, movedItem);
+                // 2. Calculate correct insertion index
+                // If dragging DOWN (index 0 -> 2), the target (2) shifts to 1 after removal.
+                // We want to insert AT that new position to be "before" it.
+                // If dragging UP (index 2 -> 0), the target (0) stays at 0.
+                let insertionIndex = targetIndex;
+                if (currentIndex < targetIndex) {
+                    insertionIndex -= 1;
+                }
 
-                // 3. Re-index EVERYTHING to 0, 1, 2, 3...
+                // 3. Move Item
+                const [movedItem] = sorted.splice(currentIndex, 1);
+                sorted.splice(insertionIndex, 0, movedItem);
+
+                // 4. Re-index EVERYTHING to 0, 1, 2, 3...
                 for (let i = 0; i < sorted.length; i++) {
                     await db.categories.update(sorted[i].id!, { order: i });
                 }
