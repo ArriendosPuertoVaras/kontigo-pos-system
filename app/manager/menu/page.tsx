@@ -121,7 +121,10 @@ function CategoriesView() {
     const [draggedId, setDraggedId] = useState<number | null>(null);
 
     const handleAdd = async () => {
-        if (!newCatName.trim()) return;
+        if (!newCatName.trim()) {
+            alert("Por favor escribe un nombre para la categoría.");
+            return;
+        }
         try {
             // Get max order safely to append at end
             const lastCat = await db.categories.orderBy('order').last();
@@ -134,8 +137,10 @@ function CategoriesView() {
             });
             setNewCatName("");
             triggerChange(); // Auto-Sync
+            // toast.success("Categoría cread"); // Optional: if you have toast imported, otherwise just relying on UI update
         } catch (error) {
             console.error("Error adding category:", error);
+            alert("Error al crear categoría: " + JSON.stringify(error));
         }
     };
 
