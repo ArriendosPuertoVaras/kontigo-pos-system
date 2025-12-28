@@ -78,10 +78,63 @@ export default function AccountingDashboard() {
                                         <div className="text-center py-6">
                                             <p className="text-gray-500 mb-3 text-xs">No hay cuentas init.</p>
                                             <button onClick={handleManualInit} disabled={initializing} className="px-3 py-1.5 bg-toast-orange rounded text-[10px] font-bold">
-                                                {initializing ? 'Creando...' : 'Inicializar Nexus'}
                                             </button>
                                         </div>
                                     )}
+
+                                    {/* Manual Sync Utility */}
+                                    <div className="mb-4 flex justify-end px-2">
+                                        <button
+                                            onClick={async () => {
+                                                setInitializing(true);
+                                                // DEBUG: Get raw values to show user
+                                                const ingredients = await db.ingredients.toArray();
+                                                let totalVal = 0;
+                                                ingredients.forEach(i => {
+                                                    if (i.stock > 0 && i.cost > 0) totalVal += i.stock * i.cost;
+                                                });
+                                                alert(`DEBUG INVENTARIO:\n- Ingredientes: ${ingredients.length}\n- Valor Calculado: ${totalVal}\n- Costos > 0: ${ingredients.filter(i => i.cost > 0).length}`);
+
+                                                await KontigoFinance.recalculateInventoryValuation();
+                                                setInitializing(false);
+                                                window.location.reload();
+                                            }}
+                                            disabled={initializing}
+                                            className="text-[10px] text-toast-orange hover:text-white border border-toast-orange hover:bg-toast-orange/10 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                                        >
+                                            <RefreshCw className={`w-3 h-3 ${initializing ? 'animate-spin' : ''}`} />
+                                            Sincronizar Inventario
+                                        </button>
+
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm("⚠️ ¿REINICIAR FINANZAS? ⚠️\n\nEsto borrará todo el historial contable y lo regenerará desde CERO usando tus Ventas, Compras y Mermas reales.\n\nÚsalo solo si los saldos son incorrectos.")) return;
+
+                                                try {
+                                                    setInitializing(true);
+                                                    const orderCount = await db.orders.count();
+                                                    alert(`DEBUG: Iniciando regeneración. Órdenes encontradas: ${orderCount}`);
+
+                                                    await KontigoFinance.regenerateFinancials();
+
+                                                    const entryCount = await db.journalEntries.count();
+                                                    alert(`✅ Regeneración Completada.\n\n- Asientos Generados: ${entryCount}`);
+
+                                                    setInitializing(false);
+                                                    window.location.reload();
+                                                } catch (e: any) {
+                                                    alert(`❌ ERROR CRÍTICO: ${e.message}`);
+                                                    console.error(e);
+                                                    setInitializing(false);
+                                                }
+                                            }}
+                                            disabled={initializing}
+                                            className="ml-2 text-[10px] text-red-400 hover:text-white border border-red-400 hover:bg-red-400/10 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                                        >
+                                            <RefreshCw className={`w-3 h-3 ${initializing ? 'animate-spin' : ''}`} />
+                                            Reiniciar Finanzas
+                                        </button>
+                                    </div>
 
                                     {/* Group by Type */}
                                     {['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'].map(type => {

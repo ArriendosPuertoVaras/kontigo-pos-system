@@ -103,11 +103,35 @@ export default function SettingsPage() {
                 <div className="flex-1 overflow-y-auto p-8">
                     <div className="max-w-4xl mx-auto space-y-8">
 
-                        {/* DATA MANAGEMENT SECTION */}
+
+
+                        {/* SYSTEM HEALTH AND DIAGNOSTICS */}
                         <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-6 shadow-xl">
                             <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
                                 <Database className="w-5 h-5 text-toast-orange" />
-                                Gestión de Datos
+                                Diagnóstico y Salud
+                            </h3>
+                            <p className="text-sm text-gray-400 mb-6">Herramientas para verificar la integridad de tus datos.</p>
+
+                            <div className="bg-black/20 p-4 rounded-lg border border-white/5 flex items-center justify-between">
+                                <div>
+                                    <h4 className="font-bold text-white mb-1">Diagnóstico de Inventario y Finanzas</h4>
+                                    <p className="text-xs text-gray-500">Detecta productos con costo $0, inventario fantasma y descuadres contables.</p>
+                                </div>
+                                <button
+                                    onClick={() => router.push('/settings/system-health')}
+                                    className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 rounded-lg text-sm font-bold transition flex items-center gap-2"
+                                >
+                                    Abrir Diagnóstico
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* DATA MANAGEMENT SECTION */}
+                        <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-6 shadow-xl">
+                            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                                Zona de Peligro (Gestión de Datos)
                             </h3>
                             <p className="text-sm text-gray-400 mb-6">Controla los datos de prueba y limpieza del sistema.</p>
 

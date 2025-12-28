@@ -231,14 +231,32 @@ function CategoriesView() {
                                     groups.get(key)!.push(c);
                                 }
 
+                                // SPECIAL CASE: Merge "Bebidas" into "Bebidas y Jugos" if requested
+                                const bebidas = groups.get('bebidas');
+                                const bebidasYJugos = groups.get('bebidas y jugos');
+
+                                if (bebidas && bebidasYJugos) {
+                                    // Move all from 'bebidas' to the first 'bebidas y jugos'
+                                    const target = bebidasYJugos[0];
+                                    for (const b of bebidas) {
+                                        const products = await db.products.where('categoryId').equals(b.id!).toArray();
+                                        for (const p of products) {
+                                            await db.products.update(p.id!, { categoryId: target.id });
+                                        }
+                                        await db.categories.delete(b.id!);
+                                    }
+                                    groups.delete('bebidas'); // Done
+                                    alert("✅ Se fusionaron todas las 'Bebidas' en 'Bebidas y Jugos'");
+                                }
+
                                 let mergedCount = 0;
                                 let productsUpdated = 0;
 
-                                // 2. Process Groups
+                                // 2. Process Groups (Standard Dedupe)
                                 await db.transaction('rw', db.categories, db.products, async () => {
                                     for (const [name, list] of groups.entries()) {
                                         if (list.length > 1) {
-                                            // Sort to keep the "best" one
+                                            // Sort to keep the "best" one (lowest ID usually)
                                             list.sort((a, b) => (a.id || 999999) - (b.id || 999999));
 
                                             const winner = list[0];
@@ -259,15 +277,14 @@ function CategoriesView() {
                                     }
                                 });
 
-                                // 3. Sync Logic handled via triggerChange if we were in context or manual sync
-                                // For bulk operations, manual push is still safer immediate feedback
+                                // 3. Sync Logic 
                                 if (mergedCount > 0) {
                                     const { syncService } = await import('@/lib/sync_service');
-                                    await syncService.pushAll(); // Force immediate sync for cleanup
+                                    await syncService.pushAll();
 
                                     alert(`✅ Limpieza Completa:\n- Fusionadas: ${mergedCount} categorías\n- Productos movidos: ${productsUpdated}`);
                                 } else {
-                                    alert("👍 No se encontraron duplicados.");
+                                    alert("👍 No se encontraron otros duplicados.");
                                 }
 
                             } catch (err) {
@@ -282,13 +299,14 @@ function CategoriesView() {
                         ⚡ Consolidar Duplicados
                     </button>
 
-                    {/* Basic Restore Button - Kept plain for emergencies */}
+                    {/* Basic Restore Button - Removed "Bebidas" to prevent re-creation */}
                     <button
                         onClick={async (e) => {
                             const btn = e.currentTarget;
                             btn.innerText = "⏳ ...";
                             try {
-                                const needed = ["Entradas", "Platos", "Caracter", "Postres", "Bebidas", "Jugos", "Copete", "Cafe"];
+                                // REMOVE 'Bebidas' from this list to avoid re-creating it
+                                const needed = ["Entradas", "Platos", "Caracter", "Postres", "Bebidas y Jugos", "Copete", "Cafe"];
                                 const existing = await db.categories.toArray();
                                 const existingNames = new Set(existing.map(c => c.name.toLowerCase().trim()));
                                 let maxOrder = existing.reduce((max, c) => Math.max(max, c.order || 0), 0);
@@ -297,7 +315,7 @@ function CategoriesView() {
                                 for (const name of needed) {
                                     if (!existingNames.has(name.toLowerCase())) {
                                         maxOrder++;
-                                        const dest = (name === "Bebidas" || name === "Jugos" || name === "Copete" || name === "Cafe" || name === "Bebidas y Jugos") ? 'bar' : 'kitchen';
+                                        const dest = (name.includes("Bebidas") || name === "Copete" || name === "Cafe") ? 'bar' : 'kitchen';
                                         await db.categories.add({
                                             name, destination: dest, order: maxOrder
                                         });
@@ -309,7 +327,7 @@ function CategoriesView() {
                                     await syncService.pushAll();
                                     alert(`✅ Restauradas ${added} categorías básicas`);
                                 } else {
-                                    alert("👍 Categorías básicas OK (Si falta 'Platos', intenta renombrar alguna vacía o crearla de nuevo)");
+                                    alert("👍 Categorías básicas OK");
                                 }
                             } catch (e) { console.error(e); }
                             btn.innerText = "🔄 Restaurar";
@@ -404,8 +422,8 @@ function CategoriesView() {
                                 </div>
                                 <span className="font-bold text-lg">{cat.name}</span>
                                 <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ml-2 ${cat.destination === 'bar'
-                                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/20'
-                                        : 'bg-orange-500/10 text-orange-400 border-orange-500/10'
+                                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/20'
+                                    : 'bg-orange-500/10 text-orange-400 border-orange-500/10'
                                     }`}>
                                     {cat.destination === 'bar' ? 'BAR' : 'COCINA'}
                                 </span>

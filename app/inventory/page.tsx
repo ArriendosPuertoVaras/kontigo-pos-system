@@ -1,9 +1,12 @@
 'use client';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { KontigoFinance } from '@/lib/accounting';
+import { syncService } from '@/lib/sync_service';
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Package, Search, Settings, AlertTriangle, Plus, Filter, Trash2, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { ArrowLeft, Package, Search, Settings, AlertTriangle, Plus, Filter, Trash2, XCircle, ChefHat } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 
@@ -160,6 +163,12 @@ export default function InventoryPage() {
                 </div>
                 <nav className="flex flex-col gap-2 w-full px-2">
                     <NavItem icon={<ArrowLeft />} label="Volver" onClick={() => router.push('/tables')} />
+                    <div className="h-px w-full bg-white/10 my-2"></div>
+                    <NavItem
+                        icon={<ChefHat />}
+                        label="Cocina"
+                        onClick={() => router.push('/inventory/preparations')}
+                    />
                 </nav>
             </aside>
 
@@ -283,6 +292,7 @@ export default function InventoryPage() {
                                     <th className="px-4 py-2 whitespace-nowrap">Stock Actual</th>
                                     <th className="px-4 py-2 whitespace-nowrap">Unidad</th>
                                     <th className="px-4 py-2 whitespace-nowrap">Costo Unit.</th>
+                                    <th className="px-4 py-2 whitespace-nowrap">Valor Total</th>
                                     <th className="px-4 py-2 whitespace-nowrap">Estado</th>
                                     <th className="px-4 py-2 text-right whitespace-nowrap">Acciones</th>
                                 </tr>
@@ -300,6 +310,15 @@ export default function InventoryPage() {
                                         </td>
                                         <td className="px-4 py-2 text-xs whitespace-nowrap">{item.unit}</td>
                                         <td className="px-4 py-2 text-xs whitespace-nowrap">${item.cost || 0}</td>
+                                        <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">
+                                            {item.isInfinite ? (
+                                                <span className="text-gray-600">-</span>
+                                            ) : (
+                                                <span className={`${item.stock > 0 && (!item.cost || item.cost === 0) ? 'text-red-500 font-bold' : 'text-gray-300'}`}>
+                                                    {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format((item.stock || 0) * (item.cost || 0))}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-2 whitespace-nowrap">
                                             {item.isInfinite ? (
                                                 <span className="text-blue-400 font-bold text-[10px] bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">INFINITO</span>
@@ -530,7 +549,12 @@ function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () =
 }
 
 function EditInventoryItemModal({ ingredient, onClose, existingSubFamilies }: { ingredient: any, onClose: () => void, existingSubFamilies: string[] }) {
-    const [form, setForm] = useState({ ...ingredient });
+    const [form, setForm] = useState({
+        ...ingredient,
+        family: ingredient.family || ingredient.category || "Abarrotes",
+        storage: ingredient.storage || "Bodega Seca",
+        subFamily: ingredient.subFamily || ""
+    });
 
     const handleSave = async () => {
         if (!form.name.trim()) return alert("El nombre es obligatorio");

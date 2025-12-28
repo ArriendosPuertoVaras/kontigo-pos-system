@@ -8,6 +8,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seedDatabase, Product, ModifierGroup, ModifierOption, RestaurantTable, TicketItem, Order } from '@/lib/db';
 import { KontigoFinance } from '@/lib/accounting';
 import { printOrderToKitchen } from '@/lib/printing';
+import { getRecipeItemConversion } from '@/lib/recipes';
 import PaymentModal from '@/components/PaymentModal';
 import ClockOutModal from '@/components/ClockOutModal';
 import Sidebar from '@/components/Sidebar';
@@ -239,7 +240,30 @@ function POSContent() {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
+  // --- AVAILABILITY CHECK HELPER ---
+  const isProductOutOfStock = (product: Product) => {
+    // 1. If explicitly unavailable manually
+    if (product.isAvailable === false) return true;
 
+    // 2. If it has Batch Stock (Created via Production), use it!
+    if ((product.stock || 0) > 0) return false;
+
+    // 3. If no recipe, assume available (unless stock was specifically 0 and it's a tracked item? 
+    // For now, if no recipe and stock is 0/undefined, we assume it's untracked/infinite like "Water").
+    if (!product.recipe || product.recipe.length === 0) return false;
+
+    // 4. Check Ingredients (Made to Order OR Empty Batch backup)
+    // We only block if ingredients are STRICTLY insufficient using correct units.
+    if (!ingredients) return false; // Loading... assume available
+
+    return product.recipe.some(recipeItem => {
+      const ingredient = ingredients.find(i => i.id === recipeItem.ingredientId);
+      if (!ingredient) return false; // Missing data shouldn't block sales in POS? Or should? Safety: Don't block.
+
+      const { convertedQuantity } = getRecipeItemConversion(ingredient, recipeItem);
+      return ingredient.stock < convertedQuantity;
+    });
+  };
 
   const formatPrice = (amount: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(amount);
 
@@ -319,9 +343,52 @@ function POSContent() {
       // 1. Deduct Stock (Iterate final items)
       console.log("Finalizing order, deducting stock...");
       for (const item of order.items) {
-        if (item.product.recipe) {
-          for (const recipeItem of item.product.recipe) {
-            await deductStock(recipeItem.ingredientId, recipeItem.quantity * item.quantity);
+        // A. If Product has Batch Stock (Kitchen Production Item), deduct from Product Stock
+        // We assume that if stock is being tracked (even if currently 0), we should deduct from it (going negative is better than double-deducting ingredients)
+        // How to know if it is a batch item? 
+        // Heuristic: If it has a recipe AND is a "Kitchen" item? 
+        // Simplest: If `stock` property is defined on the product object in DB. 
+        // But `stock` might be 0. 
+
+        // Let's use the same logic: If we have positive stock, we definitely deduct from it.
+        // If we have 0 stock, but it IS a batch item, we should still deduct from it (negative stock) rather than ingredients.
+        // BUT, currently we don't have a strict flag for "Batch Tracked". 
+        // Changing strategy: If stock > 0, deduct stock. If stock <= 0, deduct ingredients?
+        // No, that mixes models. 
+
+        // BETTER: Check if the product category destination is 'kitchen'. 
+        // If 'kitchen', it's likely a batch item? Not necessarily (Steak).
+
+        // FOR THIS USER: "Entradas con Perso" (Empanadas) are clearly Batch.
+        // Let's rely on: If `img` (image) or logic implies batch? No.
+
+        // SAFE HYBRID FOR NOW:
+        // If `product.stock` is greater than 0, we DEDUCT STOCK.
+        // If `product.stock` is <= 0... 
+        //   If we allowed headers to produce it, we should deduct stock. 
+
+        // Let's use: If stock > -100 (basically if the field exists and is numeric), deduct stock?
+        // No, `product.stock` is on the object.
+
+        // Current implementation of `produce`: Updates `stock`.
+        // So `stock` will be > 0.
+
+        if ((item.product.stock || 0) > 0) {
+          const currentStock = item.product.stock || 0;
+          await db.products.update(item.product.id!, { stock: currentStock - item.quantity });
+        } else {
+          // Fallback: Deduct Ingredients (Made to Order)
+          if (item.product.recipe) {
+            for (const recipeItem of item.product.recipe) {
+              // Use raw quantity from recipe (no conversion needed for simple deduction if units align, but safer to use simple math here as recipe is source of truth for 'un'/'gr')
+              // Wait, ingredient.stock is in DB unit. Recipe is in Recipe Unit.
+              // We MUST use conversion here too!
+              const ingredient = await db.ingredients.get(recipeItem.ingredientId);
+              if (ingredient) {
+                const { convertedQuantity } = getRecipeItemConversion(ingredient, recipeItem);
+                await db.ingredients.update(ingredient.id!, { stock: ingredient.stock - (convertedQuantity * item.quantity) });
+              }
+            }
           }
         }
       }
@@ -691,16 +758,7 @@ function POSContent() {
             <div className="w-full md:col-span-8 flex flex-col gap-3 h-full overflow-hidden">
               {/* Breadcrumbs / Categories */}
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                {categories?.slice().sort((a, b) => {
-                  const order = ["Entradas", "Platos", "Caracter", "Postres", "Bebidas", "Jugos", "Copete", "Cafe"];
-                  const idxA = order.indexOf(a.name);
-                  const idxB = order.indexOf(b.name);
-                  // If both in list, sort by list index. If not in list (shouldn't happen), push to end.
-                  if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                  if (idxA !== -1) return -1;
-                  if (idxB !== -1) return 1;
-                  return 0;
-                }).map((cat) => (
+                {categories?.slice().sort((a, b) => (a.order || 999) - (b.order || 999)).map((cat) => (
                   <CategoryTab
                     key={cat.id}
                     label={cat.name}
@@ -719,29 +777,22 @@ function POSContent() {
                     onClick={() => handleProductClick(item)}
                     onContextMenu={(e) => handleContextMenu(e, item)}
                     // STOCK VISUAL FEEDBACK
-                    disabled={item.recipe && ingredients && item.recipe.some(r => {
-                      const ing = ingredients.find(i => i.id === r.ingredientId);
-                      return ing && ing.stock < r.quantity;
-                    })}
+                    disabled={isProductOutOfStock(item)}
                     className={`active:scale-95 transition-all text-white border rounded-md shadow-sm flex flex-col items-center justify-center gap-1 p-2 relative group overflow-hidden h-[100px]
                             ${item.isAvailable === false
                         ? 'bg-[#1a1a1a] border-white/5 opacity-60 cursor-not-allowed'
-                        : (item.recipe && ingredients && item.recipe.some(r => {
-                          const ing = ingredients.find(i => i.id === r.ingredientId);
-                          return ing && ing.stock < r.quantity;
-                        }))
+                        : isProductOutOfStock(item)
                           ? 'bg-red-900/20 border-red-500/50 cursor-not-allowed grayscale' // No Stock Style
                           : 'bg-toast-charcoal-light active:bg-white/10 hover:bg-[#4a4a4a] border-white/5'}`}
                   >
                     {/* OUT OF STOCK OVERLAY */}
-                    {(item.recipe && ingredients && item.recipe.some(r => {
-                      const ing = ingredients.find(i => i.id === r.ingredientId);
-                      return ing && ing.stock < r.quantity;
-                    })) && (
-                        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
-                          <span className="text-red-500 font-bold border-2 border-red-500 px-2 py-1 -rotate-12 bg-black/80 text-xs">SIN STOCK</span>
-                        </div>
-                      )}
+                    {isProductOutOfStock(item) && item.isAvailable !== false && (
+                      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+                        <span className="text-red-500 font-bold border-2 border-red-500 px-2 py-1 -rotate-12 bg-black/80 text-xs text-center leading-tight">
+                          {(item.stock || 0) <= 0 ? 'SIN STOCK' : 'INGREDIENTES FALTANTES'}
+                        </span>
+                      </div>
+                    )}
 
                     {item.isAvailable === false ? (
                       <>

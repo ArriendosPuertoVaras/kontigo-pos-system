@@ -79,9 +79,15 @@ export default function Header({ title, children, backHref }: HeaderProps) {
                             </Link>
                         )}
                         <h1 className="text-lg md:text-xl font-bold tracking-tight text-white/90 truncate">{title}</h1>
-                        <span className="flex items-center gap-1.5 bg-toast-green/10 text-toast-green px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-toast-green/20 hidden sm:flex">
-                            <Wifi className="w-3 h-3" /> ONLINE
-                        </span>
+                        {status === 'offline' ? (
+                            <span className="flex items-center gap-1.5 bg-red-500/10 text-red-500 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-red-500/20 hidden sm:flex animate-pulse">
+                                <WiFiOff className="w-3 h-3" /> OFFLINE
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 bg-toast-green/10 text-toast-green px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-toast-green/20 hidden sm:flex cursor-pointer hover:bg-toast-green/20 transition-colors" title="Conectado a la Nube">
+                                <Wifi className="w-3 h-3" /> ONLINE
+                            </span>
+                        )}
                     </div>
                 </div>
 

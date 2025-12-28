@@ -209,7 +209,7 @@ export default function DataImportPage() {
         <div className="min-h-screen bg-neutral-900 text-white p-8 pb-32">
             {/* Header */}
             <div className="flex items-center gap-4 mb-8">
-                <Link href="/manager/admin" className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                <Link href="/manager" className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
                     <ArrowLeft className="w-6 h-6" />
                 </Link>
                 <div>

@@ -153,60 +153,12 @@ export default function OrdersPage() {
     const hasAccess = usePermission('kds:view');
     const [viewMode, setViewMode] = useState<'kitchen' | 'bar'>('kitchen');
 
-    // Healing: Auto-assign drinks to Bar category based on keywords
-    useEffect(() => {
-        const fixCategories = async () => {
-            // 1. Find or Create 'Bebidas'
-            let barCat = await db.categories.where('name').equals('Bebidas').first();
-            if (!barCat) {
-                const id = await db.categories.add({ name: 'Bebidas', destination: 'bar', course: 'beverage' });
-                barCat = { id, name: 'Bebidas', destination: 'bar', course: 'beverage' };
-            } else if (barCat.destination !== 'bar') {
-                // Force update if it was wrong
-                await db.categories.update(barCat.id!, { destination: 'bar', course: 'beverage' });
-            }
-
-            // 2. Scan Products
-            const products = await db.products.toArray();
-            const drinkKeywords = ['Limonada', 'Jugo', 'Coca', 'Fanta', 'Sprite', 'Pepsi', 'Ginger', 'Zero', 'Light', 'Agua', 'Mineral', 'Cerveza', 'Shop', 'Kross', 'Kunstmann', 'Corona', 'Wine', 'Vino', 'Cabernet', 'Merlot', 'Sauvignon', 'Espumante', 'Té', 'Te ', 'Café', 'Cafe ', 'Capuccino', 'Latte', 'Espresso', 'Pisco', 'Sour', 'Mojito', 'Ramazzotti', 'Spritz', 'Gin', 'Vodka', 'Ron', 'Whisky', 'Bebida'];
-
-            const updates = [];
-            for (const p of products) {
-                if (p.categoryId === barCat.id) continue;
-
-                // Check content
-                const isDrink = drinkKeywords.some(k => p.name.toLowerCase().includes(k.toLowerCase()));
-                if (isDrink) {
-                    updates.push(db.products.update(p.id!, { categoryId: barCat.id }));
-                }
-            }
-
-            if (updates.length > 0) {
-                await Promise.all(updates);
-                console.log(`Auto-migrated ${updates.length} items to Bar Category`);
-            }
-        };
-
-        fixCategories();
-    }, []);
+    // Healing: Logic Removed to prevent Zombie Categories
+    // useEffect(() => { ... }, []);
 
     const orders = useLiveQuery(async () => {
         const activeOrders = await db.orders.where('status').equals('open').toArray();
         const tables = await db.restaurantTables.toArray();
-
-        // --- AUTO-FIX: Ensure "Limonada" etc go to Bar ---
-        // This runs implicitly on fetch to self-heal the KDS display
-        // We do this check lightly to avoid perf hits
-        const drinksCategory = await db.categories.where('name').equals('Bebidas').first();
-        if (drinksCategory) {
-            const drinkKeywords = ['Limonada', 'Jugo', 'Coca', 'Fanta', 'Sprite', 'Zero', 'Light', 'Agua', 'Mineral', 'Cerveza', 'Shop', 'Kross', 'Wine', 'Vino', 'Té', 'Te ', 'Café', 'Cafe ', 'Latte', 'Espresso', 'Pisco', 'Sour', 'Mojito', 'Ramazzotti', 'Gin', 'Vodka', 'Ron', 'Volcan Choco'];
-            // Added Volcan Choco?? No, that's dessert. Removed.
-
-            // Fix locally for display if needed? 
-            // Better to fix DB once.
-            // Note: We can't easily wait for DB write in a liveQuery without side effects.
-            // So we'll trigger a side-effect fix elsewhere or relying on the 'autoFix' effect.
-        }
 
         // Deep fetch for items -> product -> category
         const enrichedOrders = await Promise.all(activeOrders.map(async (o) => {

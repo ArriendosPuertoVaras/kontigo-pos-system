@@ -55,7 +55,13 @@ export default function ManagerPage() {
     });
 
     const lowStockIngredients = useLiveQuery(async () => {
-        return db.ingredients.filter(i => i.stock < 10).toArray();
+        return db.ingredients.filter(i => {
+            // 1. Infinite Stock -> NEVER Alert
+            if (i.isInfinite) return false;
+            // 2. Custom Threshold or Default (e.g. 5)
+            const threshold = i.minStock !== undefined ? i.minStock : 5;
+            return i.stock <= threshold;
+        }).toArray();
     });
 
     if (hasAccess === false) {

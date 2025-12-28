@@ -4,6 +4,8 @@ import { db, Order, Payment } from '@/lib/db';
 import { KontigoFinance } from '@/lib/accounting'; // Import Nexus
 import { generateDTE } from '@/lib/dte_mock';
 import { openCashDrawer } from '@/lib/printing';
+import { toast } from 'sonner';
+import { syncService } from '@/lib/sync_service';
 import { X, CreditCard, Banknote, Smartphone, Receipt, Users, CheckCircle2, AlertCircle, FileText, Building2 } from 'lucide-react';
 
 interface PaymentModalProps {
@@ -176,6 +178,20 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                 // Do NOT close modal
             } else {
                 // Fully Paid -> Close
+                // 5. UPDATE INVENTORY VALUATION (Async)
+                KontigoFinance.recalculateInventoryValuation().catch(console.error);
+
+                // 6. AUTO-SYNC (Cloud) - Fire and Forget
+                if (navigator.onLine) {
+                    console.log("🦁 Nexus: Auto-Syncing Sale to Cloud...");
+                    syncService.autoSync(db.orders, 'orders').catch(console.error);
+                    // Also sync finance since we just touched it
+                    syncService.autoSync(db.journalEntries, 'journal_entries').catch(console.error);
+                    syncService.autoSync(db.accounts, 'accounts').catch(console.error);
+                }
+
+                const methodFormatted = paymentMethod === 'cash' ? 'efectivo' : paymentMethod === 'card' ? 'tarjeta' : 'transferencia';
+                toast.success(`Pago con ${methodFormatted} registrado!`);
                 onClose();
             }
 

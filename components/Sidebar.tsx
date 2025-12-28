@@ -15,9 +15,11 @@ import {
     Settings,
     LogOut,
     Briefcase,
-    Leaf,
     ChefHat,
-    Upload
+    Upload,
+    DollarSign,
+    Wallet,
+    Lock
 } from 'lucide-react';
 
 import { db } from '@/lib/db';
@@ -31,7 +33,11 @@ export default function Sidebar() {
     const [showNotifications, setShowNotifications] = useState(false);
 
     // --- REAL ALERTS DATA ---
-    const lowStockItems = useLiveQuery(() => db.ingredients.filter(i => i.stock <= (i.minStock || 0)).toArray());
+    const lowStockItems = useLiveQuery(() => db.ingredients.filter(i => {
+        if (i.isInfinite) return false;
+        const threshold = i.minStock !== undefined ? i.minStock : 5;
+        return i.stock <= threshold;
+    }).toArray());
     const activeOrders = useLiveQuery(() => db.orders.where('status').equals('open').toArray());
     // Only show shifts that have been open for more than 12 hours as an "Alert" or maybe just all open shifts for now?
     // Let's just show all open shifts for visibility
@@ -105,6 +111,13 @@ export default function Sidebar() {
                     <NavItem href="/?mode=pos" icon={<UtensilsCrossed />} label="POS" isActive={pathname === '/'} />
                     <NavItem href="/orders" icon={<ClipboardList />} label="KDS" isActive={pathname === '/orders'} />
                     <NavItem href="/manager/menu" icon={<ChefHat />} label="Menú" isActive={pathname === '/manager/menu'} />
+
+                    <div className="h-px bg-white/10 w-full my-1"></div>
+
+                    <NavItem href="/manager/cash" icon={<Wallet />} label="Caja" isActive={pathname.startsWith('/manager/cash') || pathname === '/manager/open' || pathname === '/manager/close'} />
+
+                    <div className="h-px bg-white/10 w-full my-1"></div>
+
                     <NavItem href="/staff/schedule" icon={<ClipboardList />} label="Turnos" isActive={pathname === '/staff/schedule'} />
                     <NavItem href="/inventory" icon={<Package />} label="Inventario" isActive={pathname === '/inventory'} />
                     <NavItem href="/manager" icon={<Briefcase />} label="Admin" isActive={pathname === '/manager'} />
@@ -115,6 +128,7 @@ export default function Sidebar() {
 
                     <NavItem href="/suppliers" icon={<Truck />} label="Prov." isActive={pathname === '/suppliers'} />
                     <NavItem href="/purchases" icon={<ShoppingCart />} label="Comp." isActive={pathname === '/purchases'} />
+                    <NavItem href="/manager/sales" icon={<DollarSign />} label="Ventas" isActive={pathname === '/manager/sales'} />
                     <NavItem href="/waste" icon={<Trash2 />} label="Mermas" isActive={pathname === '/waste'} danger />
 
                     <div className="h-px bg-white/10 w-full my-1"></div>

@@ -7,9 +7,12 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { WasteModal } from './WasteModal';
+import { KontigoFinance } from '@/lib/accounting';
+import { syncService } from '@/lib/sync_service';
 import Header from '@/components/Header';
 // ... imports
 import { usePermission } from '@/hooks/usePermission';
+import { toast } from 'sonner';
 import { Lock } from 'lucide-react';
 
 // Extends the standard item to include the transient supplier ID for the cart
@@ -158,6 +161,15 @@ export default function PurchasesPage() {
             }
             if (order.id) {
                 await db.purchaseOrders.update(order.id, { status: 'Received' });
+                // AUTO-SYNC: Record Expense
+                await KontigoFinance.recordPurchase(order.supplierId.toString(), order.totalCost, true);
+
+                // AUTO-SYNC
+                syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
+                syncService.autoSync(db.ingredients, 'ingredients').catch(console.error); // Stock changed
+                syncService.autoSync(db.journalEntries, 'journal_entries').catch(console.error); // Money moved
+
+                toast.success("Pedido recibido e inventario actualizado");
             }
         });
     };
@@ -178,8 +190,14 @@ export default function PurchasesPage() {
 
         const conversion = getConversionMultiplier(unit, ingredient);
         const stockDeduction = qty * conversion;
+        // Calculate cost of waste for finance
+        // Cost is per unit. If we waste 'qty' of 'purchaseUnit', we need the cost of that.
+        // Simplified: We deduct stock, we assume cost is proportionate.
+        // We need to know the cost of the wasted amount. 
+        // ingredient.cost is usually per 'unit' (e.g. per gram).
+        const wasteCost = stockDeduction * ingredient.cost;
 
-        await db.transaction('rw', db.ingredients, db.wasteLogs, async () => {
+        await db.transaction('rw', db.ingredients, db.wasteLogs, db.accounts, db.journalEntries, async () => {
             await db.wasteLogs.add({
                 ingredientId,
                 quantity: qty, // Store the raw quantity
@@ -188,8 +206,16 @@ export default function PurchasesPage() {
                 note: `${note} (${unit})` // Append unit to note for record
             });
             await db.ingredients.update(ingredientId, { stock: ingredient.stock - stockDeduction });
+
+            // AUTO-SYNC: Record Waste Expense
+            await KontigoFinance.recordWaste(ingredient.name, wasteCost, reason);
+
+            // AUTO-SYNC
+            syncService.autoSync(db.wasteLogs, 'waste_logs').catch(console.error);
+            syncService.autoSync(db.ingredients, 'ingredients').catch(console.error);
         });
         setIsWasteModalOpen(false);
+        toast.success(`Merma registrada: ${qty} ${unit}`);
     };
 
     return (

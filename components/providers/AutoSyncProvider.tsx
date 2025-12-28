@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+import { db } from '@/lib/db';
 
 type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
 
@@ -46,6 +47,62 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
             // Don't toast on background error to avoid annoyance, just show icon
         }
     }, []);
+
+
+
+    // Initial Sync on Mount (Recover from offline close) or SMART RESTORE
+    useEffect(() => {
+        // Wait a bit for app to settle
+        const timer = setTimeout(async () => {
+            if (typeof window === 'undefined') return;
+
+            if (navigator.onLine) {
+                // 1. SMART CHECK: Is this a fresh install?
+                const productCount = await db.products.count();
+                if (productCount === 0) {
+                    console.log("🦁 Smart Sync: Local DB is empty. Checking cloud...");
+                    try {
+                        // Dynamically import service
+                        const { syncService } = await import('@/lib/sync_service');
+                        const hasCloud = await syncService.hasCloudData();
+
+                        if (hasCloud) {
+                            console.log("☁️ Smart Sync: Found data in cloud! Auto-Restoring...");
+                            setStatus('saving');
+                            toast.info("Descargando datos de la nube...");
+
+                            try {
+                                await syncService.restoreFromCloud((msg) => console.log(msg));
+                                toast.success("✅ Datos recuperados exitosamente");
+                                window.location.reload();
+                                return;
+                            } catch (e) {
+                                console.error("Smart Sync Restore Failed:", e);
+                                toast.error("Error al restaurar datos");
+                                setStatus('error');
+                            }
+                        } else {
+                            console.log("🦁 Smart Sync: Cloud appears empty.");
+                            toast("Sistema listo (Modo Local)", {
+                                description: "No se encontraron datos en la nube para sincronizar.",
+                                duration: 5000
+                            });
+                        }
+                    } catch (importError) {
+                        console.error("Smart Sync Import Failed:", importError);
+                        // Likely env vars missing or network error on script load
+                        toast.error("Error de Configuración", {
+                            description: "No se pudo conectar a los servicios de nube."
+                        });
+                    }
+                } else {
+                    console.log("🚀 Initial App Sync: Ensuring cloud consistency...");
+                    performSync();
+                }
+            }
+        }, 1500); // 1.5s is enough
+        return () => clearTimeout(timer);
+    }, [performSync]);
 
     // Function called by components when they mutate data
     const triggerChange = useCallback(() => {

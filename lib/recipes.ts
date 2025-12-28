@@ -40,6 +40,79 @@ export interface RecipeAnalysisResult {
 // --- LOGIC ENGINE ---
 
 /**
+ * Computes the conversion factor and normalized quantity for a recipe item
+ * based on the ingredient's inventory unit.
+ */
+export function getRecipeItemConversion(
+    ingredient: Ingredient,
+    recipeItem: { quantity: number, unit?: string }
+): { factor: number, convertedQuantity: number, warning?: string, resolvedUnit: string } {
+
+    const dbUnit = ingredient.unit.toLowerCase().trim();
+    let recipeUnit = recipeItem.unit ? recipeItem.unit.toLowerCase().trim() : dbUnit;
+
+    let conversionFactor = 1;
+    let warning: string | undefined;
+
+    // Weight Conversions
+    if ((dbUnit === 'kg' || dbUnit === 'kilo') && (recipeUnit === 'g' || recipeUnit === 'gr' || recipeUnit === 'gramos')) {
+        conversionFactor = 0.001;
+    } else if ((dbUnit === 'g' || dbUnit === 'gr') && (recipeUnit === 'kg' || recipeUnit === 'kilo')) {
+        conversionFactor = 1000;
+    }
+
+    // Volume Conversions
+    else if ((dbUnit === 'lt' || dbUnit === 'l' || dbUnit === 'litro') && (recipeUnit === 'ml' || recipeUnit === 'cc')) {
+        conversionFactor = 0.001;
+    } else if ((dbUnit === 'ml' || dbUnit === 'cc') && (recipeUnit === 'lt' || recipeUnit === 'l' || recipeUnit === 'litro')) {
+        conversionFactor = 1000;
+    }
+
+    // Fallback for Mismatches
+    else if (dbUnit !== recipeUnit) {
+        // Check for Critical "Unit vs Weight" error
+        const isGOrMl = ['g', 'gr', 'gramo', 'gram', 'gramos', 'ml', 'cc', 'mililitro'].includes(recipeUnit);
+        const isUnit = ['un', 'u', 'und', 'unidad'].includes(dbUnit);
+
+        if (isUnit && isGOrMl) {
+            // KITCHEN STANDARD ASSUMPTION: 
+            // If buying in "Units" (e.g. 1 Box of Milk) and recipe uses "ml" (e.g. 100ml).
+            // We ASSUME 1 Unit = 1000 ml/g (1 Litre/Kilo Standard).
+            if (recipeItem.quantity > 1.0) {
+                conversionFactor = 0.001;
+                warning = `ℹ️ Auto-Corrección (${ingredient.name}): Inventario en 'Unidad', Receta en '${recipeUnit}'. Se asumió 1 Unidad = 1000 ${recipeUnit}.`;
+            } else {
+                warning = `⚠️ Ambigüedad en ${ingredient.name}: Inv='Unidad', Receta='${recipeUnit}'. Se usó factor 1. Verificar.`;
+            }
+        }
+    }
+
+    // --- HEURISTIC SAFEGUARD (Auto-Correction) ---
+    // Fixes "8 un" walnuts case where Inventory is KG.
+    // If conversionFactor is 1 (No direct conversion found)
+    // AND dbUnit is Mass/Vol (Kg/Lt)
+    // AND Quantity > 2 (implied grams/units mismatch)
+    const isDbMassVol = ['kg', 'kilo', 'kilogramo', 'lt', 'l', 'litro', 'liter'].includes(dbUnit);
+
+    if (conversionFactor === 1 && isDbMassVol && recipeItem.quantity > 2.0) {
+        conversionFactor = 0.001;
+        warning = `ℹ️ Auto-Corrección (${ingredient.name}): Cantidad ${recipeItem.quantity} es alta para '${dbUnit}'. Se asumió gramos/ml y se dividió por 1000.`;
+
+        // CORRECTION: If we are assuming it is grams because context implies it, 
+        // we should report it as 'gr' to the UI to avoid confusion (Calculated as grams, displayed as Units).
+        // 1 un of walnuts -> 1 gr of walnuts
+        recipeUnit = 'gr';
+    }
+
+    return {
+        factor: conversionFactor,
+        convertedQuantity: recipeItem.quantity * conversionFactor,
+        warning,
+        resolvedUnit: recipeUnit
+    };
+}
+
+/**
  * Calculates the full financial profile of a recipe item (Product)
  * @param product The product definition (Menu Item)
  * @param ingredientsMap A map of ALL ingredients available (for fast lookup)
@@ -64,69 +137,18 @@ export function analyzeRecipe(
                 return;
             }
 
-            // 0. Base Quantity (Hoisted to fix ReferenceError)
-            const netQuantityOriginal = item.quantity;
+            // USE SHARED CONVERSION LOGIC
+            const conversion = getRecipeItemConversion(ing, item);
+            if (conversion.warning) warnings.push(conversion.warning);
 
             // 1. Determine Yield
             const yieldPct = ing.yieldPercent || 1.0;
             if (yieldPct < 0.5) warnings.push(`Alerta: Rendimiento muy bajo (${yieldPct * 100}%) para ${ing.name}. Verificar merma.`);
 
-            // 2. Unit Conversion Logic
-            const dbUnit = ing.unit.toLowerCase().trim();
-            const recipeUnit = item.unit ? item.unit.toLowerCase().trim() : dbUnit; // Default to DB unit if missing
+            // 2. Quantities
+            const grossQuantity = conversion.convertedQuantity / yieldPct;
 
-            let conversionFactor = 1;
-
-            // Weight Conversions
-            if ((dbUnit === 'kg' || dbUnit === 'kilo') && (recipeUnit === 'g' || recipeUnit === 'gr' || recipeUnit === 'gramos')) {
-                conversionFactor = 0.001;
-            } else if ((dbUnit === 'g' || dbUnit === 'gr') && (recipeUnit === 'kg' || recipeUnit === 'kilo')) {
-                conversionFactor = 1000;
-            }
-
-            // Volume Conversions
-            else if ((dbUnit === 'lt' || dbUnit === 'l' || dbUnit === 'litro') && (recipeUnit === 'ml' || recipeUnit === 'cc')) {
-                conversionFactor = 0.001;
-            } else if ((dbUnit === 'ml' || dbUnit === 'cc') && (recipeUnit === 'lt' || recipeUnit === 'l' || recipeUnit === 'litro')) {
-                conversionFactor = 1000;
-            }
-
-            // Fallback for Mismatches
-            else if (dbUnit !== recipeUnit) {
-                // Check for Critical "Unit vs Weight" error
-                const isGOrMl = ['g', 'gr', 'gramo', 'gram', 'gramos', 'ml', 'cc', 'mililitro'].includes(recipeUnit);
-                const isUnit = ['un', 'u', 'und', 'unidad'].includes(dbUnit);
-
-                if (isUnit && isGOrMl) {
-                    // KITCHEN STANDARD ASSUMPTION: 
-                    // If buying in "Units" (e.g. 1 Box of Milk) and recipe uses "ml" (e.g. 100ml).
-                    // We ASSUME 1 Unit = 1000 ml/g (1 Litre/Kilo Standard).
-                    if (netQuantityOriginal > 1.0) {
-                        conversionFactor = 0.001;
-                        warnings.push(`ℹ️ Auto-Corrección (${ing.name}): Inventario en 'Unidad', Receta en '${recipeUnit}'. Se asumió 1 Unidad = 1000 ${recipeUnit}.`);
-                    } else {
-                        warnings.push(`⚠️ Ambigüedad en ${ing.name}: Inv='Unidad', Receta='${recipeUnit}'. Se usó factor 1. Verificar.`);
-                    }
-                }
-            }
-
-            // --- HEURISTIC SAFEGUARD (Auto-Correction) ---
-            // Fixes "8 un" walnuts case where Inventory is KG.
-            // If conversionFactor is 1 (No direct conversion found)
-            // AND dbUnit is Mass/Vol (Kg/Lt)
-            // AND Quantity > 2 (implied grams/units mismatch)
-            const isDbMassVol = ['kg', 'kilo', 'kilogramo', 'lt', 'l', 'litro', 'liter'].includes(dbUnit);
-
-            if (conversionFactor === 1 && isDbMassVol && netQuantityOriginal > 2.0) {
-                conversionFactor = 0.001;
-                warnings.push(`ℹ️ Auto-Corrección (${ing.name}): Cantidad ${netQuantityOriginal} es alta para '${dbUnit}'. Se asumió gramos/ml.`);
-            }
-
-            // 3. Quantities
-            const netQuantityNormalized = netQuantityOriginal * conversionFactor; // Converted to Purchase Unit
-            const grossQuantity = netQuantityNormalized / yieldPct;
-
-            // 4. Costs
+            // 3. Costs
             const purchaseCost = ing.cost || 0;
 
             // Real Unit Cost (Impacted by Yield)
@@ -146,10 +168,10 @@ export function analyzeRecipe(
                 name: ing.name,
                 type: 'Raw Material',
                 purchase_unit: ing.unit || 'un',
-                recipe_unit: recipeUnit || ing.unit || 'un', // Pass the resolved recipe unit
+                recipe_unit: conversion.resolvedUnit,
                 yield_percent: yieldPct,
                 gross_quantity_inventory: Number(grossQuantity.toFixed(4)),
-                net_quantity_plate: Number(netQuantityOriginal.toFixed(2)), // Show original quantity (e.g. 200) for clarity
+                net_quantity_plate: Number(item.quantity.toFixed(2)), // Show original quantity
                 unit_cost_real: Number(realUnitCost.toFixed(2)),
                 total_line_cost: Number(lineCost.toFixed(0))
             });

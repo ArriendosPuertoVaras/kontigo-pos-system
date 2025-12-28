@@ -25,6 +25,14 @@ export interface Product {
     modifiers?: ModifierGroup[];
     isAvailable: boolean;
     recipe?: RecipeItem[];
+    // Batch Inventory for Production
+    stock?: number;
+    // New fields for Preparations (Sub-recipes)
+    instructions?: string[]; // Steps 1, 2, 3...
+    chefNote?: string;
+    prepTime?: string; // Active preparation time
+    cookTime?: string; // Cooking time
+    totalTime?: string; // Total time to client
 }
 
 export interface Ingredient {
@@ -55,21 +63,7 @@ export interface Ingredient {
     totalTime?: string; // Total time to client
 }
 
-export interface Product {
-    id?: number;
-    name: string;
-    price: number;
-    categoryId: number;
-    image?: string;
-    modifiers?: ModifierGroup[];
-    isAvailable: boolean;
-    recipe?: RecipeItem[];
-    instructions?: string[]; // Steps 1, 2, 3...
-    chefNote?: string;
-    prepTime?: string; // Active preparation time
-    cookTime?: string; // Cooking time
-    totalTime?: string; // Total time to client
-}
+
 
 export interface RecipeItem {
     ingredientId: number;
@@ -275,9 +269,11 @@ export interface CashCount {
 
 export interface DailyClose {
     id?: number;
-    date: Date;
+    date: Date; // Closing Date
+    startTime?: Date; // Opening Date/Time
+    openingCash?: number; // Fondo de Caja
     totalSales: number;
-    totalCash: number;
+    totalCash: number; // Cash from Sales
     totalCard: number;
     totalOnline: number;
     totalTips: number;
@@ -285,6 +281,16 @@ export interface DailyClose {
     cashDifference: number;
     closedBy: string;
     status?: 'open' | 'closed';
+}
+
+export interface ProductionLog {
+    id?: number;
+    productId: number;
+    productName: string; // Snapshot
+    quantity: number;
+    date: Date;
+    staffId?: number; // Optional: who cooked it
+    costPerUnit?: number; // Snapshot of cost at that time
 }
 
 // --- PHASE 3: FINANCIAL NEXUS (ACCOUNTING CORE) ---
@@ -345,6 +351,7 @@ export class KontigoDatabase extends Dexie {
     accounts!: Table<Account>;
     journalEntries!: Table<JournalEntry>;
     settings!: Table<SystemSetting>;
+    productionLogs!: Table<ProductionLog>;
 
     constructor() {
         super('Kontigo_Final'); // Force final fresh DB
@@ -369,11 +376,16 @@ export class KontigoDatabase extends Dexie {
             dailyCloses: '++id, date',
             jobTitles: '++id, &name, active',
             accounts: '++id, &code, type',
-            journalEntries: '++id, date, status, referenceId'
+            journalEntries: '++id, date, status, referenceId',
+            productionLogs: '++id, productId, date'
         });
 
         this.version(9).stores({
             settings: '++id, &key'
+        });
+
+        this.version(10).stores({
+            dailyCloses: '++id, date, status' // Indexing status for fast lookup of open sessions
         });
 
         // Populate if empty
