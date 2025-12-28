@@ -392,6 +392,10 @@ class SyncService {
             await this.pullTable(db.accounts, 'accounts');
             await this.pullTable(db.journalEntries, 'journal_entries');
 
+            // 7. CLEANUP: Consolidate Duplicates (Self-Healing)
+            onProgress?.("Limpiando duplicados y reparando menú...");
+            await this.consolidateCategories();
+
             onProgress?.("¡Restauración Completada!");
             window.location.reload(); // Refresh to show data
         } catch (error: any) {
@@ -399,6 +403,66 @@ class SyncService {
             throw error;
         }
     }
+
+    /**
+     * SELF-HEALING: Consolidates duplicate categories by Name.
+     * Moves items to the first category and deletes the rest.
+     */
+    async consolidateCategories() {
+        try {
+            console.log("[Sync] Running Category Consolidation...");
+            const allCats = await db.categories.toArray();
+            const groups = new Map<string, typeof allCats>();
+
+            // 1. Group by normalized name
+            for (const c of allCats) {
+                const key = c.name.trim().toLowerCase();
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key)!.push(c);
+            }
+
+            let mergedCount = 0;
+
+            // 2. Process Groups
+            await db.transaction('rw', db.categories, db.products, async () => {
+                for (const [name, list] of groups.entries()) {
+                    if (list.length > 1) {
+                        // Sort: Keep the one with lowest ID (usually oldest)
+                        list.sort((a, b) => (a.id || 999999) - (b.id || 999999));
+
+                        const winner = list[0];
+                        const losers = list.slice(1);
+
+                        console.log(`[Sync] Merging ${losers.length} duplicates for '${winner.name}'...`);
+
+                        for (const loser of losers) {
+                            // Repoint products
+                            const affectedProducts = await db.products.where('categoryId').equals(loser.id!).toArray();
+                            for (const p of affectedProducts) {
+                                await db.products.update(p.id!, { categoryId: winner.id });
+                            }
+                            // Delete duplicate
+                            await db.categories.delete(loser.id!);
+                            mergedCount++;
+                        }
+                    }
+                }
+            });
+
+            if (mergedCount > 0) {
+                console.log(`[Sync] Merged ${mergedCount} duplicate categories. Pushing cleanup to cloud...`);
+                // Push changes back to cloud to fix it there too
+                await this.pushTable(db.categories, 'categories');
+                await this.pushTable(db.products, 'products');
+            } else {
+                console.log("[Sync] No duplicates found.");
+            }
+
+        } catch (e) {
+            console.error("[Sync] Consolidation Failed:", e);
+        }
+    }
+
     /**
      * AUTO-SYNC: Checks connection and triggers push.
      * Designed to be called by event listeners or after mutations.
