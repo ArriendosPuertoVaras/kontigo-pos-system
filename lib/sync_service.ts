@@ -392,15 +392,62 @@ class SyncService {
             await this.pullTable(db.accounts, 'accounts');
             await this.pullTable(db.journalEntries, 'journal_entries');
 
+            // -------------------------------------------------------------
+
             // 7. CLEANUP: Consolidate Duplicates (Self-Healing)
             onProgress?.("Limpiando duplicados y reparando menú...");
             await this.consolidateCategories();
+
+            // 8. RESCUE MISSION: Find orphans
+            await this.rescueOrphans();
 
             onProgress?.("¡Restauración Completada!");
             window.location.reload(); // Refresh to show data
         } catch (error: any) {
             console.error("Restore Failed:", error);
             throw error;
+        }
+    }
+
+    /**
+     * RESCUE MISSION: Finds products whose category does not exist and gives them a home.
+     */
+    async rescueOrphans() {
+        try {
+            const allProducts = await db.products.toArray();
+            const allCategories = await db.categories.toArray();
+            const validCategoryIds = new Set(allCategories.map(c => c.id));
+
+            const orphans = allProducts.filter(p => !validCategoryIds.has(p.categoryId));
+
+            if (orphans.length > 0) {
+                console.log(`[Sync] 🚑 Found ${orphans.length} ORPHAN products. Rescuing...`);
+
+                // Create Rescue Category if needed
+                let rescueCat = allCategories.find(c => c.name === "⚠️ RESCATADOS");
+                let rescueId: number;
+
+                if (!rescueCat) {
+                    rescueId = await db.categories.add({
+                        name: "⚠️ RESCATADOS",
+                        destination: 'kitchen',
+                        order: 0
+                    }) as number;
+                } else {
+                    rescueId = rescueCat.id!;
+                }
+
+                // Move orphans
+                for (const p of orphans) {
+                    await db.products.update(p.id!, { categoryId: rescueId });
+                }
+                console.log(`[Sync] 🚑 Rescued ${orphans.length} products to '⚠️ RESCATADOS'`);
+                // Force push changes so they are saved to cloud
+                await this.pushTable(db.categories, 'categories');
+                await this.pushTable(db.products, 'products');
+            }
+        } catch (e) {
+            console.error("Rescue failed:", e);
         }
     }
 
