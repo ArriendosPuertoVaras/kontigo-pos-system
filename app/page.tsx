@@ -758,7 +758,7 @@ function POSContent() {
             <div className="w-full md:col-span-8 flex flex-col gap-3 h-full overflow-hidden">
               {/* Breadcrumbs / Categories */}
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                {categories?.slice().sort((a, b) => (a.order || 999) - (b.order || 999)).map((cat) => (
+                {categories?.slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)).map((cat) => (
                   <CategoryTab
                     key={cat.id}
                     label={cat.name}
