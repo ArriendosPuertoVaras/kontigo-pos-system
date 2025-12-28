@@ -426,6 +426,7 @@ class SyncService {
             // --- SPECIAL FIX: MERGE 'BEBIDAS' INTO 'BEBIDAS Y JUGOS' ---
             const bebidas = groups.get('bebidas');
             const bebidasYJugos = groups.get('bebidas y jugos');
+            let changesMade = false;
 
             if (bebidas && bebidas.length > 0) {
                 console.log("[Sync] Detected legacy 'Bebidas' category. Merging into 'Bebidas y Jugos'...");
@@ -440,6 +441,7 @@ class SyncService {
                     await db.categories.update(firstBebidas.id!, { name: "Bebidas y Jugos" });
                     targetCategory = firstBebidas;
                     bebidas.shift(); // Remove from processing list as it's now the target
+                    changesMade = true;
                 }
 
                 if (targetCategory) {
@@ -453,6 +455,30 @@ class SyncService {
                     }
                 }
                 // Update groups map to reflect changes if needed, but we proceed to standard dedupe for others
+            }
+            // -------------------------------------------------------------
+
+            // --- EMERGENCY RESTORE: If categories are missing (e.g. data loss), restore defaults ---
+            const currentCount = await db.categories.count();
+            if (currentCount <= 2) {
+                console.log("[Sync] Detectada pérdida de categorías. Restaurando Básicos...");
+                const needed = ["Entradas", "Platos", "Postres", "Bebidas y Jugos", "Copete", "Cafe"];
+
+                const existingNow = await db.categories.toArray();
+                const existingNames = new Set(existingNow.map(c => c.name.toLowerCase().trim()));
+
+                let maxOrder = existingNow.reduce((max, c) => Math.max(max, c.order || 0), 0);
+
+                for (const name of needed) {
+                    if (!existingNames.has(name.toLowerCase())) {
+                        maxOrder++;
+                        const dest = (name.includes("Bebidas") || name === "Copete" || name === "Cafe") ? 'bar' : 'kitchen';
+                        await db.categories.add({
+                            name, destination: dest, order: maxOrder
+                        });
+                        changesMade = true;
+                    }
+                }
             }
             // -------------------------------------------------------------
 
@@ -485,8 +511,8 @@ class SyncService {
                 }
             });
 
-            if (mergedCount > 0) {
-                console.log(`[Sync] Merged ${mergedCount} duplicate categories. Pushing cleanup to cloud...`);
+            if (mergedCount > 0 || changesMade) {
+                console.log(`[Sync] Cleanup/Restore complete. Pushing changes to cloud...`);
                 // Push changes back to cloud to fix it there too
                 await this.pushTable(db.categories, 'categories');
                 await this.pushTable(db.products, 'products');
