@@ -251,9 +251,22 @@ export default function PublicSchedulePage() {
                                                     ${hasAdminAccess ? 'cursor-pointer hover:bg-white/10 active:bg-white/20' : ''}
                                                 `}
                                             >
+                                                {hasAdminAccess && (
+                                                    <div
+                                                        className="absolute top-0 right-0 bottom-0 w-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10 cursor-pointer bg-white/5 hover:bg-white/10"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCellClick(staff.id!, day);
+                                                        }}
+                                                        title="Agregar otro turno (Turno Cortado)"
+                                                    >
+                                                        <span className="text-lg font-bold text-toast-orange drop-shadow-md pb-1">+</span>
+                                                    </div>
+                                                )}
+
                                                 {hasAdminAccess && cellShifts.length === 0 && (
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                                                        <span className="text-xl text-white/20">+</span>
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
+                                                        <span className="text-xl text-white/10">+</span>
                                                     </div>
                                                 )}
 
