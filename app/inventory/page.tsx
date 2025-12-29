@@ -298,13 +298,15 @@ export default function InventoryPage() {
                                         <button
                                             onClick={async () => {
                                                 setIsActionsOpen(false);
-                                                const { checkAllData } = await import('@/lib/deep_scan');
-                                                const count = await checkAllData();
-                                                alert(`Resultado del Escaneo Profundo: Se encontraron ${count} ingredientes en TOTAL en este dispositivo.`);
+                                                const { restoreEmpanadaIngredients } = await import('@/lib/manual_restore');
+                                                const toastId = toast.loading("Aplicando nombres del pantallazo...");
+                                                const result = await restoreEmpanadaIngredients();
+                                                toast.success(result, { id: toastId, duration: 8000 });
+                                                setTimeout(() => window.location.reload(), 2000);
                                             }}
-                                            className="text-left px-4 py-3 hover:bg-white/5 text-purple-300 hover:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-3 transition-colors"
+                                            className="text-left px-4 py-3 hover:bg-white/5 text-green-300 hover:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-3 transition-colors"
                                         >
-                                            <Search className="w-3 h-3 text-purple-400" /> Escaneo Profundo (Debug)
+                                            <HeartPulse className="w-3 h-3 text-green-400" /> Restaurar Nombres (Empanadas)
                                         </button>
                                     </div>
                                 )}
