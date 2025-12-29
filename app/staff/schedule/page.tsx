@@ -253,14 +253,14 @@ export default function PublicSchedulePage() {
                                             >
                                                 {hasAdminAccess && (
                                                     <div
-                                                        className="absolute top-0 right-0 bottom-0 w-8 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity z-50 cursor-pointer bg-black/40 hover:bg-black/60 backdrop-blur-sm"
+                                                        className="absolute top-0 right-0 bottom-0 w-8 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity z-50 cursor-pointer bg-black/20 hover:bg-black/60 backdrop-blur-sm group/add-btn"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleCellClick(staff.id!, day);
                                                         }}
                                                         title="Agregar otro turno (Turno Cortado)"
                                                     >
-                                                        <span className="text-xl font-bold text-white drop-shadow-md pb-1">+</span>
+                                                        <span className="text-xl font-bold text-white drop-shadow-md pb-1 transform group-hover/add-btn:scale-125 transition-transform">+</span>
                                                     </div>
                                                 )}
 
