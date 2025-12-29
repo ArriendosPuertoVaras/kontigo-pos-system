@@ -33,6 +33,7 @@ export default function InventoryPage() {
     const router = useRouter();
 
     const ingredients = useLiveQuery(() => db.ingredients.toArray());
+    console.log("DEBUG INGREDIENTS:", ingredients);
     const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("");
 
