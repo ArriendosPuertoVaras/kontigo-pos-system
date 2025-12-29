@@ -178,6 +178,10 @@ export default function InventoryPage() {
                 <Header title="Inventario / Stock">
 
                     <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full">
+                        {/* DEBUG: Remove later */}
+                        <div className="bg-red-500 text-white text-xs p-1 rounded">
+                            DEBUG: {ingredients ? ingredients.length : 'Loading...'} items
+                        </div>
                         {/* SEARCH & FILTER GROUP */}
                         <div className="flex items-center gap-2 bg-black/20 p-1 rounded-lg border border-white/5">
                             <select
