@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import Link from 'next/link';
-import { ArrowLeft, ClipboardList, CheckCircle2, Clock, ChefHat, Check, Users, Martini, Beer } from 'lucide-react';
+import { ArrowLeft, ClipboardList, CheckCircle2, Clock, ChefHat, Check, Users, Martini, Beer, Book } from 'lucide-react';
 import Header from '@/components/Header';
 
 // Duplicated NavItem for independence
@@ -290,6 +290,12 @@ export default function OrdersPage() {
                         onClick={handleOpenSettings}
                         active={isSettingsOpen}
                     />
+
+                    <div className="h-px bg-white/10 my-2 w-full"></div>
+
+                    <Link href="/orders/recipes">
+                        <NavItem icon={<Book />} label="Recetas" />
+                    </Link>
                 </nav>
             </aside>
 
