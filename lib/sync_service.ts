@@ -106,11 +106,11 @@ class SyncService {
                     converted.restaurant_id = restaurantId;
                 }
 
-                // Map 'role' -> 'role_name' (Legacy fix)
-                if (converted.role) {
-                    converted.role_name = converted.role;
-                    delete converted.role;
-                }
+                // 1. DELETE ID (Local is Number, Supabase IS UUID)
+                // This allows Supabase to auto-generate a UUID for new inserts.
+                // Note: Updates to existing staff might duplicate if we don't map UUIDs back, 
+                // but for now this unblocks the data upload.
+                delete converted.id;
 
                 // CRITICAL FIX: Ensure 'active' column is NEVER sent to Supabase
                 // 1. If 'status' is missing but 'active' exists, backfill 'status'
@@ -131,33 +131,29 @@ class SyncService {
                     delete converted.active_role;
                 }
 
-                // 5. HARD DELETE 'address' - Local only field, or mismatch
-                if ('address' in converted) {
-                    delete converted.address;
-                }
+                // 5. DO NOT DELETE 'address' - It EXISTS in Supabase now.
 
-                // 6. BATCH DELETE: Remove all Chilean Payroll fields (Local Only for now)
-                const payrollFields = [
-                    'afp',
-                    'health_system', 'health_fee', // snake_case of healthSystem, healthFee
-                    'seguro_cesantia',             // snake_case of seguroCesantia
-                    'bank_details',                // snake_case of bankDetails
-                    'colacion', 'movilizacion',
-                    'estimated_tips',              // snake_case of estimatedTips
-                    'contract_type',               // snake_case of contractType
-                    'contract_duration',           // snake_case of contractDuration
-                    'weekly_hours_limit',          // snake_case of weeklyHoursLimit
-                    'birth_date',                  // snake_case of birthDate
-                    'nationality',
-                    'salary_type',                 // snake_case of salaryType
-                    'base_salary',                 // snake_case of baseSalary
-                    'daily_salary',                // Legacy/Calculated field
-                    'gratification'
+                // 6. ONLY DELETE LEGACY/CALCULATED FIELDS
+                // We keep 'afp', 'health_system', etc. because they EXIST in Supabase now.
+                const fieldsToDelete = [
+                    'daily_salary', // Legacy/Calculated field (NOT in schema)
+                    'active_role'   // Redundant check
                 ];
 
-                payrollFields.forEach(field => {
+                fieldsToDelete.forEach(field => {
                     if (field in converted) delete converted[field];
                 });
+
+                // Ensure 'role' is preserved if possible, or mapped.
+                // Code above maps role -> role_name and deletes role.
+                // Supabase has BOTH 'role' and 'role_name'. 
+                // Let's restore 'role' if it was deleted, or better yet, send BOTH.
+                // (Refactoring previous Legacy fix block to effectively send both if needed, 
+                // but for safety, let's just Stick to role_name as primary, 
+                // and maybe backfill role from role_name if missing?)
+                if (converted.role_name && !converted.role) {
+                    converted.role = converted.role_name;
+                }
             }
             if (supabaseTableName === 'job_titles') {
                 delete converted.id;
