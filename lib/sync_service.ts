@@ -26,10 +26,20 @@ class SyncService {
     // tableName: Dexie table name
     // supabaseTableName: Supabase table name (usually snake_case version of Dexie name)
     async pushTable(dexieTable: Table, supabaseTableName: string) {
-        console.log(`[Sync] Syncing ${dexieTable.name} to ${supabaseTableName}...`);
+        // --- GATEKEEPER CHECK ---
+        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+        if (!restaurantId) {
+            console.warn(`[Sync] ⛔ Blocked ${dexieTable.name}: No Restaurant Context.`);
+            return;
+        }
+
+        console.log(`[Sync] Syncing ${dexieTable.name} to ${supabaseTableName} for Restaurant: ${restaurantId}...`);
 
         // 1. Get all local data
-        let localData = await dexieTable.toArray();
+        // FILTER: Only push data belonging to this restaurant (Safety measure)
+        // If local DB has multiple tenants mixed (shouldn't happen with new logic, but good primarily), we filter.
+        let localData = await dexieTable.filter(item => !item.restaurantId || item.restaurantId === restaurantId).toArray();
+
         if (localData.length === 0) {
             console.log(`[Sync] No data in ${dexieTable.name} to sync.`);
             // Continue to mirror sync to ensure cloud is empty too if local is empty
@@ -75,34 +85,6 @@ class SyncService {
         }
         // --------------------------------
 
-        // Pre-fetch restaurant ID if needed
-        let restaurantId: string | undefined;
-        if (supabaseTableName === 'restaurant_staff') {
-            const { data: rest } = await supabase.from('restaurants').select('id').limit(1).single();
-            restaurantId = rest?.id;
-
-            // AUTO-CREATE RESTAURANT IF MISSING
-            if (!restaurantId) {
-                console.log("[Sync] No restaurant found. Creating default restaurant...");
-                const { data: newRest, error: createError } = await supabase
-                    .from('restaurants')
-                    .insert([{
-                        name: 'Mi Restaurante Kontigo',
-                        owner_email: 'admin@kontigo.cl',
-                        commerce_code: 'KONTIGO-STGO',
-                        active: true
-                    }])
-                    .select('id')
-                    .single();
-
-                if (createError || !newRest) {
-                    console.error("[Sync] Failed to create default restaurant:", createError);
-                    return; // Abort if creation fails
-                }
-                restaurantId = newRest.id;
-            }
-        }
-
         // 2. Convert to snake_case
         const payload = localData.map(item => {
             const converted = this.toSnakeCase(item);
@@ -146,6 +128,10 @@ class SyncService {
             if (supabaseTableName === 'cash_counts') {
                 // Schema now fixed by MASTER SCRIPT. No exclusions needed.
             }
+
+            // SAFETY: FORCE RESTAURANT_ID
+            converted.restaurant_id = restaurantId;
+
             return converted;
         });
 
@@ -179,10 +165,11 @@ class SyncService {
 
         if (SAFE_TO_MIRROR.includes(supabaseTableName)) {
             try {
-                // Get all IDs currently in Supabase
+                // Get all IDs currently in Supabase FOR THIS RESTAURANT
                 const { data: remoteIds, error: fetchError } = await supabase
                     .from(supabaseTableName)
-                    .select('id');
+                    .select('id')
+                    .eq('restaurant_id', restaurantId);
 
                 if (fetchError) throw fetchError;
 
@@ -226,9 +213,17 @@ class SyncService {
 
     async pushAll(onProgress?: (msg: string) => void) {
         if (this.isSyncing) {
-            console.log("[Sync] Sync already in progress, skipping.");
             return;
         }
+
+        // CHECK SUBSCRIPTION BEFORE SYNC
+        const canSync = await this.checkSubscriptionStatus();
+        if (!canSync) {
+            console.error("[Sync] gatekeeper: Subscription Inactive or Expired.");
+            onProgress?.("⛔ Error: Suscripción Vencida. Contacte a Soporte.");
+            return;
+        }
+
         this.isSyncing = true;
 
         try {
@@ -282,9 +277,19 @@ class SyncService {
 
     // Pull data from Supabase to Dexie (Restore)
     async pullTable(dexieTable: Table, supabaseTableName: string) {
-        console.log(`[Sync] Restoring ${supabaseTableName} to ${dexieTable.name}...`);
+        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+        if (!restaurantId) {
+            console.error(`[Sync] ❌ Restore failed: No Restaurant ID in context.`);
+            return;
+        }
 
-        const { data, error } = await supabase.from(supabaseTableName).select('*');
+        console.log(`[Sync] Restoring ${supabaseTableName} from Cloud for Restaurant ${restaurantId}...`);
+
+        // FILTER: ONLY DOWNLOAD DATA FOR MY RESTAURANT
+        const { data, error } = await supabase
+            .from(supabaseTableName)
+            .select('*')
+            .eq('restaurant_id', restaurantId);
 
         if (error) {
             console.error(`[Sync] Error fetching ${supabaseTableName}:`, error);
@@ -297,6 +302,8 @@ class SyncService {
         }
 
         // Only clear if we actually have data to replace it with
+        // OR if we are doing a full restore and want to wipe local data that might belong to another restaurant?
+        // STRATEGY: Clear everything in local table, assuming this device is now dedicated to this restaurantId.
         await dexieTable.clear();
         console.log(`[Sync] Cleared local table ${dexieTable.name}`);
 
@@ -588,6 +595,44 @@ class SyncService {
             console.log(`[AutoSync] ✅ ${supabaseName} synced successfully.`);
         } catch (err) {
             console.error(`[AutoSync] ❌ Failed to sync ${supabaseName}`, err);
+        }
+    }
+
+    // --- GATEKEEPER ---
+    async checkSubscriptionStatus(): Promise<boolean> {
+        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+        if (!restaurantId) return false; // No context = No service
+
+        try {
+            const { data: restaurant, error } = await supabase
+                .from('restaurants')
+                .select('plan_status, trial_ends_at')
+                .eq('id', restaurantId)
+                .single();
+
+            if (error || !restaurant) {
+                console.error("[Gatekeeper] Failed to fetch subscription:", error);
+                return false; // Fail safe: Block if we can't verify
+            }
+
+            // 1. Check Active Status
+            if (restaurant.plan_status === 'active') return true;
+
+            // 2. Check Trial
+            if (restaurant.plan_status === 'trial') {
+                const now = new Date();
+                const trialEnd = new Date(restaurant.trial_ends_at);
+                if (now < trialEnd) {
+                    return true; // Trial Valid
+                } else {
+                    console.warn("[Gatekeeper] Trial Expired.");
+                    return false;
+                }
+            }
+
+            return false; // Inactive/Cancelled
+        } catch (e) {
+            return false;
         }
     }
 }

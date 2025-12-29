@@ -33,6 +33,7 @@ export interface Product {
     prepTime?: string; // Active preparation time
     cookTime?: string; // Cooking time
     totalTime?: string; // Total time to client
+    restaurantId?: string; // Multi-Tenant Isolation
 }
 
 export interface Ingredient {
@@ -61,6 +62,7 @@ export interface Ingredient {
     prepTime?: string; // Active preparation time
     cookTime?: string; // Cooking time
     totalTime?: string; // Total time to client
+    restaurantId?: string; // Multi-Tenant Isolation
 }
 
 
@@ -79,6 +81,7 @@ export interface Category {
     destination?: string; // Changed from union to string for custom areas
     course?: 'starter' | 'main' | 'dessert' | 'beverage';
     order?: number;
+    restaurantId?: string; // Multi-Tenant Isolation
 }
 
 
@@ -90,6 +93,7 @@ export interface Supplier {
     phone: string;
     leadTimeDays: number;
     category: string;
+    restaurantId?: string;
 }
 
 export interface PurchaseOrderItem {
@@ -106,6 +110,7 @@ export interface PurchaseOrder {
     status: 'Pending' | 'Ordered' | 'Received';
     totalCost: number;
     items: PurchaseOrderItem[];
+    restaurantId?: string;
 }
 
 export interface WasteLog {
@@ -115,6 +120,7 @@ export interface WasteLog {
     reason: 'Expired' | 'Damaged' | 'Mistake' | 'Other';
     date: Date;
     note?: string;
+    restaurantId?: string;
 }
 
 export interface Customer {
@@ -126,6 +132,7 @@ export interface Customer {
     totalSpent: number;
     visitCount: number;
     lastVisit: Date;
+    restaurantId?: string;
 }
 
 export interface TicketItem {
@@ -142,6 +149,7 @@ export interface RestaurantTable {
     currentOrderId?: number;
     x: number;
     y: number;
+    restaurantId?: string;
 }
 
 export interface Payment {
@@ -165,6 +173,7 @@ export interface Order {
     payments?: Payment[];
     createdAt: Date;
     closedAt?: Date;
+    restaurantId?: string;
 }
 
 export interface JobTitle {
@@ -172,6 +181,7 @@ export interface JobTitle {
     name: string;
     active: boolean;
     permissions?: string[]; // Array of Permission IDs
+    restaurantId?: string;
 }
 
 export interface Staff {
@@ -207,6 +217,7 @@ export interface Staff {
         accountType: 'corriente' | 'vista' | 'ahorro';
         accountNumber: string;
     };
+    restaurantId?: string;
 }
 
 export interface Shift {
@@ -224,6 +235,7 @@ export interface Shift {
     managerApproval?: 'pending' | 'approved' | 'rejected';
     autoClockOut?: boolean;
     status?: 'open' | 'closed';
+    restaurantId?: string;
 }
 
 export interface Printer {
@@ -232,6 +244,7 @@ export interface Printer {
     ip: string;
     categories: string[];
     type: 'network' | 'usb';
+    restaurantId?: string;
 }
 
 export interface ModifierTemplate {
@@ -240,6 +253,7 @@ export interface ModifierTemplate {
     minSelect: number;
     maxSelect: number;
     options: ModifierOption[];
+    restaurantId?: string;
 }
 
 export interface DTE {
@@ -254,6 +268,7 @@ export interface DTE {
     receiverAddress?: string;
     xmlContent?: string;
     status: 'issued' | 'received' | 'voided';
+    restaurantId?: string;
 }
 
 export interface CashCount {
@@ -266,6 +281,7 @@ export interface CashCount {
     difference: number;
     notes?: string;
     details?: { denomination: number; quantity: number }[];
+    restaurantId?: string;
 }
 
 export interface DailyClose {
@@ -282,6 +298,7 @@ export interface DailyClose {
     cashDifference: number;
     closedBy: string;
     status?: 'open' | 'closed';
+    restaurantId?: string;
 }
 
 export interface ProductionLog {
@@ -292,6 +309,7 @@ export interface ProductionLog {
     date: Date;
     staffId?: number; // Optional: who cooked it
     costPerUnit?: number; // Snapshot of cost at that time
+    restaurantId?: string;
 }
 
 // --- PHASE 3: FINANCIAL NEXUS (ACCOUNTING CORE) ---
@@ -304,6 +322,7 @@ export interface Account {
     balance: number; // Current balance (cached) for quick dashboards
     isGroup?: boolean; // If true, it sums children
     parentCode?: string;
+    restaurantId?: string;
 }
 
 export interface JournalMovement {
@@ -320,12 +339,14 @@ export interface JournalEntry {
     movements: JournalMovement[];
     status: 'draft' | 'posted';
     created_at: Date;
+    restaurantId?: string;
 }
 
 export interface SystemSetting {
     id?: number;
     key: string;
     value: any;
+    restaurantId?: string;
 }
 
 // --- Database Definition ---
@@ -387,6 +408,31 @@ export class KontigoDatabase extends Dexie {
 
         this.version(10).stores({
             dailyCloses: '++id, date, status' // Indexing status for fast lookup of open sessions
+        });
+
+        // V11: Multi-Tenant Schema Update
+        this.version(11).stores({
+            products: '++id, categoryId, name, restaurantId',
+            categories: '++id, name, order, restaurantId',
+            ingredients: '++id, name, supplierId, code, restaurantId',
+            suppliers: '++id, name, restaurantId',
+            purchaseOrders: '++id, supplierId, date, status, restaurantId',
+            wasteLogs: '++id, ingredientId, date, reason, restaurantId',
+            customers: '++id, name, phone, email, restaurantId',
+            restaurantTables: '++id, status, restaurantId',
+            orders: '++id, tableId, status, createdAt, restaurantId',
+            staff: '++id, name, pin, role, status, restaurantId',
+            shifts: '++id, staffId, startTime, restaurantId',
+            printers: '++id, name, restaurantId',
+            modifierTemplates: '++id, name, restaurantId',
+            dtes: '++id, type, folio, date, restaurantId',
+            cashCounts: '++id, date, restaurantId',
+            dailyCloses: '++id, date, status, restaurantId',
+            jobTitles: '++id, &name, active, restaurantId',
+            accounts: '++id, &code, type, restaurantId',
+            journalEntries: '++id, date, status, referenceId, restaurantId',
+            productionLogs: '++id, productId, date, restaurantId',
+            settings: '++id, &key, restaurantId'
         });
 
         // Populate if empty

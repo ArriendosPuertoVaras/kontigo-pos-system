@@ -20,6 +20,14 @@ export default function LoginPage() {
 
     // Check Configuration & Load Name
     useEffect(() => {
+        // --- PHASE 2: DEVICE CONTEXT CHECK ---
+        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+        if (!restaurantId) {
+            // New Device? Force Commerce Login
+            router.replace('/login/commerce');
+            return;
+        }
+
         const loadSettings = async () => {
             const name = await getSetting<string>(SettingsKeys.RESTAURANT_NAME, "Kontigo POS");
             setRestaurantName(name);
