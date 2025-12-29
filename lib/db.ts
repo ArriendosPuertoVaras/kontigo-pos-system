@@ -435,6 +435,11 @@ export class KontigoDatabase extends Dexie {
             settings: '++id, &key, restaurantId'
         });
 
+        // V12: Index Email for Secure Login
+        this.version(12).stores({
+            staff: '++id, name, pin, role, status, &email, restaurantId'
+        });
+
         // Populate if empty
         this.on('populate', () => seedDatabase());
     }
