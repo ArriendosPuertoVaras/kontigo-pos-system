@@ -21,12 +21,21 @@ export default function Header({ title, children, backHref }: HeaderProps) {
     // Live Data Binding for Header Profile
     const { staffName, staffRole } = useLiveQuery(async () => {
         const id = localStorage.getItem('kontigo_staff_id');
+        const localName = localStorage.getItem('kontigo_staff_name');
+        const localRole = localStorage.getItem('kontigo_staff_role');
+
         if (!id) return { staffName: 'Staff', staffRole: 'Personal' };
 
         const staff = await db.staff.get(Number(id));
         if (staff) {
             return { staffName: staff.name, staffRole: staff.role };
         }
+
+        // Fallback to localStorage if DB lookup fails (e.g. after fresh login before sync)
+        if (localName) {
+            return { staffName: localName, staffRole: localRole || 'Miembro de Equipo' };
+        }
+
         return { staffName: 'Staff', staffRole: 'Personal' };
     }, []) || { staffName: 'Cargando...', staffRole: '...' };
 
