@@ -108,16 +108,24 @@ class SyncService {
                 if ('restaurant_id' in converted === false) {
                     converted.restaurant_id = restaurantId;
                 }
-                // Map 'role' -> 'role_name'
+
+                // Map 'role' -> 'role_name' (Legacy fix)
                 if (converted.role) {
                     converted.role_name = converted.role;
                     delete converted.role;
                 }
 
-                // FIX: Map local 'active' boolean -> remote 'status' string
-                // The error "Could not find 'active' column" implies Supabase has 'status' but not 'active'.
-                if ('active' in converted) {
+                // CRITICAL FIX: Ensure 'active' column is NEVER sent to Supabase
+                // 1. If 'status' is missing but 'active' exists, backfill 'status'
+                if (!converted.status && 'active' in converted) {
                     converted.status = converted.active ? 'active' : 'inactive';
+                }
+                // 2. Default status if still missing
+                if (!converted.status) {
+                    converted.status = 'active';
+                }
+                // 3. HARD DELETE 'active' - Supabase does not have this column
+                if ('active' in converted) {
                     delete converted.active;
                 }
             }
