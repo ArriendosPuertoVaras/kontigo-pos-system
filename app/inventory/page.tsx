@@ -6,7 +6,7 @@ import { syncService } from '@/lib/sync_service';
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowLeft, Package, Search, Settings, AlertTriangle, Plus, Filter, Trash2, XCircle, ChefHat } from 'lucide-react';
+import { ArrowLeft, Package, Search, Settings, AlertTriangle, Plus, Filter, Trash2, XCircle, ChefHat, CloudUpload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 
