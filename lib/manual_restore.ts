@@ -72,7 +72,16 @@ export async function restoreEmpanadaIngredients() {
     // 4. Save to DB
     if (recoveredIngredients.length > 0) {
         await db.ingredients.bulkPut(recoveredIngredients);
-        return `✅ ¡ÉXITO! Se han restaurado ${recoveredIngredients.length} ingredientes con sus nombres reales. Ve a ver tu ficha técnica.`;
+
+        // 5. AUTO-SYNC TO CLOUD (Supabase)
+        try {
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pushTable('ingredients');
+            return `✅ ÉXITO TOTAL: ${recoveredIngredients.length} Ingredientes restaurados Y respaldados en la Nube (Supabase).`;
+        } catch (error) {
+            console.error("Sync Error:", error);
+            return `⚠️ Restaurados localmente (${recoveredIngredients.length}), pero falló la subida a la nube. Revisa tu conexión.`;
+        }
     }
 
     return "⚠️ No se pudieron procesar los ingredientes.";
