@@ -135,30 +135,53 @@ export default function PublicSchedulePage() {
         e.dataTransfer.dropEffect = "move";
     };
 
-    const handleDrop = async (e: React.DragEvent, targetStaffId: number, targetDate: Date) => {
-        if (!hasAdminAccess) return;
+    const handleDrop = async (e: React.DragEvent, targetStaffId: number, date: Date) => {
         e.preventDefault();
         const shiftId = Number(e.dataTransfer.getData("shiftId"));
-        if (!shiftId || !shifts) return;
+        if (!shiftId) return;
 
-        const shift = shifts.find(s => s.id === shiftId);
+        const shift = shifts?.find(s => s.id === shiftId);
         if (!shift) return;
 
-        // Calculate new times preserving duration and time of day
+        // COPY BEHAVIOR (Requested by user: "Duplicate instead of Move")
         const oldStart = new Date(shift.scheduledStart!);
-        const newStart = new Date(targetDate);
-        newStart.setHours(oldStart.getHours(), oldStart.getMinutes());
-
         const duration = new Date(shift.scheduledEnd!).getTime() - oldStart.getTime();
+
+        // Calculate new times on the target day
+        const newStart = new Date(date);
+        newStart.setHours(oldStart.getHours(), oldStart.getMinutes());
         const newEnd = new Date(newStart.getTime() + duration);
 
-        await db.shifts.update(shiftId, {
-            staffId: targetStaffId, // Allow moving between staff
-            startTime: newStart, // Sync legacy field
-            scheduledStart: newStart,
-            scheduledEnd: newEnd
-        });
-        toast.success("Turno movido");
+        try {
+            // Prevent duplicate exact shifts
+            const duplicate = await db.shifts
+                .where({ staffId: targetStaffId })
+                .filter(s =>
+                    s.scheduledStart?.getTime() === newStart.getTime() &&
+                    s.scheduledEnd?.getTime() === newEnd.getTime()
+                )
+                .first();
+
+            if (duplicate) {
+                toast.warning("Ya existe un turno idéntico ahí");
+                return;
+            }
+
+            // Create NEW shift (Clone)
+            await db.shifts.add({
+                staffId: targetStaffId,
+                scheduledStart: newStart,
+                scheduledEnd: newEnd,
+                type: shift.type,
+                status: 'pending', // Reset status for new shift
+                restaurantId: shift.restaurantId // Maintain tenant
+            });
+
+            toast.success("Turno duplicado correctamente");
+        } catch (e) {
+            console.error(e);
+            toast.error("Error al duplicar turno");
+        }
     };
 
 
