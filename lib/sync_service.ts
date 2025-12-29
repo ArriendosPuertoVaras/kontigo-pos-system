@@ -275,6 +275,21 @@ class SyncService {
         }
     }
 
+    // Helper to convert snake_case object to camelCase for Dexie
+    private toCamelCase(obj: any): any {
+        if (obj === null || obj === undefined) return obj;
+        if (Array.isArray(obj)) {
+            return obj.map(v => this.toCamelCase(v));
+        } else if (obj.constructor === Object) {
+            return Object.keys(obj).reduce((result, key) => {
+                const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+                result[camelKey] = this.toCamelCase(obj[key]);
+                return result;
+            }, {} as any);
+        }
+        return obj;
+    }
+
     // Pull data from Supabase to Dexie (Restore)
     async pullTable(dexieTable: Table, supabaseTableName: string) {
         const restaurantId = localStorage.getItem('kontigo_restaurant_id');
@@ -301,339 +316,363 @@ class SyncService {
             return;
         }
 
-        // Only clear if we actually have data to replace it with
-        // OR if we are doing a full restore and want to wipe local data that might belong to another restaurant?
-        // STRATEGY: Clear everything in local table, assuming this device is now dedicated to this restaurantId.
-        await dexieTable.clear();
-        console.log(`[Sync] Cleared local table ${dexieTable.name}`);
+        // TRANSFORM: Convert snake_case (Cloud) -> camelCase (Dexie)
+        const transformedData = data.map(item => {
+            const camelItem = this.toCamelCase(item);
 
-        // Map snake_case back to camelCase (basic implementation)
-        const toCamelCase = (obj: any): any => {
-            if (Array.isArray(obj)) return obj.map(v => toCamelCase(v));
-            if (obj !== null && typeof obj === 'object') {
-                return Object.keys(obj).reduce((result, key) => {
-                    const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-                    result[camelKey] = toCamelCase(obj[key]);
-                    return result;
-                }, {} as any);
+            // SPECIFIC TRANSFORMS FOR COMPATIBILITY
+            if (supabaseTableName === 'ingredients') {
+                // Explicitly ensure critical fields are numbers/strings as expected
+                if ('stock' in camelItem) camelItem.stock = Number(camelItem.stock);
+                if ('cost' in camelItem) camelItem.cost = Number(camelItem.cost);
+                if ('minStock' in camelItem) camelItem.minStock = Number(camelItem.minStock);
             }
-            return obj;
-        };
 
-        const localData = data.map(item => {
-            const converted = toCamelCase(item);
-
-            // Fix Specific Mismatches
-            if (supabaseTableName === 'restaurant_staff') {
-                // Map active -> status
-                if (converted.active !== undefined) {
-                    converted.status = converted.active ? 'active' : 'inactive';
-                }
-                // Restore role from roleName if needed
-                if (converted.roleName) {
-                    converted.role = converted.roleName;
-                    converted.activeRole = converted.roleName;
-                }
-            }
-            return converted;
+            return camelItem;
         });
 
-        await dexieTable.bulkPut(localData);
-        console.log(`[Sync] Restored ${localData.length} items to ${dexieTable.name}`);
+        console.log(`[Sync] Pulled ${transformedData.length} records for ${dexieTable.name}. Overwriting local...`);
+
+        // Strategy: Clear and Replace to ensure 100% sync (removes local ghosts)
+        await dexieTable.clear();
+        await dexieTable.bulkPut(transformedData);
+    }
+    return;
+}
+
+// Only clear if we actually have data to replace it with
+// OR if we are doing a full restore and want to wipe local data that might belong to another restaurant?
+// STRATEGY: Clear everything in local table, assuming this device is now dedicated to this restaurantId.
+await dexieTable.clear();
+console.log(`[Sync] Cleared local table ${dexieTable.name}`);
+
+// Map snake_case back to camelCase (basic implementation)
+const toCamelCase = (obj: any): any => {
+    if (Array.isArray(obj)) return obj.map(v => toCamelCase(v));
+    if (obj !== null && typeof obj === 'object') {
+        return Object.keys(obj).reduce((result, key) => {
+            const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+            result[camelKey] = toCamelCase(obj[key]);
+            return result;
+        }, {} as any);
+    }
+    return obj;
+};
+
+const localData = data.map(item => {
+    const converted = toCamelCase(item);
+
+    // Fix Specific Mismatches
+    if (supabaseTableName === 'restaurant_staff') {
+        // Map active -> status
+        if (converted.active !== undefined) {
+            converted.status = converted.active ? 'active' : 'inactive';
+        }
+        // Restore role from roleName if needed
+        if (converted.roleName) {
+            converted.role = converted.roleName;
+            converted.activeRole = converted.roleName;
+        }
+    }
+    return converted;
+});
+
+await dexieTable.bulkPut(localData);
+console.log(`[Sync] Restored ${localData.length} items to ${dexieTable.name}`);
     }
 
     /**
      * Efficiently checks if there is ANY data in the cloud to modify default behavior.
      * Uses 'products' table as a proxy for "Has Data".
      */
-    async hasCloudData(): Promise<boolean> {
-        try {
-            const { count, error } = await supabase
-                .from('products')
-                .select('*', { count: 'exact', head: true });
+    async hasCloudData(): Promise < boolean > {
+    try {
+        const { count, error } = await supabase
+            .from('products')
+            .select('*', { count: 'exact', head: true });
 
-            if (error) throw error;
-            return (count || 0) > 0;
+        if(error) throw error;
+        return(count || 0) > 0;
         } catch (e) {
-            console.error("[Sync] Error checking cloud data:", e);
-            return false;
-        }
+    console.error("[Sync] Error checking cloud data:", e);
+    return false;
+}
     }
 
-    async restoreFromCloud(onProgress?: (msg: string) => void) {
-        try {
-            onProgress?.("Restaurando Categorías y Plantillas...");
-            await this.pullTable(db.categories, 'categories');
-            await this.pullTable(db.modifierTemplates, 'modifier_templates');
+    async restoreFromCloud(onProgress ?: (msg: string) => void) {
+    try {
+        onProgress?.("Restaurando Categorías y Plantillas...");
+        await this.pullTable(db.categories, 'categories');
+        await this.pullTable(db.modifierTemplates, 'modifier_templates');
 
-            onProgress?.("Restaurando Proveedores y Clientes...");
-            await this.pullTable(db.suppliers, 'suppliers');
-            await this.pullTable(db.customers, 'customers');
+        onProgress?.("Restaurando Proveedores y Clientes...");
+        await this.pullTable(db.suppliers, 'suppliers');
+        await this.pullTable(db.customers, 'customers');
 
-            // 4. Products & Inventory
-            onProgress?.("Restaurando Inventario...");
-            await this.pullTable(db.ingredients, 'ingredients');
+        // 4. Products & Inventory
+        onProgress?.("Restaurando Inventario...");
+        await this.pullTable(db.ingredients, 'ingredients');
 
-            onProgress?.("Restaurando Productos...");
-            await this.pullTable(db.products, 'products');
+        onProgress?.("Restaurando Productos...");
+        await this.pullTable(db.products, 'products');
 
-            // 5. Staff & Roles
-            onProgress?.("Restaurando Personal y Turnos...");
-            await this.pullTable(db.jobTitles, 'job_titles');
-            await this.pullTable(db.staff, 'restaurant_staff');
-            await this.pullTable(db.shifts, 'shifts');
+        // 5. Staff & Roles
+        onProgress?.("Restaurando Personal y Turnos...");
+        await this.pullTable(db.jobTitles, 'job_titles');
+        await this.pullTable(db.staff, 'restaurant_staff');
+        await this.pullTable(db.shifts, 'shifts');
 
-            onProgress?.("Restaurando Mesas...");
-            await this.pullTable(db.restaurantTables, 'restaurant_tables');
+        onProgress?.("Restaurando Mesas...");
+        await this.pullTable(db.restaurantTables, 'restaurant_tables');
 
-            onProgress?.("Restaurando Operaciones Completa...");
-            await this.pullTable(db.orders, 'orders');
-            await this.pullTable(db.purchaseOrders, 'purchase_orders');
-            await this.pullTable(db.wasteLogs, 'waste_logs');
-            await this.pullTable(db.dtes, 'dtes');
-            await this.pushTable(db.cashCounts, 'cash_counts');
-            await this.pushTable(db.dailyCloses, 'daily_closes');
+        onProgress?.("Restaurando Operaciones Completa...");
+        await this.pullTable(db.orders, 'orders');
+        await this.pullTable(db.purchaseOrders, 'purchase_orders');
+        await this.pullTable(db.wasteLogs, 'waste_logs');
+        await this.pullTable(db.dtes, 'dtes');
+        await this.pushTable(db.cashCounts, 'cash_counts');
+        await this.pushTable(db.dailyCloses, 'daily_closes');
 
-            // 6. Finance
-            onProgress?.("Restaurando Finanzas...");
-            await this.pullTable(db.accounts, 'accounts');
-            await this.pullTable(db.journalEntries, 'journal_entries');
+        // 6. Finance
+        onProgress?.("Restaurando Finanzas...");
+        await this.pullTable(db.accounts, 'accounts');
+        await this.pullTable(db.journalEntries, 'journal_entries');
 
-            // -------------------------------------------------------------
+        // -------------------------------------------------------------
 
-            // 7. CLEANUP: Consolidate Duplicates (Self-Healing)
-            onProgress?.("Limpiando duplicados y reparando menú...");
-            await this.consolidateCategories();
+        // 7. CLEANUP: Consolidate Duplicates (Self-Healing)
+        onProgress?.("Limpiando duplicados y reparando menú...");
+        await this.consolidateCategories();
 
-            // 8. RESCUE MISSION: Find orphans
-            await this.rescueOrphans();
+        // 8. RESCUE MISSION: Find orphans
+        await this.rescueOrphans();
 
-            onProgress?.("¡Restauración Completada!");
-            window.location.reload(); // Refresh to show data
-        } catch (error: any) {
-            console.error("Restore Failed:", error);
-            throw error;
-        }
+        onProgress?.("¡Restauración Completada!");
+        window.location.reload(); // Refresh to show data
+    } catch (error: any) {
+        console.error("Restore Failed:", error);
+        throw error;
     }
+}
 
     /**
      * RESCUE MISSION: Finds products whose category does not exist and gives them a home.
      */
     async rescueOrphans() {
-        try {
-            const allProducts = await db.products.toArray();
-            const allCategories = await db.categories.toArray();
-            const validCategoryIds = new Set(allCategories.map(c => c.id));
+    try {
+        const allProducts = await db.products.toArray();
+        const allCategories = await db.categories.toArray();
+        const validCategoryIds = new Set(allCategories.map(c => c.id));
 
-            const orphans = allProducts.filter(p => !validCategoryIds.has(p.categoryId));
+        const orphans = allProducts.filter(p => !validCategoryIds.has(p.categoryId));
 
-            if (orphans.length > 0) {
-                console.log(`[Sync] 🚑 Found ${orphans.length} ORPHAN products. Rescuing...`);
+        if (orphans.length > 0) {
+            console.log(`[Sync] 🚑 Found ${orphans.length} ORPHAN products. Rescuing...`);
 
-                // Create Rescue Category if needed
-                let rescueCat = allCategories.find(c => c.name === "⚠️ RESCATADOS");
-                let rescueId: number;
+            // Create Rescue Category if needed
+            let rescueCat = allCategories.find(c => c.name === "⚠️ RESCATADOS");
+            let rescueId: number;
 
-                if (!rescueCat) {
-                    rescueId = await db.categories.add({
-                        name: "⚠️ RESCATADOS",
-                        destination: 'kitchen',
-                        order: 0
-                    }) as number;
-                } else {
-                    rescueId = rescueCat.id!;
-                }
-
-                // Move orphans
-                for (const p of orphans) {
-                    await db.products.update(p.id!, { categoryId: rescueId });
-                }
-                console.log(`[Sync] 🚑 Rescued ${orphans.length} products to '⚠️ RESCATADOS'`);
-                // Force push changes so they are saved to cloud
-                await this.pushTable(db.categories, 'categories');
-                await this.pushTable(db.products, 'products');
+            if (!rescueCat) {
+                rescueId = await db.categories.add({
+                    name: "⚠️ RESCATADOS",
+                    destination: 'kitchen',
+                    order: 0
+                }) as number;
+            } else {
+                rescueId = rescueCat.id!;
             }
-        } catch (e) {
-            console.error("Rescue failed:", e);
+
+            // Move orphans
+            for (const p of orphans) {
+                await db.products.update(p.id!, { categoryId: rescueId });
+            }
+            console.log(`[Sync] 🚑 Rescued ${orphans.length} products to '⚠️ RESCATADOS'`);
+            // Force push changes so they are saved to cloud
+            await this.pushTable(db.categories, 'categories');
+            await this.pushTable(db.products, 'products');
         }
+    } catch (e) {
+        console.error("Rescue failed:", e);
     }
+}
 
     /**
      * SELF-HEALING: Consolidates duplicate categories by Name.
      * Moves items to the first category and deletes the rest.
      */
     async consolidateCategories() {
-        try {
-            console.log("[Sync] Running Category Consolidation...");
-            const allCats = await db.categories.toArray();
-            const groups = new Map<string, typeof allCats>();
+    try {
+        console.log("[Sync] Running Category Consolidation...");
+        const allCats = await db.categories.toArray();
+        const groups = new Map<string, typeof allCats>();
 
-            // 1. Group by normalized name
-            for (const c of allCats) {
-                const key = c.name.trim().toLowerCase();
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key)!.push(c);
+        // 1. Group by normalized name
+        for (const c of allCats) {
+            const key = c.name.trim().toLowerCase();
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(c);
+        }
+
+        let mergedCount = 0;
+
+        // --- SPECIAL FIX: MERGE 'BEBIDAS' INTO 'BEBIDAS Y JUGOS' ---
+        const bebidas = groups.get('bebidas');
+        const bebidasYJugos = groups.get('bebidas y jugos');
+        let changesMade = false;
+
+        if (bebidas && bebidas.length > 0) {
+            console.log("[Sync] Detected legacy 'Bebidas' category. Merging into 'Bebidas y Jugos'...");
+
+            let targetCategory;
+
+            if (bebidasYJugos && bebidasYJugos.length > 0) {
+                targetCategory = bebidasYJugos[0];
+            } else {
+                // Rename the first 'Bebidas' to 'Bebidas y Jugos'
+                const firstBebidas = bebidas[0];
+                await db.categories.update(firstBebidas.id!, { name: "Bebidas y Jugos" });
+                targetCategory = firstBebidas;
+                bebidas.shift(); // Remove from processing list as it's now the target
+                changesMade = true;
             }
 
-            let mergedCount = 0;
+            if (targetCategory) {
+                for (const b of bebidas) {
+                    const affectedProducts = await db.products.where('categoryId').equals(b.id!).toArray();
+                    for (const p of affectedProducts) {
+                        await db.products.update(p.id!, { categoryId: targetCategory.id });
+                    }
+                    await db.categories.delete(b.id!);
+                    mergedCount++;
+                }
+            }
+            // Update groups map to reflect changes if needed, but we proceed to standard dedupe for others
+        }
+        // -------------------------------------------------------------
 
-            // --- SPECIAL FIX: MERGE 'BEBIDAS' INTO 'BEBIDAS Y JUGOS' ---
-            const bebidas = groups.get('bebidas');
-            const bebidasYJugos = groups.get('bebidas y jugos');
-            let changesMade = false;
+        // --- EMERGENCY RESTORE: If categories are missing (e.g. data loss), restore defaults ---
+        const currentCount = await db.categories.count();
+        if (currentCount <= 2) {
+            console.log("[Sync] Detectada pérdida de categorías. Restaurando Básicos...");
+            const needed = ["Entradas", "Platos", "Postres", "Bebidas y Jugos", "Copete", "Cafe"];
 
-            if (bebidas && bebidas.length > 0) {
-                console.log("[Sync] Detected legacy 'Bebidas' category. Merging into 'Bebidas y Jugos'...");
+            const existingNow = await db.categories.toArray();
+            const existingNames = new Set(existingNow.map(c => c.name.toLowerCase().trim()));
 
-                let targetCategory;
+            let maxOrder = existingNow.reduce((max, c) => Math.max(max, c.order || 0), 0);
 
-                if (bebidasYJugos && bebidasYJugos.length > 0) {
-                    targetCategory = bebidasYJugos[0];
-                } else {
-                    // Rename the first 'Bebidas' to 'Bebidas y Jugos'
-                    const firstBebidas = bebidas[0];
-                    await db.categories.update(firstBebidas.id!, { name: "Bebidas y Jugos" });
-                    targetCategory = firstBebidas;
-                    bebidas.shift(); // Remove from processing list as it's now the target
+            for (const name of needed) {
+                if (!existingNames.has(name.toLowerCase())) {
+                    maxOrder++;
+                    const dest = (name.includes("Bebidas") || name === "Copete" || name === "Cafe") ? 'bar' : 'kitchen';
+                    await db.categories.add({
+                        name, destination: dest, order: maxOrder
+                    });
                     changesMade = true;
                 }
+            }
+        }
+        // -------------------------------------------------------------
 
-                if (targetCategory) {
-                    for (const b of bebidas) {
-                        const affectedProducts = await db.products.where('categoryId').equals(b.id!).toArray();
+        // 2. Process Groups (Standard Dedupe)
+        await db.transaction('rw', db.categories, db.products, async () => {
+            for (const [name, list] of groups.entries()) {
+                // Skip 'bebidas' key as we handled it, but check others
+                if (name === 'bebidas') continue;
+
+                if (list.length > 1) {
+                    // Sort: Keep the one with lowest ID (usually oldest)
+                    list.sort((a, b) => (a.id || 999999) - (b.id || 999999));
+
+                    const winner = list[0];
+                    const losers = list.slice(1);
+
+                    console.log(`[Sync] Merging ${losers.length} duplicates for '${winner.name}'...`);
+
+                    for (const loser of losers) {
+                        // Repoint products
+                        const affectedProducts = await db.products.where('categoryId').equals(loser.id!).toArray();
                         for (const p of affectedProducts) {
-                            await db.products.update(p.id!, { categoryId: targetCategory.id });
+                            await db.products.update(p.id!, { categoryId: winner.id });
                         }
-                        await db.categories.delete(b.id!);
+                        // Delete duplicate
+                        await db.categories.delete(loser.id!);
                         mergedCount++;
                     }
                 }
-                // Update groups map to reflect changes if needed, but we proceed to standard dedupe for others
             }
-            // -------------------------------------------------------------
+        });
 
-            // --- EMERGENCY RESTORE: If categories are missing (e.g. data loss), restore defaults ---
-            const currentCount = await db.categories.count();
-            if (currentCount <= 2) {
-                console.log("[Sync] Detectada pérdida de categorías. Restaurando Básicos...");
-                const needed = ["Entradas", "Platos", "Postres", "Bebidas y Jugos", "Copete", "Cafe"];
-
-                const existingNow = await db.categories.toArray();
-                const existingNames = new Set(existingNow.map(c => c.name.toLowerCase().trim()));
-
-                let maxOrder = existingNow.reduce((max, c) => Math.max(max, c.order || 0), 0);
-
-                for (const name of needed) {
-                    if (!existingNames.has(name.toLowerCase())) {
-                        maxOrder++;
-                        const dest = (name.includes("Bebidas") || name === "Copete" || name === "Cafe") ? 'bar' : 'kitchen';
-                        await db.categories.add({
-                            name, destination: dest, order: maxOrder
-                        });
-                        changesMade = true;
-                    }
-                }
-            }
-            // -------------------------------------------------------------
-
-            // 2. Process Groups (Standard Dedupe)
-            await db.transaction('rw', db.categories, db.products, async () => {
-                for (const [name, list] of groups.entries()) {
-                    // Skip 'bebidas' key as we handled it, but check others
-                    if (name === 'bebidas') continue;
-
-                    if (list.length > 1) {
-                        // Sort: Keep the one with lowest ID (usually oldest)
-                        list.sort((a, b) => (a.id || 999999) - (b.id || 999999));
-
-                        const winner = list[0];
-                        const losers = list.slice(1);
-
-                        console.log(`[Sync] Merging ${losers.length} duplicates for '${winner.name}'...`);
-
-                        for (const loser of losers) {
-                            // Repoint products
-                            const affectedProducts = await db.products.where('categoryId').equals(loser.id!).toArray();
-                            for (const p of affectedProducts) {
-                                await db.products.update(p.id!, { categoryId: winner.id });
-                            }
-                            // Delete duplicate
-                            await db.categories.delete(loser.id!);
-                            mergedCount++;
-                        }
-                    }
-                }
-            });
-
-            if (mergedCount > 0 || changesMade) {
-                console.log(`[Sync] Cleanup/Restore complete. Pushing changes to cloud...`);
-                // Push changes back to cloud to fix it there too
-                await this.pushTable(db.categories, 'categories');
-                await this.pushTable(db.products, 'products');
-            } else {
-                console.log("[Sync] No duplicates found.");
-            }
-
-        } catch (e) {
-            console.error("[Sync] Consolidation Failed:", e);
+        if (mergedCount > 0 || changesMade) {
+            console.log(`[Sync] Cleanup/Restore complete. Pushing changes to cloud...`);
+            // Push changes back to cloud to fix it there too
+            await this.pushTable(db.categories, 'categories');
+            await this.pushTable(db.products, 'products');
+        } else {
+            console.log("[Sync] No duplicates found.");
         }
+
+    } catch (e) {
+        console.error("[Sync] Consolidation Failed:", e);
     }
+}
 
     /**
      * AUTO-SYNC: Checks connection and triggers push.
      * Designed to be called by event listeners or after mutations.
      */
     async autoSync(table: Table, supabaseName: string) {
-        if (!navigator.onLine) {
-            console.log(`[AutoSync] ⚠️ Offline. Queuing ${supabaseName} sync for later.`);
-            // TODO: Add to a persistent queue if critical, but for now we rely on the "online" event listener to catch up.
-            return;
-        }
-
-        try {
-            await this.pushTable(table, supabaseName);
-            console.log(`[AutoSync] ✅ ${supabaseName} synced successfully.`);
-        } catch (err) {
-            console.error(`[AutoSync] ❌ Failed to sync ${supabaseName}`, err);
-        }
+    if (!navigator.onLine) {
+        console.log(`[AutoSync] ⚠️ Offline. Queuing ${supabaseName} sync for later.`);
+        // TODO: Add to a persistent queue if critical, but for now we rely on the "online" event listener to catch up.
+        return;
     }
 
+    try {
+        await this.pushTable(table, supabaseName);
+        console.log(`[AutoSync] ✅ ${supabaseName} synced successfully.`);
+    } catch (err) {
+        console.error(`[AutoSync] ❌ Failed to sync ${supabaseName}`, err);
+    }
+}
+
     // --- GATEKEEPER ---
-    async checkSubscriptionStatus(): Promise<boolean> {
-        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
-        if (!restaurantId) return false; // No context = No service
+    async checkSubscriptionStatus(): Promise < boolean > {
+    const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+    if(!restaurantId) return false; // No context = No service
 
-        try {
-            const { data: restaurant, error } = await supabase
-                .from('restaurants')
-                .select('plan_status, trial_ends_at')
-                .eq('id', restaurantId)
-                .single();
+    try {
+        const { data: restaurant, error } = await supabase
+            .from('restaurants')
+            .select('plan_status, trial_ends_at')
+            .eq('id', restaurantId)
+            .single();
 
-            if (error || !restaurant) {
-                console.error("[Gatekeeper] Failed to fetch subscription:", error);
-                return false; // Fail safe: Block if we can't verify
-            }
+        if(error || !restaurant) {
+    console.error("[Gatekeeper] Failed to fetch subscription:", error);
+    return false; // Fail safe: Block if we can't verify
+}
 
-            // 1. Check Active Status
-            if (restaurant.plan_status === 'active') return true;
+// 1. Check Active Status
+if (restaurant.plan_status === 'active') return true;
 
-            // 2. Check Trial
-            if (restaurant.plan_status === 'trial') {
-                const now = new Date();
-                const trialEnd = new Date(restaurant.trial_ends_at);
-                if (now < trialEnd) {
-                    return true; // Trial Valid
-                } else {
-                    console.warn("[Gatekeeper] Trial Expired.");
-                    return false;
-                }
-            }
+// 2. Check Trial
+if (restaurant.plan_status === 'trial') {
+    const now = new Date();
+    const trialEnd = new Date(restaurant.trial_ends_at);
+    if (now < trialEnd) {
+        return true; // Trial Valid
+    } else {
+        console.warn("[Gatekeeper] Trial Expired.");
+        return false;
+    }
+}
 
-            return false; // Inactive/Cancelled
+return false; // Inactive/Cancelled
         } catch (e) {
-            return false;
-        }
+    return false;
+}
     }
 }
 
