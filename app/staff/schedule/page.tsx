@@ -170,6 +170,7 @@ export default function PublicSchedulePage() {
             // Create NEW shift (Clone)
             await db.shifts.add({
                 staffId: targetStaffId,
+                startTime: newStart, // Required by Legacy Shift interface
                 scheduledStart: newStart,
                 scheduledEnd: newEnd,
                 type: shift.type,
