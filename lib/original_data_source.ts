@@ -1,4 +1,4 @@
-```
+
 import { db } from '@/lib/db';
 
 export async function restoreEmpanadaIngredients() {
@@ -20,11 +20,12 @@ export async function restoreEmpanadaIngredients() {
         return "❌ El producto existe pero NO tiene receta vinculada.";
     }
 
-    // 2. Exact Data from USER SCREENSHOTS (Inventory View) - RECOVERED SNAPSHOT 17:53 PM
+    // 2. Exact Data from USER SCREENSHOTS (Inventory View)
+    // Order matches the Recipe Screenshot to ensure correct ID mapping
     const restoreMap = [
         { name: "Harina sin Polvos", unit: "kg", cost: 700, stock: 25, category: "GENERAL", storage: "" },
         { name: "Manteca de Cerdo", unit: "kg", cost: 2900, stock: 2, category: "GENERAL", storage: "" },
-        { name: "Salmuera", unit: "ml", cost: 0, stock: 9999, category: "OTROS", storage: "Fresco" }, 
+        { name: "Salmuera", unit: "ml", cost: 0, stock: 9999, category: "OTROS", storage: "Fresco" }, // Infinity represented as high number
         { name: "Vino Blanco", unit: "ml", cost: 1700, stock: 5, category: "BEBIDAS Y LICORES", storage: "" },
         { name: "Prieta", unit: "kg", cost: 4600, stock: 5, category: "CARNES Y CECINAS", storage: "Refrigerado" },
         { name: "Cebolla", unit: "kg", cost: 1200, stock: 10, category: "FRUTAS Y VERDURAS", storage: "" },
@@ -38,29 +39,33 @@ export async function restoreEmpanadaIngredients() {
         { name: "Leche entera", unit: "l", cost: 900, stock: 12, category: "LACTEOS Y HUEVOS", storage: "" }
     ];
 
-    console.log(`Analyzing Recipe with ${ product.recipe.length } items vs ${ restoreMap.length } detailed records...`);
+    console.log(`Analyzing Recipe with ${product.recipe.length} items vs ${restoreMap.length} detailed records...`);
 
     // 3. Map IDs to Names & Metadata
     const recoveredIngredients: any[] = [];
+
+    // Safety check: Don't exceed array bounds
     const loopLimit = Math.min(product.recipe.length, restoreMap.length);
 
     for (let i = 0; i < loopLimit; i++) {
         const recipeItem = product.recipe[i];
         const data = restoreMap[i];
+
+        // Define isInfinite check based on large stock or cost 0
         const isInfinite = data.stock > 1000 || data.cost === 0;
 
         recoveredIngredients.push({
-            id: recipeItem.ingredientId,
+            id: recipeItem.ingredientId, // VITAL: Reuse the ID referenced in the recipe
             name: data.name,
             unit: data.unit,
-            stock: isInfinite ? 0 : data.stock,
+            stock: isInfinite ? 0 : data.stock, // Stock 0 for infinite to avoid weirdness
             cost: data.cost,
             minStock: 5,
             family: data.category,
             category: data.category,
             storage: data.storage || 'Bodega Seca',
             isInfinite: isInfinite,
-            restaurantId: currentRestaurantId
+            restaurantId: currentRestaurantId // Assign to current tenant
         });
     }
 
@@ -68,17 +73,17 @@ export async function restoreEmpanadaIngredients() {
     if (recoveredIngredients.length > 0) {
         await db.ingredients.bulkPut(recoveredIngredients);
 
-        // 5. AUTO-SYNC TO CLOUD (Supabase) - IMMEDIATE BACKUP
+        // 5. AUTO-SYNC TO CLOUD (Supabase)
         try {
             const { syncService } = await import('@/lib/sync_service');
+            // FIX: Pass the actual Table object as first arg, and string name as second
             await syncService.pushTable(db.ingredients, 'ingredients');
-            return `✅ RECUPERADO: ${ recoveredIngredients.length } ingredientes originales(17: 53 PM) restaurados y respaldados en Nube.`;
+            return `✅ ÉXITO TOTAL: ${recoveredIngredients.length} Ingredientes restaurados Y respaldados en la Nube (Supabase).`;
         } catch (error) {
             console.error("Sync Error:", error);
-            return `⚠️ Restaurados localmente pero falló respaldo nube: ${ (error as Error).message } `;
+            return `⚠️ Restaurados localmente (${recoveredIngredients.length}), pero falló la subida a la nube. Revisa tu conexión.`;
         }
     }
 
-    return "⚠️ Error desconocido.";
+    return "⚠️ No se pudieron procesar los ingredientes.";
 }
-```
