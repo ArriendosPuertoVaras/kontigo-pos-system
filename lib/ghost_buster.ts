@@ -49,12 +49,15 @@ export async function rebuildGhostIngredients() {
     // 4. Create Ghost Ingredients
     const ghostsToCreate = missingIds.map(id => {
         const details = ghostDetails[id];
-        const context = details.foundIn.join(", ");
+        // Take first 2 product names as context
+        const context = details.foundIn.slice(0, 2).join(", ");
+        const moreCount = details.foundIn.length > 2 ? ` +${details.foundIn.length - 2}` : '';
         const notes = Array.from(details.notes).join(" ");
 
         let nameHint = `Ingrediente #${id}`;
-        // Try to guess type based on context usually implies generic stuff, but let's just use context
-        if (notes) nameHint += ` (${notes})`;
+        // Add context to name for easier identification
+        if (context) nameHint += ` (usado en: ${context}${moreCount})`;
+        if (notes) nameHint += ` [Nota: ${notes}]`;
 
         return {
             id: id, // RESTORE THE ORIGINAL ID VITAL!!
