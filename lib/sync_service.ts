@@ -99,10 +99,7 @@ class SyncService {
             }
 
             if (supabaseTableName === 'ingredients') {
-                const missingCols = ['yield_percent'];
-                missingCols.forEach(col => {
-                    if (col in converted) delete converted[col];
-                });
+                // Schema fixed by ALIGN script. No exclusions needed.
             }
             if (supabaseTableName === 'restaurant_staff' && restaurantId) {
                 if ('restaurant_id' in converted === false) {
