@@ -30,6 +30,13 @@ export default function Header({ title, children, backHref }: HeaderProps) {
         return { staffName: 'Staff', staffRole: 'Personal' };
     }, []) || { staffName: 'Cargando...', staffRole: '...' };
 
+    const [currentTime, setCurrentTime] = useState('');
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showSyncModal, setShowSyncModal] = useState(false);
+
+    // Auto-Sync Hook
+    const { status, forceSync } = useAutoSync();
+
     useEffect(() => {
         // Initial time
         setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
