@@ -247,20 +247,20 @@ export default function PublicSchedulePage() {
                                                 onDragOver={handleDragOver}
                                                 onDrop={(e) => handleDrop(e, staff.id!, day)}
                                                 className={`
-                                                    border-l border-white/5 p-1 min-h-[60px] relative flex gap-1 overflow-hidden transition-colors
+                                                    border-l border-white/5 p-1 min-h-[60px] relative flex gap-1 overflow-hidden transition-colors group/cell
                                                     ${hasAdminAccess ? 'cursor-pointer hover:bg-white/10 active:bg-white/20' : ''}
                                                 `}
                                             >
                                                 {hasAdminAccess && (
                                                     <div
-                                                        className="absolute top-0 right-0 bottom-0 w-6 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10 cursor-pointer bg-white/5 hover:bg-white/10"
+                                                        className="absolute top-0 right-0 bottom-0 w-8 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity z-50 cursor-pointer bg-black/40 hover:bg-black/60 backdrop-blur-sm"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleCellClick(staff.id!, day);
                                                         }}
                                                         title="Agregar otro turno (Turno Cortado)"
                                                     >
-                                                        <span className="text-lg font-bold text-toast-orange drop-shadow-md pb-1">+</span>
+                                                        <span className="text-xl font-bold text-white drop-shadow-md pb-1">+</span>
                                                     </div>
                                                 )}
 

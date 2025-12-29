@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Wifi, LayoutGrid, Users, ChefHat, Briefcase, Calculator, CloudUpload, RefreshCw, Check, AlertCircle, ArrowLeft, WifiOff as WiFiOff } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 import SyncDecisionModal from './SyncDecisionModal';
 import QuickProfileModal from './QuickProfileModal';
 import { useAutoSync } from './providers/AutoSyncProvider';
@@ -16,22 +18,19 @@ interface HeaderProps {
 
 export default function Header({ title, children, backHref }: HeaderProps) {
     const pathname = usePathname();
-    const [staffName, setStaffName] = useState('Staff');
-    const [staffRole, setStaffRole] = useState('Personal');
-    const [currentTime, setCurrentTime] = useState('');
-    const [showProfileModal, setShowProfileModal] = useState(false);
-    const [showSyncModal, setShowSyncModal] = useState(false); // New Modal State
+    // Live Data Binding for Header Profile
+    const { staffName, staffRole } = useLiveQuery(async () => {
+        const id = localStorage.getItem('kontigo_staff_id');
+        if (!id) return { staffName: 'Staff', staffRole: 'Personal' };
 
-    // Auto-Sync Hook
-    const { status, forceSync } = useAutoSync();
-
-    // Legacy Sync Status for Modal (Internal state for the modal's spinner)
-    const [modalSyncing, setModalSyncing] = useState(false);
+        const staff = await db.staff.get(Number(id));
+        if (staff) {
+            return { staffName: staff.name, staffRole: staff.role };
+        }
+        return { staffName: 'Staff', staffRole: 'Personal' };
+    }, []) || { staffName: 'Cargando...', staffRole: '...' };
 
     useEffect(() => {
-        setStaffName(localStorage.getItem('kontigo_staff_name') || 'Staff');
-        setStaffRole(localStorage.getItem('kontigo_staff_role') || 'Personal');
-
         // Initial time
         setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
 
