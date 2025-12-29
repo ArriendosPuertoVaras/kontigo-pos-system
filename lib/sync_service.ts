@@ -133,6 +133,11 @@ class SyncService {
                 if ('active_role' in converted) {
                     delete converted.active_role;
                 }
+
+                // 5. HARD DELETE 'address' - Local only field, or mismatch
+                if ('address' in converted) {
+                    delete converted.address;
+                }
             }
             if (supabaseTableName === 'job_titles') {
                 delete converted.id;
