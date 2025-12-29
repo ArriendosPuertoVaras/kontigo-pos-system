@@ -76,7 +76,8 @@ export async function restoreEmpanadaIngredients() {
         // 5. AUTO-SYNC TO CLOUD (Supabase)
         try {
             const { syncService } = await import('@/lib/sync_service');
-            await syncService.pushTable('ingredients');
+            // FIX: Pass the actual Table object as first arg, and string name as second
+            await syncService.pushTable(db.ingredients, 'ingredients');
             return `✅ ÉXITO TOTAL: ${recoveredIngredients.length} Ingredientes restaurados Y respaldados en la Nube (Supabase).`;
         } catch (error) {
             console.error("Sync Error:", error);
