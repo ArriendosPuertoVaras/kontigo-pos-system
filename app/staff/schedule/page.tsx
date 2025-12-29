@@ -173,7 +173,7 @@ export default function PublicSchedulePage() {
                 scheduledStart: newStart,
                 scheduledEnd: newEnd,
                 type: shift.type,
-                status: 'pending', // Reset status for new shift
+                status: 'open', // Correct valid status for new shift
                 restaurantId: shift.restaurantId // Maintain tenant
             });
 
