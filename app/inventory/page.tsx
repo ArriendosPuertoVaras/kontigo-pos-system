@@ -6,7 +6,7 @@ import { syncService } from '@/lib/sync_service';
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowLeft, Package, Search, Settings, AlertTriangle, Plus, Filter, Trash2, XCircle, ChefHat, CloudUpload } from 'lucide-react';
+import { ArrowLeft, Package, Search, Settings, AlertTriangle, Plus, Filter, Trash2, XCircle, ChefHat, CloudUpload, HeartPulse } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 
@@ -291,6 +291,20 @@ export default function InventoryPage() {
                                             className="text-left px-4 py-3 hover:bg-white/5 text-blue-300 hover:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-3 transition-colors"
                                         >
                                             <CloudUpload className="w-3 h-3 text-blue-400" /> Restaurar desde Nube
+                                        </button>
+
+                                        <div className="h-px bg-white/10 my-1"></div>
+
+                                        <button
+                                            onClick={async () => {
+                                                setIsActionsOpen(false);
+                                                const { checkAllData } = await import('@/lib/deep_scan');
+                                                const count = await checkAllData();
+                                                alert(`Resultado del Escaneo Profundo: Se encontraron ${count} ingredientes en TOTAL en este dispositivo.`);
+                                            }}
+                                            className="text-left px-4 py-3 hover:bg-white/5 text-purple-300 hover:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-3 transition-colors"
+                                        >
+                                            <Search className="w-3 h-3 text-purple-400" /> Escaneo Profundo (Debug)
                                         </button>
                                     </div>
                                 )}
