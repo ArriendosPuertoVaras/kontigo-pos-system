@@ -1,4 +1,4 @@
-```
+
 import { db } from '@/lib/db';
 
 export async function restoreEmpanadaIngredients() {
@@ -24,7 +24,7 @@ export async function restoreEmpanadaIngredients() {
     const restoreMap = [
         { name: "Harina sin Polvos", unit: "kg", cost: 700, stock: 25, category: "GENERAL", storage: "" },
         { name: "Manteca de Cerdo", unit: "kg", cost: 2900, stock: 2, category: "GENERAL", storage: "" },
-        { name: "Salmuera", unit: "ml", cost: 0, stock: 9999, category: "OTROS", storage: "Fresco" }, 
+        { name: "Salmuera", unit: "ml", cost: 0, stock: 9999, category: "OTROS", storage: "Fresco" },
         { name: "Vino Blanco", unit: "ml", cost: 1700, stock: 5, category: "BEBIDAS Y LICORES", storage: "" },
         { name: "Prieta", unit: "kg", cost: 4600, stock: 5, category: "CARNES Y CECINAS", storage: "Refrigerado" },
         { name: "Cebolla", unit: "kg", cost: 1200, stock: 10, category: "FRUTAS Y VERDURAS", storage: "" },
@@ -38,7 +38,7 @@ export async function restoreEmpanadaIngredients() {
         { name: "Leche entera", unit: "l", cost: 900, stock: 12, category: "LACTEOS Y HUEVOS", storage: "" }
     ];
 
-    console.log(`Analyzing Recipe with ${ product.recipe.length } items vs ${ restoreMap.length } detailed records...`);
+    console.log(`Analyzing Recipe with ${product.recipe.length} items vs ${restoreMap.length} detailed records...`);
 
     // 3. Map IDs to Names & Metadata
     const recoveredIngredients: any[] = [];
@@ -72,13 +72,12 @@ export async function restoreEmpanadaIngredients() {
         try {
             const { syncService } = await import('@/lib/sync_service');
             await syncService.pushTable(db.ingredients, 'ingredients');
-            return `✅ RECUPERADO: ${ recoveredIngredients.length } ingredientes originales(17: 53 PM) restaurados y respaldados en Nube.`;
+            return `✅ RECUPERADO: ${recoveredIngredients.length} ingredientes originales (17:53 PM) restaurados y respaldados en Nube.`;
         } catch (error) {
             console.error("Sync Error:", error);
-            return `⚠️ Restaurados localmente pero falló respaldo nube: ${ (error as Error).message } `;
+            return `⚠️ Restaurados localmente pero falló respaldo nube: ${(error as Error).message}`;
         }
     }
 
     return "⚠️ Error desconocido.";
 }
-```
