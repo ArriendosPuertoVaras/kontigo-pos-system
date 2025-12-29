@@ -10,27 +10,28 @@ export async function restoreEmpanadaIngredients() {
     if (!product) return "❌ No se encontró el producto 'Empanaditas de Prieta'.";
     if (!product.recipe || product.recipe.length === 0) return "❌ El producto no tiene receta.";
 
-    // 2. The List of Names form the Screenshot (IN ORDER)
+    // 2. Exact Data from USER SCREENSHOTS (Inventory View)
+    // Order matches the Recipe Screenshot to ensure correct ID mapping
     const restoreMap = [
-        { name: "Harina sin Polvos", unit: "gr" },
-        { name: "Manteca de Cerdo", unit: "gr" },
-        { name: "Salmuera", unit: "ml" },
-        { name: "Vino Blanco", unit: "ml" },
-        { name: "Prieta", unit: "gr" },
-        { name: "Cebolla", unit: "gr" },
-        { name: "Manzana Verde", unit: "gr" },
-        { name: "Nueces", unit: "un" },
-        { name: "Orégano", unit: "gr" },
-        { name: "Comino", unit: "gr" },
-        { name: "Ají Color", unit: "gr" },
-        { name: "Aceite vegetal", unit: "ml" },
-        { name: "Huevo", unit: "un" },
-        { name: "Leche entera", unit: "ml" }
+        { name: "Harina sin Polvos", unit: "kg", cost: 700, stock: 25, category: "GENERAL", storage: "" },
+        { name: "Manteca de Cerdo", unit: "kg", cost: 2900, stock: 2, category: "GENERAL", storage: "" },
+        { name: "Salmuera", unit: "ml", cost: 0, stock: 9999, category: "OTROS", storage: "Fresco" }, // Infinity represented as high number
+        { name: "Vino Blanco", unit: "ml", cost: 1700, stock: 5, category: "BEBIDAS Y LICORES", storage: "" },
+        { name: "Prieta", unit: "kg", cost: 4600, stock: 5, category: "CARNES Y CECINAS", storage: "Refrigerado" },
+        { name: "Cebolla", unit: "kg", cost: 1200, stock: 10, category: "FRUTAS Y VERDURAS", storage: "" },
+        { name: "Manzana Verde", unit: "kg", cost: 1350, stock: 18, category: "FRUTAS Y VERDURAS", storage: "Refrigerado" },
+        { name: "Nueces", unit: "kg", cost: 10000, stock: 1, category: "GENERAL", storage: "" },
+        { name: "Orégano", unit: "kg", cost: 7500, stock: 1, category: "GENERAL", storage: "" },
+        { name: "Comino", unit: "kg", cost: 6600, stock: 1, category: "GENERAL", storage: "" },
+        { name: "Ají Color", unit: "kg", cost: 6600, stock: 1, category: "GENERAL", storage: "" },
+        { name: "Aceite vegetal", unit: "l", cost: 1200, stock: 5, category: "GENERAL", storage: "" },
+        { name: "Huevo", unit: "un", cost: 180, stock: 30, category: "LACTEOS Y HUEVOS", storage: "" },
+        { name: "Leche entera", unit: "l", cost: 900, stock: 12, category: "LACTEOS Y HUEVOS", storage: "" }
     ];
 
-    console.log(`Analyzing Recipe with ${product.recipe.length} items vs ${restoreMap.length} names...`);
+    console.log(`Analyzing Recipe with ${product.recipe.length} items vs ${restoreMap.length} detailed records...`);
 
-    // 3. Map IDs to Names
+    // 3. Map IDs to Names & Metadata
     const recoveredIngredients: any[] = [];
 
     // Safety check: Don't exceed array bounds
@@ -38,18 +39,18 @@ export async function restoreEmpanadaIngredients() {
 
     for (let i = 0; i < loopLimit; i++) {
         const recipeItem = product.recipe[i];
-        const restoreData = restoreMap[i];
+        const data = restoreMap[i];
 
         recoveredIngredients.push({
             id: recipeItem.ingredientId, // VITAL: Reuse the ID referenced in the recipe
-            name: restoreData.name,
-            unit: restoreData.unit, // Use the unit from screenshot/map
-            stock: 0,
-            cost: 1, // Placeholder
+            name: data.name,
+            unit: data.unit,
+            stock: data.stock,
+            cost: data.cost,
             minStock: 5,
-            family: 'Recuperados',
-            category: 'General',
-            storage: 'Bodega Seca'
+            family: data.category, // Map category to family as per screenshot column header
+            category: data.category,
+            storage: data.storage || 'Bodega Seca'
         });
     }
 
