@@ -137,6 +137,7 @@ class SyncService {
                 // We keep 'afp', 'health_system', etc. because they EXIST in Supabase now.
                 const fieldsToDelete = [
                     'daily_salary', // Legacy/Calculated field (NOT in schema)
+                    'hourly_rate',  // Legacy field causing schema error
                     'active_role'   // Redundant check
                 ];
 
