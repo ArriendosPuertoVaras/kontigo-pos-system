@@ -151,6 +151,7 @@ class SyncService {
                     'nationality',
                     'salary_type',                 // snake_case of salaryType
                     'base_salary',                 // snake_case of baseSalary
+                    'daily_salary',                // Legacy/Calculated field
                     'gratification'
                 ];
 
