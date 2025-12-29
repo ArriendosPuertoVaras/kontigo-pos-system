@@ -54,6 +54,35 @@ export default function Header({ title, children, backHref }: HeaderProps) {
             setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
         }, 60000); // 1 min update is enough for HH:MM
 
+        // --- AGGRESSIVE SELF-FIX: "Ghost Buster" ---
+        // If we really are stuck as "Admin (Dueño)" but "Ricardo" exists, FIX IT AUTOMATICALLY.
+        const fixGhostUser = async () => {
+            const id = localStorage.getItem('kontigo_staff_id');
+            if (!id) return;
+
+            const me = await db.staff.get(Number(id));
+            if (me && me.name === 'Admin (Dueño)') {
+                // We are the ghost. Do we have a real body to possess?
+                const realUser = await db.staff
+                    .filter(s => s.name !== 'Admin (Dueño)' && ['admin', 'manager', 'gerente', 'dueño', 'administrador'].includes(s.role.toLowerCase()))
+                    .first();
+
+                if (realUser) {
+                    console.log("👻 GHOST BUSTER: Found real user, switching...", realUser.name);
+                    localStorage.setItem('kontigo_staff_id', realUser.id!.toString());
+                    localStorage.setItem('kontigo_staff_name', realUser.name);
+                    localStorage.setItem('kontigo_staff_role', realUser.role);
+
+                    // Kill the ghost
+                    await db.staff.delete(me.id!);
+
+                    // Force Reload to reflect change
+                    window.location.reload();
+                }
+            }
+        };
+        fixGhostUser();
+
         return () => clearInterval(timer);
     }, []);
 
