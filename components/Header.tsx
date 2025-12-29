@@ -6,6 +6,7 @@ import { Wifi, LayoutGrid, Users, ChefHat, Briefcase, Calculator, CloudUpload, R
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { toast } from 'sonner';
 import SyncDecisionModal from './SyncDecisionModal';
 import QuickProfileModal from './QuickProfileModal';
 import { useAutoSync } from './providers/AutoSyncProvider';
