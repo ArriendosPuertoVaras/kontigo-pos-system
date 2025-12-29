@@ -541,20 +541,34 @@ export async function seedDatabase() {
         }
     } catch (e) { console.error("Role Migration Failed:", e); }
 
-    // Seed Job Titles if empty
+    // Seed Job Titles if empty OR missing critical roles
     try {
         const titleCount = await db.jobTitles.count();
         if (titleCount === 0) {
             console.log("Seeding Default Job Titles...");
             await db.jobTitles.bulkAdd([
                 { name: 'Administrador', active: true },
+                { name: 'Gerente', active: true }, // Added requested role
+                { name: 'Administración', active: true }, // Added requested role
+                { name: 'Admin', active: true }, // Added requested role
                 { name: 'Garzón', active: true },
                 { name: 'Cocina', active: true },
                 { name: 'Barra', active: true },
                 { name: 'Copero', active: true },
                 { name: 'Aseo', active: true },
-                { name: 'Manager', active: true } // Legacy fallback
+                { name: 'Manager', active: true },
+                { name: 'Dueño', active: true }
             ]);
+        } else {
+            // Self-Healing: Ensure specific requested roles exist even if DB is not empty
+            const criticalRoles = ['Gerente', 'Administración', 'Admin', 'Dueño'];
+            for (const roleName of criticalRoles) {
+                const exists = await db.jobTitles.where('name').equals(roleName).count();
+                if (exists === 0) {
+                    console.log(`🦁 Nexus: Restoring missing role '${roleName}'...`);
+                    await db.jobTitles.add({ name: roleName, active: true });
+                }
+            }
         }
     } catch (e) { console.error("Job Title Seed Failed", e); }
 
