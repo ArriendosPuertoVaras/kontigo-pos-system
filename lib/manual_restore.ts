@@ -2,82 +2,34 @@
 import { db } from '@/lib/db';
 
 export async function restoreEmpanadaIngredients() {
-    // 0. Get Current Tenant Context
-    const currentRestaurantId = localStorage.getItem('kontigo_restaurant_id') || 'default';
+    try {
+        const { syncService } = await import('@/lib/sync_service');
 
-    // 1. Find the specific product
-    // "Empanaditas de Prieta con Manzana y Nuez"
-    const products = await db.products.filter(p => p.name.includes("Empanaditas de Prieta")).toArray();
-    const product = products[0];
-
-    if (!product) {
-        console.error("❌ PRODUCTO NO ENCONTRADO: Buscando 'Empanaditas de Prieta'");
-        return "❌ Error: No se encontró el producto 'Empanaditas de Prieta'.";
-    }
-
-    // Check if recipe exists, but be lenient if we are forcing it
-    if (!product.recipe || product.recipe.length === 0) {
-        return "❌ El producto existe pero NO tiene receta vinculada.";
-    }
-
-    // 2. Exact Data from USER SCREENSHOTS (Inventory View) - RECOVERED SNAPSHOT 17:53 PM
-    const restoreMap = [
-        { name: "Harina sin Polvos", unit: "kg", cost: 700, stock: 25, category: "GENERAL", storage: "" },
-        { name: "Manteca de Cerdo", unit: "kg", cost: 2900, stock: 2, category: "GENERAL", storage: "" },
-        { name: "Salmuera", unit: "ml", cost: 0, stock: 9999, category: "OTROS", storage: "Fresco" },
-        { name: "Vino Blanco", unit: "ml", cost: 1700, stock: 5, category: "BEBIDAS Y LICORES", storage: "" },
-        { name: "Prieta", unit: "kg", cost: 4600, stock: 5, category: "CARNES Y CECINAS", storage: "Refrigerado" },
-        { name: "Cebolla", unit: "kg", cost: 1200, stock: 10, category: "FRUTAS Y VERDURAS", storage: "" },
-        { name: "Manzana Verde", unit: "kg", cost: 1350, stock: 18, category: "FRUTAS Y VERDURAS", storage: "Refrigerado" },
-        { name: "Nueces", unit: "kg", cost: 10000, stock: 1, category: "GENERAL", storage: "" },
-        { name: "Orégano", unit: "kg", cost: 7500, stock: 1, category: "GENERAL", storage: "" },
-        { name: "Comino", unit: "kg", cost: 6600, stock: 1, category: "GENERAL", storage: "" },
-        { name: "Ají Color", unit: "kg", cost: 6600, stock: 1, category: "GENERAL", storage: "" },
-        { name: "Aceite vegetal", unit: "l", cost: 1200, stock: 5, category: "GENERAL", storage: "" },
-        { name: "Huevo", unit: "un", cost: 180, stock: 30, category: "LACTEOS Y HUEVOS", storage: "" },
-        { name: "Leche entera", unit: "l", cost: 900, stock: 12, category: "LACTEOS Y HUEVOS", storage: "" }
-    ];
-
-    console.log(`Analyzing Recipe with ${product.recipe.length} items vs ${restoreMap.length} detailed records...`);
-
-    // 3. Map IDs to Names & Metadata
-    const recoveredIngredients: any[] = [];
-    const loopLimit = Math.min(product.recipe.length, restoreMap.length);
-
-    for (let i = 0; i < loopLimit; i++) {
-        const recipeItem = product.recipe[i];
-        const data = restoreMap[i];
-        const isInfinite = data.stock > 1000 || data.cost === 0;
-
-        recoveredIngredients.push({
-            id: recipeItem.ingredientId,
-            name: data.name,
-            unit: data.unit,
-            stock: isInfinite ? 0 : data.stock,
-            cost: data.cost,
-            minStock: 5,
-            family: data.category,
-            category: data.category,
-            storage: data.storage || 'Bodega Seca',
-            isInfinite: isInfinite,
-            restaurantId: currentRestaurantId
-        });
-    }
-
-    // 4. Save to DB
-    if (recoveredIngredients.length > 0) {
-        await db.ingredients.bulkPut(recoveredIngredients);
-
-        // 5. AUTO-SYNC TO CLOUD (Supabase) - IMMEDIATE BACKUP
+        // 1. Sync Job Titles (Gerente, Garzón, etc.)
+        const jobTitlesCount = await db.jobTitles.count();
+        console.log(`[ForceSync] Pushing ${jobTitlesCount} Job Titles...`);
         try {
-            const { syncService } = await import('@/lib/sync_service');
-            await syncService.pushTable(db.ingredients, 'ingredients');
-            return `✅ RECUPERADO: ${recoveredIngredients.length} ingredientes originales (17:53 PM) restaurados y respaldados en Nube.`;
-        } catch (error) {
-            console.error("Sync Error:", error);
-            return `⚠️ Restaurados localmente pero falló respaldo nube: ${(error as Error).message}`;
+            await syncService.pushTable(db.jobTitles, 'job_titles');
+        } catch (e) {
+            console.error(e);
+            return `❌ Error JobTitles: ${(e as Error).message}`;
         }
-    }
 
-    return "⚠️ Error desconocido.";
+        // 2. Sync Staff (The actual people)
+        const staffCount = await db.staff.count();
+        console.log(`[ForceSync] Pushing ${staffCount} Staff members...`);
+
+        try {
+            await syncService.pushTable(db.staff, 'restaurant_staff');
+        } catch (e) {
+            console.error(e);
+            return `❌ Error Staff: ${(e as Error).message}`;
+        }
+
+        return `✅ ¡ÉXITO! Se enviaron ${staffCount} colaboradores y ${jobTitlesCount} cargos a Supabase. Revisa la tabla ahora.`;
+
+    } catch (error) {
+        console.error("General Sync Error:", error);
+        return `⚠️ Error General: ${(error as Error).message}`;
+    }
 }
