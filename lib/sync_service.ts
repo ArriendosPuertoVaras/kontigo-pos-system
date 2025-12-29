@@ -138,6 +138,28 @@ class SyncService {
                 if ('address' in converted) {
                     delete converted.address;
                 }
+
+                // 6. BATCH DELETE: Remove all Chilean Payroll fields (Local Only for now)
+                const payrollFields = [
+                    'afp',
+                    'health_system', 'health_fee', // snake_case of healthSystem, healthFee
+                    'seguro_cesantia',             // snake_case of seguroCesantia
+                    'bank_details',                // snake_case of bankDetails
+                    'colacion', 'movilizacion',
+                    'estimated_tips',              // snake_case of estimatedTips
+                    'contract_type',               // snake_case of contractType
+                    'contract_duration',           // snake_case of contractDuration
+                    'weekly_hours_limit',          // snake_case of weeklyHoursLimit
+                    'birth_date',                  // snake_case of birthDate
+                    'nationality',
+                    'salary_type',                 // snake_case of salaryType
+                    'base_salary',                 // snake_case of baseSalary
+                    'gratification'
+                ];
+
+                payrollFields.forEach(field => {
+                    if (field in converted) delete converted[field];
+                });
             }
             if (supabaseTableName === 'job_titles') {
                 delete converted.id;
