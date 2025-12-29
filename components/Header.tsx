@@ -54,30 +54,37 @@ export default function Header({ title, children, backHref }: HeaderProps) {
             setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
         }, 60000); // 1 min update is enough for HH:MM
 
-        // --- AGGRESSIVE SELF-FIX: "Ghost Buster" ---
-        // If we really are stuck as "Admin (Dueño)" but "Ricardo" exists, FIX IT AUTOMATICALLY.
+        // --- AGGRESSIVE SELF-FIX: "Ghost Buster 2.0" ---
         const fixGhostUser = async () => {
             const id = localStorage.getItem('kontigo_staff_id');
-            if (!id) return;
+            const localName = localStorage.getItem('kontigo_staff_name');
 
-            const me = await db.staff.get(Number(id));
-            if (me && me.name === 'Admin (Dueño)') {
-                // We are the ghost. Do we have a real body to possess?
+            // Case 1: We are currently logged in as the Ghost (or someone with that name)
+            if (localName === 'Admin (Dueño)') {
+                // Find ANY real user to switch to (Active, and NOT named Admin (Dueño))
                 const realUser = await db.staff
-                    .filter(s => s.name !== 'Admin (Dueño)' && ['admin', 'manager', 'gerente', 'dueño', 'administrador'].includes(s.role.toLowerCase()))
+                    .filter(s => s.name !== 'Admin (Dueño)' && s.status === 'active')
                     .first();
 
                 if (realUser) {
-                    console.log("👻 GHOST BUSTER: Found real user, switching...", realUser.name);
+                    // SWITCH IDENTITY
+                    console.log("👻 GHOST BUSTER: Switching to real user:", realUser.name);
                     localStorage.setItem('kontigo_staff_id', realUser.id!.toString());
                     localStorage.setItem('kontigo_staff_name', realUser.name);
                     localStorage.setItem('kontigo_staff_role', realUser.role);
-
-                    // Kill the ghost
-                    await db.staff.delete(me.id!);
-
-                    // Force Reload to reflect change
                     window.location.reload();
+                    return;
+                }
+            }
+
+            // Case 2: We are a real user, but the Ghost still haunts the database
+            // (Only run this if we are safe)
+            if (id && localName !== 'Admin (Dueño)') {
+                const ghosts = await db.staff.where('name').equals('Admin (Dueño)').toArray();
+                if (ghosts.length > 0) {
+                    console.log(`👻 GHOST BUSTER: Deleting ${ghosts.length} ghost records`);
+                    await db.staff.bulkDelete(ghosts.map(g => g.id!));
+                    toast.success("Sistema auto-reparado: Usuario fantasma eliminado");
                 }
             }
         };
