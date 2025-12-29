@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
 import { User, Lock, Loader2, LogIn } from 'lucide-react';
-import { getSetting, SettingsKeys, isSystemConfigured } from '@/lib/settings';
+import { getSetting, SettingsKeys } from '@/lib/settings';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -31,9 +31,6 @@ export default function LoginPage() {
         const loadSettings = async () => {
             const name = await getSetting<string>(SettingsKeys.RESTAURANT_NAME, "Kontigo POS");
             setRestaurantName(name);
-
-            // If we have a local owner from migration, autofill logic could go here
-            // But for security, better to keep it clean.
         };
         loadSettings();
     }, []);
@@ -54,10 +51,6 @@ export default function LoginPage() {
             if (!authData.user) throw new Error("No usuario retornado");
 
             // 2. Identify Staff Member Locally
-            // We need to match this Cloud User (Email) to a Local Staff (for permissions/name)
-            // If it's the OWNER (based on Supabase role or metadata), we grant Full Access.
-
-            // Try to find staff by email
             const staffMember = await db.staff.where('email').equals(credentials.email).first();
 
             if (staffMember) {
@@ -68,18 +61,13 @@ export default function LoginPage() {
                 router.push('/tables');
                 toast.success(`Bienvenido, ${staffMember.name}`);
             } else {
-                // FALLBACK: Is it the Owner who hasn't been created in local DB yet?
-                // Or maybe the admin@kontigo.cl we just used?
-                // Let's allow entry as 'Admin' temporarily if matches owner email behavior
-                // Ideally, we sync here from cloud 'restaurant_staff' table...
-
-                // For now, let's allow access and Create a provisional local user (Self-Healing)
+                // FALLBACK: Admin Access for Owner
                 const newId = await db.staff.add({
                     name: 'Admin (Dueño)',
                     email: credentials.email,
                     role: 'admin',
                     activeRole: 'admin',
-                    pin: '0000', // Legacy strict requirement
+                    pin: '0000',
                     status: 'active',
                     weeklyHoursLimit: 45,
                     contractType: 'art-22',
@@ -103,21 +91,82 @@ export default function LoginPage() {
     };
 
     return (
-        <button onClick={() => setSelectedStaff(null)} className="text-gray-500 text-xs hover:text-white transition-colors">
-            ← Volver a selección de usuario
-        </button>
-                    </div >
-                </div >
-            )
-}
+        <div className="min-h-screen flex items-center justify-center bg-[var(--toast-charcoal-dark)] p-4">
+            <div className="bg-[var(--toast-charcoal)] border border-[var(--toast-charcoal-light)] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
 
-{/* CORPORATE FOOTER */ }
-<div className="fixed bottom-4 text-center opacity-30 hover:opacity-100 transition-opacity">
-    <p className="text-[10px] text-gray-500 font-medium tracking-widest uppercase">
-        Powered by <span className="font-bold text-gray-400">Kontigo Lab SpA</span>
-    </p>
-</div>
-        </div >
+                {/* Header */}
+                <div className="bg-[var(--toast-orange)] p-6 text-center">
+                    <div className="mx-auto bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mb-3 backdrop-blur-sm">
+                        <Lock className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-white uppercase tracking-wider">
+                        {restaurantName}
+                    </h2>
+                    <p className="text-blue-100 text-xs mt-1">Acceso Seguro</p>
+                </div>
 
+                {/* Form */}
+                <div className="p-8">
+                    <form onSubmit={handleLogin} className="space-y-5">
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-[var(--toast-text-gray)] uppercase tracking-wide ml-1">
+                                Email / Usuario
+                            </label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-3.5 w-5 h-5 text-gray-500" />
+                                <input
+                                    type="email"
+                                    required
+                                    className="w-full bg-[var(--toast-charcoal-light)] border border-transparent focus:border-[var(--toast-orange)] focus:ring-1 focus:ring-[var(--toast-orange)] text-white rounded-xl py-3 pl-10 pr-4 placeholder-gray-500 transition-all font-medium"
+                                    placeholder="usuario@kontigo.cl"
+                                    value={credentials.email}
+                                    onChange={e => setCredentials({ ...credentials, email: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-[var(--toast-text-gray)] uppercase tracking-wide ml-1">
+                                Contraseña
+                            </label>
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-500" />
+                                <input
+                                    type="password"
+                                    required
+                                    className="w-full bg-[var(--toast-charcoal-light)] border border-transparent focus:border-[var(--toast-orange)] focus:ring-1 focus:ring-[var(--toast-orange)] text-white rounded-xl py-3 pl-10 pr-4 placeholder-gray-500 transition-all font-medium"
+                                    placeholder="••••••••"
+                                    value={credentials.password}
+                                    onChange={e => setCredentials({ ...credentials, password: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-[var(--toast-orange)] hover:bg-[var(--toast-orange-hover)] text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <LogIn className="w-5 h-5" />}
+                            <span>INICIAR TURNO</span>
+                        </button>
+
+                    </form>
+                </div>
+
+                <div className="bg-[var(--toast-charcoal-light)]/50 p-4 text-center border-t border-[var(--toast-charcoal-light)]">
+                    <p className="text-xs text-gray-500">
+                        ¿Problemas para entrar? <span className="text-[var(--toast-orange)] cursor-pointer hover:underline">Solicitar reset</span>
+                    </p>
+                </div>
+            </div>
+
+            <div className="fixed bottom-4 text-center opacity-30 hover:opacity-100 transition-opacity">
+                <p className="text-[10px] text-gray-500 font-medium tracking-widest uppercase">
+                    Powered by <span className="font-bold text-gray-400">Kontigo Lab SpA</span>
+                </p>
+            </div>
+        </div>
     );
 }
