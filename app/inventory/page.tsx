@@ -267,6 +267,27 @@ export default function InventoryPage() {
                                         >
                                             <Filter className="w-3 h-3 text-red-400" /> Limpiar Duplicados
                                         </button>
+
+                                        <div className="h-px bg-white/10 my-1"></div>
+
+                                        <button
+                                            onClick={async () => {
+                                                setIsActionsOpen(false);
+                                                if (!confirm("⚠️ ¿Estás seguro? Esto descargará tu inventario desde la Nube (Supabase) y podría reemplazar cambios locales no guardados.")) return;
+
+                                                const toastId = toast.loading("Iniciando restauración...");
+                                                try {
+                                                    await syncService.restoreFromCloud((msg) => toast.loading(msg, { id: toastId }));
+                                                    toast.success("¡Inventario Restaurado!", { id: toastId });
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    toast.error("Error al restaurar: " + (e as Error).message, { id: toastId });
+                                                }
+                                            }}
+                                            className="text-left px-4 py-3 hover:bg-white/5 text-blue-300 hover:text-white text-xs font-bold uppercase tracking-wider flex items-center gap-3 transition-colors"
+                                        >
+                                            <CloudUpload className="w-3 h-3 text-blue-400" /> Restaurar desde Nube
+                                        </button>
                                     </div>
                                 )}
                             </div>
