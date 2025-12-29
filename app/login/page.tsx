@@ -51,7 +51,35 @@ export default function LoginPage() {
             if (!authData.user) throw new Error("No usuario retornado");
 
             // 2. Identify Staff Member Locally
-            const staffMember = await db.staff.where('email').equals(credentials.email).first();
+            let staffMember = await db.staff.where('email').equals(credentials.email).first();
+
+            // SELF-HEALING: If not found by email, check if we can attach this email to an existing Admin/Manager
+            // This fixes the issue where "Ricardo" exists but has no email, so we were creating "Admin (Dueño)" duplicate.
+            if (!staffMember) {
+                // Find potential match (High level role, active, no email set)
+                const existingAdmin = await db.staff
+                    .filter(s =>
+                        !s.email &&
+                        s.status === 'active' &&
+                        ['admin', 'manager', 'gerente', 'dueño', 'administrador'].includes(s.role.toLowerCase())
+                    )
+                    .first();
+
+                if (existingAdmin) {
+                    console.log(`🦁 Nexus: Merging email ${credentials.email} into existing staff ${existingAdmin.name}`);
+                    await db.staff.update(existingAdmin.id!, { email: credentials.email });
+                    staffMember = await db.staff.get(existingAdmin.id!);
+                }
+            }
+
+            // CLEANUP: Remove any accidentally created "Admin (Dueño)" duplicates if we found a real user now
+            if (staffMember) {
+                const duplicates = await db.staff.where('name').equals('Admin (Dueño)').toArray();
+                if (duplicates.length > 0) {
+                    console.log(`🦁 Nexus: Cleaning up ${duplicates.length} duplicate admin users`);
+                    await db.staff.bulkDelete(duplicates.map(d => d.id!));
+                }
+            }
 
             if (staffMember) {
                 // Success: Existing Staff
@@ -61,7 +89,7 @@ export default function LoginPage() {
                 router.push('/tables');
                 toast.success(`Bienvenido, ${staffMember.name}`);
             } else {
-                // FALLBACK: Admin Access for Owner
+                // FALLBACK: Admin Access for Owner (Only if truly no match found)
                 const newId = await db.staff.add({
                     name: 'Admin (Dueño)',
                     email: credentials.email,
