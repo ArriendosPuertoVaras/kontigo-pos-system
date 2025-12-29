@@ -113,10 +113,12 @@ class SyncService {
                     converted.role_name = converted.role;
                     delete converted.role;
                 }
-                // Map 'status' -> 'active' boolean
-                if (converted.status) {
-                    converted.active = converted.status === 'active';
-                    delete converted.status;
+
+                // FIX: Map local 'active' boolean -> remote 'status' string
+                // The error "Could not find 'active' column" implies Supabase has 'status' but not 'active'.
+                if ('active' in converted) {
+                    converted.status = converted.active ? 'active' : 'inactive';
+                    delete converted.active;
                 }
             }
             if (supabaseTableName === 'job_titles') {
