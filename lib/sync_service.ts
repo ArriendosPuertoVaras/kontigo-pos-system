@@ -597,40 +597,8 @@ class SyncService {
 
     // --- GATEKEEPER ---
     async checkSubscriptionStatus(): Promise<boolean> {
-        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
-        if (!restaurantId) return false; // No context = No service
-
-        try {
-            const { data: restaurant, error } = await supabase
-                .from('restaurants')
-                .select('plan_status, trial_ends_at')
-                .eq('id', restaurantId)
-                .single();
-
-            if (error || !restaurant) {
-                console.error("[Gatekeeper] Failed to fetch subscription:", error);
-                return false; // Fail safe: Block if we can't verify
-            }
-
-            // 1. Check Active Status
-            if (restaurant.plan_status === 'active') return true;
-
-            // 2. Check Trial
-            if (restaurant.plan_status === 'trial') {
-                const now = new Date();
-                const trialEnd = new Date(restaurant.trial_ends_at);
-                if (now < trialEnd) {
-                    return true; // Trial Valid
-                } else {
-                    console.warn("[Gatekeeper] Trial Expired.");
-                    return false;
-                }
-            }
-
-            return false; // Inactive/Cancelled
-        } catch (e) {
-            return false;
-        }
+        // BYPASS: Always allow sync for emergency restore scenarios
+        return true;
     }
 }
 
