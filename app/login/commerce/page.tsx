@@ -75,23 +75,23 @@ export default function CommerceLoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
-            <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700">
+        <div className="min-h-screen flex items-center justify-center bg-[var(--toast-charcoal-dark)] p-4">
+            <div className="bg-[var(--toast-charcoal)] p-8 rounded-2xl shadow-2xl w-full max-w-md border border-[var(--toast-charcoal-light)]">
                 <div className="flex flex-col items-center mb-8">
-                    <div className="bg-blue-600 p-4 rounded-full mb-4 shadow-lg shadow-blue-500/20">
+                    <div className="bg-[var(--toast-orange)] p-4 rounded-full mb-4 shadow-lg shadow-[var(--toast-orange)]/20">
                         <Store className="w-10 h-10 text-white" />
                     </div>
                     <h1 className="text-2xl font-bold text-white text-center">
                         Configuración de Dispositivo
                     </h1>
-                    <p className="text-gray-400 text-center mt-2">
+                    <p className="text-[var(--toast-text-gray)] text-center mt-2">
                         Ingresa tus credenciales de Dueño para vincular este iPad a tu restaurante.
                     </p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-[var(--toast-text-gray)] mb-1">
                             Email Corporativo
                         </label>
                         <input
@@ -99,13 +99,13 @@ export default function CommerceLoginPage() {
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-gray-700 text-white border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3"
+                            className="w-full bg-[var(--toast-charcoal-light)] text-white border-transparent rounded-lg focus:ring-2 focus:ring-[var(--toast-orange)] p-3"
                             placeholder="dueño@restaurante.cl"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-[var(--toast-text-gray)] mb-1">
                             Contraseña Maestra
                         </label>
                         <input
@@ -113,14 +113,14 @@ export default function CommerceLoginPage() {
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full bg-gray-700 text-white border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3"
+                            className="w-full bg-[var(--toast-charcoal-light)] text-white border-transparent rounded-lg focus:ring-2 focus:ring-[var(--toast-orange)] p-3"
                             placeholder="••••••••"
                         />
                     </div>
 
-                    <div className="bg-blue-900/30 p-4 rounded-lg flex items-start gap-3 border border-blue-800/50">
-                        <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                        <p className="text-xs text-blue-200">
+                    <div className="bg-[var(--toast-orange)]/10 p-4 rounded-lg flex items-start gap-3 border border-[var(--toast-orange)]/30">
+                        <ShieldCheck className="w-5 h-5 text-[var(--toast-orange)] shrink-0 mt-0.5" />
+                        <p className="text-xs text-[var(--toast-text-gray)]">
                             Esta acción se realiza <strong>una sola vez</strong> por dispositivo. A partir de ahora, este iPad solo mostrará información de tu local.
                         </p>
                     </div>
@@ -128,7 +128,7 @@ export default function CommerceLoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-blue-500/25 flex items-center justify-center gap-2"
+                        className="w-full bg-[var(--toast-orange)] hover:bg-[var(--toast-orange-hover)] text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-[var(--toast-orange)]/25 flex items-center justify-center gap-2"
                     >
                         {loading ? (
                             <>
@@ -143,7 +143,7 @@ export default function CommerceLoginPage() {
 
                 <div className="mt-6 text-center">
                     <p className="text-sm text-gray-500">
-                        ¿No tienes cuenta? <a href="#" className="text-blue-400 hover:underline">Contactar Soporte</a>
+                        ¿No tienes cuenta? <a href="#" className="text-[var(--toast-orange)] hover:underline">Contactar Soporte</a>
                     </p>
                 </div>
             </div>
