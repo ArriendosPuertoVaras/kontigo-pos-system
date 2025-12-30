@@ -343,7 +343,14 @@ export default function InventoryPage() {
                                 {filtered.map(item => (
                                     <tr key={item.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="px-4 py-2 font-mono text-xs text-toast-orange whitespace-nowrap">{item.code || '-'}</td>
-                                        <td className="px-4 py-2 font-semibold text-white whitespace-nowrap">{item.name}</td>
+                                        <td className="px-4 py-2 font-semibold text-white whitespace-nowrap">
+                                            {item.name}
+                                            {item.yieldPercent && item.yieldPercent < 1 && (
+                                                <span className="ml-2 text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold border border-red-500/10">
+                                                    {(item.yieldPercent * 100).toFixed(0)}% Util
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-2"><span className="bg-white/5 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider text-gray-400 whitespace-nowrap">{item.family || item.category || 'General'}</span></td>
                                         <td className="px-4 py-2 text-gray-400 text-xs whitespace-nowrap">{item.subFamily || '-'}</td>
                                         <td className="px-4 py-2 text-gray-400 text-xs whitespace-nowrap">{item.storage || '-'}</td>
@@ -431,6 +438,7 @@ function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () =
     const [stock, setStock] = useState(0);
     const [minStock, setMinStock] = useState(5);
     const [cost, setCost] = useState(0);
+    const [yieldPercent, setYieldPercent] = useState(100); // UI uses 0-100, DB uses 0.0-1.0
     const [code, setCode] = useState("");
     const [isInfinite, setIsInfinite] = useState(false);
 
@@ -468,6 +476,7 @@ function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () =
             conversionFactor: 1, // Default
             code: code || generateSKU(name, family),
             isInfinite,
+            yieldPercent: yieldPercent / 100,
             minStock: Number(minStock)
         });
         onClose();
@@ -568,6 +577,20 @@ function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () =
                             <label className="block text-xs font-bold text-gray-400 mb-1">Stock Mínimo</label>
                             <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none" value={minStock} onChange={e => setMinStock(Number(e.target.value))} />
                         </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-gray-400 mb-1">Rendimiento (%)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    max={100}
+                                    min={1}
+                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none"
+                                    value={yieldPercent}
+                                    onChange={e => setYieldPercent(Number(e.target.value))}
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">%</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2 pt-2">
@@ -595,7 +618,8 @@ function EditInventoryItemModal({ ingredient, onClose, existingSubFamilies }: { 
         ...ingredient,
         family: ingredient.family || ingredient.category || "Abarrotes",
         storage: ingredient.storage || "Bodega Seca",
-        subFamily: ingredient.subFamily || ""
+        subFamily: ingredient.subFamily || "",
+        yieldPercent: ingredient.yieldPercent ? ingredient.yieldPercent * 100 : 100
     });
 
     const handleSave = async () => {
@@ -611,6 +635,7 @@ function EditInventoryItemModal({ ingredient, onClose, existingSubFamilies }: { 
             cost: Number(form.cost),
             code: form.code, // Allow updating code manually if needed
             isInfinite: form.isInfinite,
+            yieldPercent: Number(form.yieldPercent) / 100,
             minStock: Number(form.minStock),
             purchaseUnit: form.unit === ingredient.unit ? form.unit : ingredient.purchaseUnit
         });
@@ -712,6 +737,20 @@ function EditInventoryItemModal({ ingredient, onClose, existingSubFamilies }: { 
                         <div className="flex-1">
                             <label className="block text-xs font-bold text-gray-400 mb-1">Stock Mínimo</label>
                             <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-toast-orange outline-none" value={form.minStock || 5} onChange={e => setForm({ ...form, minStock: Number(e.target.value) })} />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-gray-400 mb-1">Rendimiento (%)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    max={100}
+                                    min={1}
+                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-toast-orange outline-none"
+                                    value={form.yieldPercent || 100}
+                                    onChange={e => setForm({ ...form, yieldPercent: Number(e.target.value) })}
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">%</span>
+                            </div>
                         </div>
                     </div>
 
