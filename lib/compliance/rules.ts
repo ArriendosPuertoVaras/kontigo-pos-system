@@ -103,6 +103,7 @@ export function getOvertimeStatus(shift: Shift) {
     // Normalize dates to handle potential 1970 or incorrectly saved dates
     // Case: User scheduled 10:00 - 18:00 but Date object is 1970-01-01
     const sEnd = new Date(shift.scheduledEnd);
+    if (isNaN(sEnd.getTime())) return { isOvertime: false, minutesOver: 0 };
 
     // Construct a "Today's scheduled end" to compare fairly
     const scheduledEndToday = new Date(now);
