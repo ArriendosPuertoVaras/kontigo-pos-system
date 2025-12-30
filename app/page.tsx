@@ -734,12 +734,7 @@ function POSContent() {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 if (activeOrder?.id) {
-                                  // Mark as delivered for this section? 
-                                  // For now, simpler: keep existing "isDelivered" for whole order if clicked,
-                                  // or just show them.
-                                  if (confirm("¿Marcar toda la orden como entregada?")) {
-                                    await db.orders.update(activeOrder.id, { isDelivered: true } as any);
-                                  }
+                                  await db.orders.update(activeOrder.id, { isDelivered: true } as any);
                                 }
                               }}
                               className={`w-3.5 h-3.5 rounded-full animate-pulse shadow-lg border border-white/20 ${color}`}
