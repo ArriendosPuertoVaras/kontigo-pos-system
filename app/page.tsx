@@ -74,15 +74,9 @@ function POSContent() {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, product: Product } | null>(null);
 
   // Shift Management
-  // Shift Management
   const [showClockOut, setShowClockOut] = useState(false);
+  // Listener removed: Handled globally by GlobalModals
 
-  // LISTEN FOR SIDEBAR CLOCK-OUT EVENT
-  useEffect(() => {
-    const handleClockOut = () => setShowClockOut(true);
-    window.addEventListener('open-clock-out', handleClockOut);
-    return () => window.removeEventListener('open-clock-out', handleClockOut);
-  }, []);
 
   // --- CLOCK TICKER ---
   const [ticker, setTicker] = useState(0);

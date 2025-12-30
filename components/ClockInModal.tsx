@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db, Staff } from '@/lib/db';
-import { X, User, ArrowRight, Loader } from 'lucide-react';
+import { X, User, ArrowRight, Loader, CheckCircle, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface ClockInModalProps {
     isOpen: boolean;
@@ -25,40 +26,86 @@ export default function ClockInModal({ isOpen, onClose, onSuccess }: ClockInModa
         }
     }, [isOpen]);
 
-    const handleClockIn = async () => {
+    // State for Attendance Mode
+    const [mode, setMode] = useState<'in' | 'out'>('in');
+    const [activeShiftId, setActiveShiftId] = useState<number | null>(null);
+    const [successMsg, setSuccessMsg] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            db.staff.toArray().then(setStaffList);
+            setSelectedStaff(null);
+            setPin('');
+            setError('');
+            setSuccessMsg('');
+            setMode('in');
+            setLoading(false);
+        }
+    }, [isOpen]);
+
+    const verifyAndProceed = async () => {
         if (!selectedStaff) return;
+        setLoading(true);
+        setError('');
+
         if (selectedStaff.pin !== pin) {
             setError('PIN Incorrecto');
+            setLoading(false);
             return;
         }
 
-        setLoading(true);
+        // Check for active shift
+        const activeShift = await db.shifts
+            .where('staffId').equals(selectedStaff.id!)
+            .filter(s => !s.endTime)
+            .first();
+
+        if (activeShift) {
+            // Found Active Shift -> Switch to CLOCK OUT mode
+            setMode('out');
+            setActiveShiftId(activeShift.id!);
+            setLoading(false);
+        } else {
+            // No Active Shift -> Perform CLOCK IN immediately
+            await performClockIn();
+        }
+    };
+
+    const performClockIn = async () => {
         try {
-            // Check if already has active shift
-            const activeShift = await db.shifts
-                .where('staffId').equals(selectedStaff.id!)
-                .filter(s => !s.endTime)
-                .first();
-
-            if (activeShift) {
-                setError('Ya tiene un turno activo.');
-                setLoading(false);
-                return;
-            }
-
             await db.shifts.add({
-                staffId: selectedStaff.id!,
+                staffId: selectedStaff!.id!,
                 startTime: new Date(),
                 type: 'work',
-                scheduledStart: new Date(), // Ad-hoc shift assumes started now
+                scheduledStart: new Date(),
                 isOvertime: false
             });
-
-            onSuccess();
-            onClose();
+            setSuccessMsg('¡Entrada Registrada!');
+            setTimeout(() => {
+                onSuccess();
+                onClose();
+            }, 1500);
         } catch (err) {
             console.error(err);
-            setError('Error al registrar');
+            setError('Error al registrar entrada');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const performClockOut = async () => {
+        setLoading(true);
+        try {
+            if (activeShiftId) {
+                await db.shifts.update(activeShiftId, { endTime: new Date() });
+                setSuccessMsg('¡Turno Cerrado!');
+                setTimeout(() => {
+                    onSuccess();
+                    onClose();
+                }, 1500);
+            }
+        } catch (err) {
+            setError('Error al cerrar turno');
         } finally {
             setLoading(false);
         }
@@ -119,12 +166,24 @@ export default function ClockInModal({ isOpen, onClose, onSuccess }: ClockInModa
                             </div>
 
                             <button
-                                disabled={pin.length < 4 || loading}
-                                onClick={handleClockIn}
+                                disabled={pin.length < 4 || loading || !!successMsg}
+                                onClick={mode === 'in' ? verifyAndProceed : performClockOut}
                                 className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all
-                                ${pin.length === 4 ? 'bg-toast-orange text-white shadow-lg shadow-orange-500/20 hover:brightness-110' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
-                                {loading ? <Loader className="w-5 h-5 animate-spin" /> : <>Entrar <ArrowRight className="w-5 h-5" /></>}
+                                ${pin.length === 4
+                                        ? (mode === 'in' ? 'bg-toast-orange text-white' : 'bg-red-500 text-white')
+                                        : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+
+                                {loading ? <Loader className="w-5 h-5 animate-spin" /> :
+                                    successMsg ? <span className="flex items-center gap-2"><CheckCircle className="w-5 h-5" /> {successMsg}</span> :
+                                        mode === 'out' ? <>Cerrar Turno <LogOut className="w-5 h-5" /></> :
+                                            <>Confirmar y Entrar <ArrowRight className="w-5 h-5" /></>}
                             </button>
+
+                            {mode === 'out' && !successMsg && (
+                                <p className="text-center text-xs text-yellow-500 mt-2 animate-pulse">
+                                    ⚠️ Tienes un turno abierto. Presiona para salir.
+                                </p>
+                            )}
                         </div>
                     )}
                 </div>

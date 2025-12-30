@@ -139,7 +139,7 @@ export default function Sidebar() {
 
                     {/* CLOCK IN/OUT BUTTON */}
                     <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('open-clock-out'))}
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-attendance-modal'))}
                         className="relative flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-400 hover:text-green-400 hover:bg-green-500/10 transition-all group cursor-pointer"
                     >
                         <div className="w-5 h-5 mb-0.5"><Users className="w-5 h-5" /></div>
