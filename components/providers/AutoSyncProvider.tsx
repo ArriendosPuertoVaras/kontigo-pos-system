@@ -57,6 +57,13 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
             if (typeof window === 'undefined') return;
 
             if (navigator.onLine) {
+                // 0. GATEKEEPER: Do nothing if we are not logged in (No Restaurant ID)
+                const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+                if (!restaurantId) {
+                    // We are at Login Screen (or just setup). Do NOT try to sync or restore.
+                    return;
+                }
+
                 // 1. SMART CHECK: Health Check & Repair
                 const productCount = await db.products.count();
                 const categoryCount = await db.categories.count();
