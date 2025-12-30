@@ -132,7 +132,7 @@ export default function StaffPage() {
                         <Users className="w-4 h-4" />
                         Colaboradores
                     </Link>
-                    <Link href="/staff/schedule" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
+                    <Link href="/staff/planner" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
                         <Clock className="w-4 h-4" />
                         Ver Horarios
                     </Link>
