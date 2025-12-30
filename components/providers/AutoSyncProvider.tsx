@@ -41,10 +41,13 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
             setLastSyncedAt(new Date());
             setPendingChanges(false);
             console.log("☁️ Auto-Sync: Changes saved to cloud.");
-        } catch (error) {
+        } catch (error: any) {
             console.error("Auto-Sync Failed:", error);
             setStatus('error');
-            // Don't toast on background error to avoid annoyance, just show icon
+            // DEBUG: Show the actual error to the user
+            toast.error("Error de Sincronización", {
+                description: error.message || "Revisa la consola para más detalles."
+            });
         }
     }, []);
 
