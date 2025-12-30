@@ -35,7 +35,7 @@ function POSContent() {
     }
   }, [router, tableIdParam, searchParams]);
 
-  const [activeCategoryId, setActiveCategoryId] = useState(1);
+  const [activeCategoryId, setActiveCategoryId] = useState(0); // 0 = Loading / None Selected
   const [ticket, setTicket] = useState<TicketItem[]>([]);
   const [showMobileTicket, setShowMobileTicket] = useState(false);
 
@@ -168,6 +168,17 @@ function POSContent() {
 
   // Fetch Data Live from IndexedDB
   const categories = useLiveQuery(() => db.categories.toArray());
+
+  // AUTO-SELECT FIRST CATEGORY
+  useEffect(() => {
+    if (activeCategoryId === 0 && categories && categories.length > 0) {
+      // Sort by order to pick the true "first"
+      const sorted = [...categories].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      if (sorted[0]?.id) {
+        setActiveCategoryId(sorted[0].id);
+      }
+    }
+  }, [categories, activeCategoryId]);
   // Robust Product Fetching: Handles Type Mismatches AND Duplicate Categories
   // NUCLEAR FIX ☢️: Handle ID (number), ID (string), and NAME (string)
   const products = useLiveQuery(
@@ -924,29 +935,7 @@ function POSContent() {
                   <div className="col-span-full flex flex-col items-center justify-center py-10 gap-4">
                     <p className="text-gray-400">No hay productos en esta categoría.</p>
 
-                    {/* DEBUG PANEL */}
-                    <div className="bg-red-900/20 border border-red-500/50 p-4 rounded text-left text-xs font-mono text-red-200 w-full max-w-md">
-                      <p className="font-bold underline mb-2">DIAGNÓSTICO DE ERROR:</p>
-                      <p>Cat. Activa ID: {activeCategoryId}</p>
-                      {categories?.find(c => c.id === activeCategoryId) && (
-                        <p>Cat. Nombre: "{categories.find(c => c.id === activeCategoryId)?.name}"</p>
-                      )}
-                      <hr className="border-red-500/30 my-2" />
-                      <p>Total Productos (Global): {
-                        // We can't access global count easily here without another query, 
-                        // so let's just show a hint.
-                        "Verificando..."
-                      }</p>
-                      <button
-                        onClick={async () => {
-                          const sample = await db.products.toArray();
-                          alert(`Total DB: ${sample.length}\nEjemplo 1: ${JSON.stringify(sample[0])}\nEjemplo 2: ${JSON.stringify(sample[1])}`);
-                        }}
-                        className="mt-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                      >
-                        Ver Datos Crudos (Alert)
-                      </button>
-                    </div>
+                    {/* DEBUG PANEL REMOVED */}
                   </div>
                 ) : null}
 
