@@ -407,9 +407,12 @@ export class KontigoFinance {
                 .reverse()
                 .first();
 
-            if (lastSync && (Date.now() - lastSync.date.getTime()) < 5000) {
-                console.log("🦁 Nexus: Sync request ignored (Debounced - just synced).");
-                return;
+            if (lastSync) {
+                const lastSyncDate = typeof lastSync.date === 'string' ? new Date(lastSync.date) : lastSync.date;
+                if ((Date.now() - lastSyncDate.getTime()) < 5000) {
+                    console.log("🦁 Nexus: Sync request ignored (Debounced - just synced).");
+                    return;
+                }
             }
 
             // 1. Calculate Real Inventory Value
@@ -446,9 +449,12 @@ export class KontigoFinance {
                     .reverse()
                     .first();
 
-                if (freshLastSync && (Date.now() - freshLastSync.date.getTime()) < 2000) {
-                    console.log("🦁 Nexus: Sync abort (Race condition detected).");
-                    return;
+                if (freshLastSync) {
+                    const freshLastSyncDate = typeof freshLastSync.date === 'string' ? new Date(freshLastSync.date) : freshLastSync.date;
+                    if ((Date.now() - freshLastSyncDate.getTime()) < 2000) {
+                        console.log("🦁 Nexus: Sync abort (Race condition detected).");
+                        return;
+                    }
                 }
 
                 const movements: JournalMovement[] = [];
