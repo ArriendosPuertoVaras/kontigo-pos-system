@@ -166,6 +166,10 @@ class SyncService {
             if (supabaseTableName === 'cash_counts') {
                 // Schema now fixed by MASTER SCRIPT. No exclusions needed.
             }
+            if (supabaseTableName === 'shifts') {
+                // derived field, not in supabase schema
+                delete converted.status;
+            }
 
             // SAFETY: FORCE RESTAURANT_ID
             converted.restaurant_id = restaurantId;
