@@ -191,7 +191,10 @@ function POSContent() {
       // 3. NUCLEAR FILTER: Match ANYTHING that resembles this category
       return await db.products.filter(p => {
         // A. Match by Numeric IDs (Current + Duplicates)
-        if (duplicateIds.some(id => id == p.categoryId)) return true;
+        // e.g. If activeCategoryId is 1, but we found a ghost "Entradas" with ID 18, 
+        // duplicateIds will be [1, 18]. We check if p.categoryId is in this list.
+        // We use loose equality (==) to cover string/number mismatches.
+        if (duplicateIds.some(id => id == (p.categoryId as any))) return true;
 
         // B. Match by NAME (If legacy data stored "Entradas" instead of ID 1)
         const catId = p.categoryId as any;
