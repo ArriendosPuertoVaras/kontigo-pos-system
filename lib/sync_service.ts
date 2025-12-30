@@ -107,10 +107,8 @@ class SyncService {
                 }
 
                 // 1. DELETE ID (Local is Number, Supabase IS UUID)
-                // This allows Supabase to auto-generate a UUID for new inserts.
-                // Note: Updates to existing staff might duplicate if we don't map UUIDs back, 
-                // but for now this unblocks the data upload.
-                delete converted.id;
+                // NOW FIXED: Supabase is BIGINT too. We KEEP the ID.
+                // delete converted.id;
 
                 // CRITICAL FIX: Ensure 'active' column is NEVER sent to Supabase
                 // 1. If 'status' is missing but 'active' exists, backfill 'status'
@@ -152,8 +150,9 @@ class SyncService {
                 // (Refactoring previous Legacy fix block to effectively send both if needed, 
                 // but for safety, let's just Stick to role_name as primary, 
                 // and maybe backfill role from role_name if missing?)
-                if (converted.role_name && !converted.role) {
-                    converted.role = converted.role_name;
+                // Ensure 'role_name' is preserved/mapped.
+                if (converted.role && !converted.role_name) {
+                    converted.role_name = converted.role;
                 }
             }
             if (supabaseTableName === 'job_titles') {
