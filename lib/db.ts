@@ -173,6 +173,7 @@ export interface Order {
     payments?: Payment[];
     createdAt: Date;
     closedAt?: Date;
+    readySections?: string[]; // Tracking independent KDS station readiness
     restaurantId?: string;
 }
 

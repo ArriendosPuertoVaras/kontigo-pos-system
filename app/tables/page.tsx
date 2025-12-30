@@ -200,6 +200,7 @@ export default function TablesPage() {
                                 // Ready Flags
                                 let hasKitchenReady = false;
                                 let hasBarReady = false;
+                                let hasParrillaReady = false;
 
                                 if (table.status === 'occupied') {
                                     const order = orderMap?.get(table.currentOrderId!);
@@ -208,21 +209,15 @@ export default function TablesPage() {
                                         waitTimeLabel = getOrderWaitTimeFormatted(order.createdAt);
 
                                         // CHECK FOR READY STATUS & DELIVERY
-                                        if (order.status === 'ready' && !(order as any).isDelivered) {
-                                            // Determine destinations based on categories
-                                            if (catMap) {
-                                                const hasKitchenItem = order.items.some(i => {
-                                                    const dest = catMap.get(i.product.categoryId);
-                                                    return !dest || !dest.toLowerCase().includes('bar');
-                                                });
-                                                const hasBarItem = order.items.some(i => {
-                                                    const dest = catMap.get(i.product.categoryId);
-                                                    return dest && dest.toLowerCase().includes('bar');
-                                                });
-
-                                                if (hasKitchenItem) hasKitchenReady = true;
-                                                if (hasBarItem) hasBarReady = true;
-                                            }
+                                        // CHECK FOR READY STATUS per Section
+                                        const readySections = (order as any).readySections || [];
+                                        if (!(order as any).isDelivered) {
+                                            readySections.forEach((s: string) => {
+                                                const section = s.toLowerCase();
+                                                if (section === 'bar') hasBarReady = true;
+                                                else if (section === 'parrilla') hasParrillaReady = true;
+                                                else hasKitchenReady = true; // Default/Kitchen
+                                            });
                                         }
                                     }
                                     const status = getWaitStatus(waitTime);
@@ -265,8 +260,11 @@ export default function TablesPage() {
                                                 {hasKitchenReady && (
                                                     <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)] animate-[ping_1s_ease-in-out_infinite]" title="Cocina Lista"></div>
                                                 )}
+                                                {hasParrillaReady && (
+                                                    <div className="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)] animate-[ping_1s_ease-in-out_infinite] delay-150" title="Parrilla Lista"></div>
+                                                )}
                                                 {hasBarReady && (
-                                                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] animate-[ping_1s_ease-in-out_infinite] delay-150" title="Bar Listo"></div>
+                                                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] animate-[ping_1s_ease-in-out_infinite] delay-300" title="Bar Listo"></div>
                                                 )}
                                             </div>
 

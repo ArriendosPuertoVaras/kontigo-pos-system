@@ -242,8 +242,34 @@ export default function OrdersPage() {
     }, [visibleTabs, viewMode]);
 
 
-    const handleStatusChange = (id: number, status: any) => {
-        db.orders.update(id, { status });
+    const handleStatusChange = async (id: number, status: any) => {
+        if (status === 'ready') {
+            const order = await db.orders.get(id);
+            if (!order) return;
+
+            // 1. Determine which areas are required for this order
+            const categories = await db.categories.toArray();
+            const requiredSections = new Set(order.items.map(item => {
+                const cat = categories.find(c => c.id === item.product.categoryId);
+                return cat?.destination || 'kitchen';
+            }));
+
+            // 2. Update readySections for the current station
+            const currentReady = order.readySections || [];
+            if (!currentReady.includes(viewMode)) {
+                const updatedReady = [...currentReady, viewMode];
+
+                // 3. Check if all required sections are now ready
+                const allSectionsReady = Array.from(requiredSections).every(s => updatedReady.includes(s));
+
+                await db.orders.update(id, {
+                    readySections: updatedReady,
+                    status: allSectionsReady ? 'ready' : 'open'
+                });
+            }
+        } else {
+            db.orders.update(id, { status });
+        }
     };
 
     if (hasAccess === false) {
@@ -386,9 +412,11 @@ export default function OrdersPage() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-                            {orders.map(order => (
-                                <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} viewMode={viewMode} />
-                            ))}
+                            {orders
+                                .filter(order => !(order.readySections || []).includes(viewMode))
+                                .map(order => (
+                                    <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} viewMode={viewMode} />
+                                ))}
                         </div>
                     )}
                 </div>
