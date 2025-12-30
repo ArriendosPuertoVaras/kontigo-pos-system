@@ -134,9 +134,11 @@ class SyncService {
                 // 6. ONLY DELETE LEGACY/CALCULATED FIELDS
                 // We keep 'afp', 'health_system', etc. because they EXIST in Supabase now.
                 const fieldsToDelete = [
-                    'daily_salary', // Legacy/Calculated field (NOT in schema)
-                    'hourly_rate',  // Legacy field causing schema error
-                    'active_role'   // Redundant check
+                    'daily_salary',     // Legacy/Calculated field
+                    'hourly_rate',      // Legacy field
+                    'active_role',      // Redundant check
+                    'role_permissions', // CAUSE OF ERROR: Not in Supabase schema
+                    'rolePermissions'   // Just in case it wasn't snake_cased yet
                 ];
 
                 fieldsToDelete.forEach(field => {
