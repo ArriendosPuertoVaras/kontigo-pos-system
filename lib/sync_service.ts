@@ -207,6 +207,32 @@ class SyncService {
 
         if (SAFE_TO_MIRROR.includes(supabaseTableName)) {
             try {
+                // SPECIAL CASE: job_titles must match by NAME, because local ID (number) != cloud ID (int8)
+                // and we strip IDs on push.
+                if (supabaseTableName === 'job_titles') {
+                    const { data: remoteRows, error: fetchError } = await supabase
+                        .from(supabaseTableName)
+                        .select('id, name')
+                        .eq('restaurant_id', restaurantId);
+
+                    if (fetchError) throw fetchError;
+
+                    if (remoteRows && remoteRows.length > 0) {
+                        const localNames = new Set(localData.map(d => d.name)); // Match by Name
+                        const idsToDelete = remoteRows
+                            .filter(r => !localNames.has(r.name))
+                            .map(r => r.id);
+
+                        if (idsToDelete.length > 0) {
+                            console.log(`[Sync] Mirroring (by Name): Deleting ${idsToDelete.length} obsolete roles from ${supabaseTableName}...`);
+                            await supabase.from(supabaseTableName).delete().in('id', idsToDelete);
+                        }
+                    }
+                    return; // Exit here for job_titles
+                }
+
+
+                // STANDARD MIRROR (By ID)
                 // Get all IDs currently in Supabase FOR THIS RESTAURANT
                 const { data: remoteIds, error: fetchError } = await supabase
                     .from(supabaseTableName)
@@ -219,7 +245,7 @@ class SyncService {
                     const localIds = new Set(localData.map(d => d.id));
                     // Identify IDs that exist in Remote but NOT in Local
                     const idsToDelete = remoteIds
-                        .filter(r => !localIds.has(r.id))
+                        .filter(r => !localIds.has(r.id)) // Standard ID Match
                         .map(r => r.id);
 
                     if (idsToDelete.length > 0) {
