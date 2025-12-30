@@ -11,7 +11,12 @@ export async function getStaffingForecast(targetDate: Date) {
     // 1. Fetch historical orders for this Day of Week (last 30 days simplified -> all time for this MVP)
     // In strict production we would limit range, but filtering all by JS is fine for IndexedDB size here.
     const history = await db.orders
-        .filter(o => getDay(o.createdAt) === targetDayOfWeek)
+        .filter(o => {
+            if (!o.createdAt) return false;
+            const d = new Date(o.createdAt);
+            if (isNaN(d.getTime())) return false;
+            return getDay(d) === targetDayOfWeek;
+        })
         .toArray();
 
     // 2. Aggregate by Hour with Category Split
