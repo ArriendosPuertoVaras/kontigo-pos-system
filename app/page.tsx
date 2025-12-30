@@ -128,6 +128,44 @@ function POSContent() {
 
 
 
+  // --- SELF-HEALING: FIX CORRUPTED CATEGORY IDS ---
+  // Some products have categoryId as "String Name" instead of "Number ID". We fix this on boot.
+  useEffect(() => {
+    const healData = async () => {
+      try {
+        const productsWithIssues = await db.products.filter(p => typeof (p.categoryId as any) === 'string').toArray();
+        if (productsWithIssues.length === 0) return;
+
+        console.log(`🏥 Healing ${productsWithIssues.length} products with corrupted IDs...`);
+        const categories = await db.categories.toArray();
+        let fixed = 0;
+
+        for (const p of productsWithIssues) {
+          const badId = (p.categoryId as any) as string;
+          // 1. Try Name Match
+          const match = categories.find(c => c.name.trim().toLowerCase() === badId.trim().toLowerCase());
+          if (match && match.id) {
+            await db.products.update(p.id!, { categoryId: match.id });
+            fixed++;
+          }
+          // 2. Try identifying "Number as String" (e.g. "5")
+          else if (!isNaN(parseInt(badId))) {
+            await db.products.update(p.id!, { categoryId: parseInt(badId) });
+            fixed++;
+          }
+        }
+
+        if (fixed > 0) {
+          // setNotification(`✅ Se repararon ${fixed} productos. Recargando...`);
+          // setTimeout(() => window.location.reload(), 1500);
+        }
+      } catch (e) {
+        console.error("Healer error:", e);
+      }
+    };
+    healData();
+  }, []);
+
   // Fetch Data Live from IndexedDB
   const categories = useLiveQuery(() => db.categories.toArray());
   // Robust Product Fetching: Handles Type Mismatches AND Duplicate Categories
