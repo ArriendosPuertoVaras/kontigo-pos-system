@@ -131,7 +131,10 @@ function POSContent() {
   // Fetch Data Live from IndexedDB
   const categories = useLiveQuery(() => db.categories.toArray());
   const products = useLiveQuery(
-    () => db.products.where('categoryId').equals(activeCategoryId).toArray(),
+    async () => {
+      // Use filter instead of equals to handle String/Number type mismatches from legacy syncs
+      return await db.products.filter(p => p.categoryId == activeCategoryId).toArray();
+    },
     [activeCategoryId]
   );
 
