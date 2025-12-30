@@ -328,6 +328,7 @@ function CategoriesView() {
                                     await syncService.pushAll();
 
                                     alert(`✅ Limpieza Completa:\n- Fusionadas: ${mergedCount} categorías\n- Productos movidos: ${productsUpdated}`);
+                                    window.location.reload();
                                 } else {
                                     alert("👍 No se encontraron otros duplicados.");
                                 }
