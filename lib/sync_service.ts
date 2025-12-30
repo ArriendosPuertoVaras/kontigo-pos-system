@@ -370,6 +370,26 @@ class SyncService {
                 if ('minStock' in camelItem) camelItem.minStock = Number(camelItem.minStock);
             }
 
+            // CRITICAL: Convert Date Strings to Date Objects to prevent App Crashes
+            // Dexie needs Date objects, but JSON gives strings.
+            if (supabaseTableName === 'orders') {
+                if ('createdAt' in camelItem && typeof camelItem.createdAt === 'string') camelItem.createdAt = new Date(camelItem.createdAt);
+                if ('closedAt' in camelItem && typeof camelItem.closedAt === 'string') camelItem.closedAt = new Date(camelItem.closedAt);
+            }
+            if (supabaseTableName === 'shifts') {
+                if ('startTime' in camelItem && typeof camelItem.startTime === 'string') camelItem.startTime = new Date(camelItem.startTime);
+                if ('endTime' in camelItem && typeof camelItem.endTime === 'string') camelItem.endTime = new Date(camelItem.endTime);
+                if ('scheduledStart' in camelItem && typeof camelItem.scheduledStart === 'string') camelItem.scheduledStart = new Date(camelItem.scheduledStart);
+                if ('scheduledEnd' in camelItem && typeof camelItem.scheduledEnd === 'string') camelItem.scheduledEnd = new Date(camelItem.scheduledEnd);
+            }
+            if (supabaseTableName === 'daily_closes' || supabaseTableName === 'cash_counts' || supabaseTableName === 'dtes' || supabaseTableName === 'purchase_orders' || supabaseTableName === 'production_logs' || supabaseTableName === 'waste_logs' || supabaseTableName === 'journal_entries') {
+                if ('date' in camelItem && typeof camelItem.date === 'string') camelItem.date = new Date(camelItem.date);
+            }
+            if (supabaseTableName === 'staff') { // or restaurant_staff
+                if ('startDate' in camelItem && typeof camelItem.startDate === 'string') camelItem.startDate = new Date(camelItem.startDate);
+                if ('birthDate' in camelItem && typeof camelItem.birthDate === 'string') camelItem.birthDate = new Date(camelItem.birthDate);
+            }
+
             return camelItem;
         });
 
