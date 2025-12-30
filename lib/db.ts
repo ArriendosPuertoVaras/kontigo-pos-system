@@ -440,6 +440,11 @@ export class KontigoDatabase extends Dexie {
             staff: '++id, name, pin, role, status, &email, restaurantId'
         });
 
+        // V13: Index Scheduled Shifs for Dashboard
+        this.version(13).stores({
+            shifts: '++id, staffId, startTime, scheduledStart, restaurantId'
+        });
+
         // Populate if empty
         this.on('populate', () => seedDatabase());
     }
