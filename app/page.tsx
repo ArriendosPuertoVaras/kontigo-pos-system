@@ -156,8 +156,9 @@ function POSContent() {
         if (duplicateIds.some(id => id == p.categoryId)) return true;
 
         // B. Match by NAME (If legacy data stored "Entradas" instead of ID 1)
-        if (typeof p.categoryId === 'string') {
-          return p.categoryId.trim().toLowerCase() === activeNameLower;
+        const catId = p.categoryId as any;
+        if (typeof catId === 'string') {
+          return catId.trim().toLowerCase() === activeNameLower;
         }
 
         return false;
