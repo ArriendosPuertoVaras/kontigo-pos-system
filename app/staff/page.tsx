@@ -28,11 +28,20 @@ export default function StaffPage() {
         const allShifts = await db.shifts.toArray();
         const active = allShifts.filter(s => !s.endTime);
 
-        // Hydrate with staff info
+        // Hydrate with staff info & Sanitize specific fields
         const populated = await Promise.all(active.map(async (s) => {
             const staff = await db.staff.get(s.staffId);
-            const overtimeStatus = getOvertimeStatus(s);
-            return { ...s, staff, overtimeStatus };
+
+            // Sanitize dates for safety
+            const safeShift = {
+                ...s,
+                startTime: typeof s.startTime === 'string' ? new Date(s.startTime) : s.startTime,
+                scheduledStart: s.scheduledStart && typeof s.scheduledStart === 'string' ? new Date(s.scheduledStart) : s.scheduledStart,
+                scheduledEnd: s.scheduledEnd && typeof s.scheduledEnd === 'string' ? new Date(s.scheduledEnd) : s.scheduledEnd,
+            };
+
+            const overtimeStatus = getOvertimeStatus(safeShift);
+            return { ...safeShift, staff, overtimeStatus };
         }));
         return populated;
     });
@@ -180,8 +189,22 @@ function LaborKPIs() {
         const orders = await db.orders.where('createdAt').above(start).toArray();
         const shifts = await db.shifts.where('startTime').above(start).toArray();
 
+        // Sanitize: Ensure dates are Dates
+        const safeOrders = orders.map(o => ({
+            ...o,
+            createdAt: typeof o.createdAt === 'string' ? new Date(o.createdAt) : o.createdAt
+        }));
+
+        const safeShifts = shifts.map(s => ({
+            ...s,
+            startTime: typeof s.startTime === 'string' ? new Date(s.startTime) : s.startTime,
+            endTime: s.endTime && typeof s.endTime === 'string' ? new Date(s.endTime) : s.endTime,
+            scheduledStart: s.scheduledStart && typeof s.scheduledStart === 'string' ? new Date(s.scheduledStart) : s.scheduledStart,
+            scheduledEnd: s.scheduledEnd && typeof s.scheduledEnd === 'string' ? new Date(s.scheduledEnd) : s.scheduledEnd,
+        }));
+
         // --- Aggregation for Totals (Existing Logic) ---
-        const totalSales = orders.filter(o => o.status !== 'cancelled').reduce((acc, o) => acc + o.total, 0);
+        const totalSales = safeOrders.filter(o => o.status !== 'cancelled').reduce((acc, o) => acc + o.total, 0);
         let totalHours = 0;
         let totalLaborCost = 0;
         let overtimeHours = 0;
@@ -192,6 +215,8 @@ function LaborKPIs() {
 
         // Normalize helper: Returns YYYY-MM-DD in local time
         const toLocalKey = (d: Date) => {
+            // Defensive check just in case
+            if (!(d instanceof Date) || isNaN(d.getTime())) return 'Invalid';
             const year = d.getFullYear();
             const month = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
@@ -208,7 +233,7 @@ function LaborKPIs() {
         }
 
         // Aggregate Orders
-        orders.forEach(o => {
+        safeOrders.forEach(o => {
             if (o.status === 'cancelled') return;
             const key = toLocalKey(o.createdAt);
             if (dailyMap.has(key)) {
@@ -217,7 +242,7 @@ function LaborKPIs() {
         });
 
         // Aggregate Shifts
-        await Promise.all(shifts.map(async (s) => {
+        await Promise.all(safeShifts.map(async (s) => {
             const staff = await db.staff.get(s.staffId);
             if (!staff) return;
 
