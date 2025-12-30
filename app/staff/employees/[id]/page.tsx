@@ -71,12 +71,20 @@ export default function EmployeeDetailPage() {
             : [...currentPermissions, permissionId];
 
         await db.jobTitles.update(roleId, { permissions: newPermissions });
+
+        // Auto-sync permissions update
+        try {
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pushAll();
+        } catch (e) {
+            console.error("Error syncing permissions:", e);
+        }
     };
 
     const handleAddRole = async () => {
         if (!newRoleName.trim()) return;
         try {
-            await db.jobTitles.add({ name: newRoleName.trim(), active: true });
+            await db.jobTitles.add({ name: newRoleName.trim(), active: true, permissions: [] });
             setNewRoleName("");
 
             // Auto-sync
