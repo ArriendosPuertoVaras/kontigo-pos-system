@@ -131,24 +131,36 @@ function POSContent() {
   // Fetch Data Live from IndexedDB
   const categories = useLiveQuery(() => db.categories.toArray());
   // Robust Product Fetching: Handles Type Mismatches AND Duplicate Categories
+  // NUCLEAR FIX ☢️: Handle ID (number), ID (string), and NAME (string)
   const products = useLiveQuery(
     async () => {
-      // 1. Get the current active category to find its name
+      // 1. Get the current active category
       const activeCat = await db.categories.get(activeCategoryId);
       if (!activeCat) return [];
 
-      // 2. Find ALL categories that share this name (handling duplicates/ghosts)
+      // 2. Prepare Match Targets
+      // Target A: The exact Numeric ID (Standard)
+      // Target B: The String ID (Legacy sync)
+      // Target C: The Name itself (User reported screenshot showing Name in field)
+      const activeNameLower = activeCat.name.trim().toLowerCase();
+
+      // Also catch duplicates/ghosts by name to add their IDs
       const sameNameCategories = await db.categories
-        .filter(c => c.name.trim().toLowerCase() === activeCat.name.trim().toLowerCase())
+        .filter(c => c.name.trim().toLowerCase() === activeNameLower)
         .toArray();
+      const duplicateIds = sameNameCategories.map(c => c.id).filter(id => id !== undefined);
 
-      const targetIds = sameNameCategories.map(c => c.id).filter(id => id !== undefined);
-
-      // 3. Find products belonging to ANY of these versions of the category
-      // We also handle the loose equality check (==) implicitly if we cast or carefully filter
+      // 3. NUCLEAR FILTER: Match ANYTHING that resembles this category
       return await db.products.filter(p => {
-        // Check if product's categoryId matches ANY of the target IDs (loose check for safety)
-        return targetIds.some(targetId => targetId == p.categoryId);
+        // A. Match by Numeric IDs (Current + Duplicates)
+        if (duplicateIds.some(id => id == p.categoryId)) return true;
+
+        // B. Match by NAME (If legacy data stored "Entradas" instead of ID 1)
+        if (typeof p.categoryId === 'string') {
+          return p.categoryId.trim().toLowerCase() === activeNameLower;
+        }
+
+        return false;
       }).toArray();
     },
     [activeCategoryId]
