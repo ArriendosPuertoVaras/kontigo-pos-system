@@ -26,8 +26,11 @@ function getLaborViolations(staff: any, allShifts: any[], day: Date) {
     const weeklyMinutes = allShifts.reduce((acc, s) => {
         if (s.staffId !== staff.id || s.type !== 'work' || !s.scheduledStart || !s.scheduledEnd) return acc;
         const sDate = new Date(s.scheduledStart);
+        const eDate = new Date(s.scheduledEnd);
+        if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) return acc;
+
         if (sDate >= startOfWeekDate && sDate <= addDays(endOfWeekDate, 1)) { // +1 safe buffer
-            return acc + (new Date(s.scheduledEnd).getTime() - sDate.getTime()) / 1000 / 60;
+            return acc + (eDate.getTime() - sDate.getTime()) / 1000 / 60;
         }
         return acc;
     }, 0);
@@ -51,7 +54,12 @@ function getLaborViolations(staff: any, allShifts: any[], day: Date) {
     let worksSunday = false;
     for (let i = 0; i < 7; i++) {
         const d = addDays(startOfWeekDate, i);
-        const hasShift = allShifts.some(s => s.staffId === staff.id && s.type === 'work' && isSameDay(new Date(s.scheduledStart), d));
+        const hasShift = allShifts.some(s => {
+            if (s.staffId !== staff.id || s.type !== 'work' || !s.scheduledStart) return false;
+            const sDate = new Date(s.scheduledStart);
+            if (isNaN(sDate.getTime())) return false;
+            return isSameDay(sDate, d);
+        });
         if (hasShift) daysWorked++;
         if (hasShift && getDay(d) === 0) worksSunday = true; // 0 is Sunday
     }
@@ -90,11 +98,19 @@ export default function PublicSchedulePage() {
 
     const getShiftsFor = (staffId: number, date: Date) => {
         if (!shifts) return [];
-        return shifts.filter(s =>
-            s.staffId === staffId &&
-            s.scheduledStart &&
-            isSameDay(new Date(s.scheduledStart), date)
-        ).sort((a, b) => (a.scheduledStart && b.scheduledStart) ? new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime() : 0);
+        return shifts.filter(s => {
+            if (s.staffId !== staffId || !s.scheduledStart) return false;
+            const sDate = new Date(s.scheduledStart);
+            if (isNaN(sDate.getTime())) return false;
+            return isSameDay(sDate, date);
+        }).sort((a, b) => {
+            const dateA = new Date(a.scheduledStart!);
+            const dateB = new Date(b.scheduledStart!);
+            // Safe sort (bad dates to end)
+            if (isNaN(dateA.getTime())) return 1;
+            if (isNaN(dateB.getTime())) return -1;
+            return dateA.getTime() - dateB.getTime();
+        });
     };
 
     const handleNext = () => {
@@ -224,8 +240,11 @@ export default function PublicSchedulePage() {
                             const periodMinutes = shifts?.reduce((acc, s) => {
                                 if (s.staffId !== staff.id || s.type !== 'work' || !s.scheduledStart || !s.scheduledEnd) return acc;
                                 const sDate = new Date(s.scheduledStart);
+                                const eDate = new Date(s.scheduledEnd);
+                                if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) return acc;
+
                                 if (sDate >= days[0] && sDate <= addDays(days[days.length - 1], 1)) {
-                                    const duration = (new Date(s.scheduledEnd).getTime() - sDate.getTime()) / 1000 / 60;
+                                    const duration = (eDate.getTime() - sDate.getTime()) / 1000 / 60;
                                     return acc + duration;
                                 }
                                 return acc;
@@ -315,7 +334,15 @@ export default function PublicSchedulePage() {
                                                                 `}
                                                             >
                                                                 {shift.type === 'day_off' ? 'LIB' : shift.type === 'sick' ? 'ENF' :
-                                                                    `${format(new Date(shift.scheduledStart!), 'HH:mm')} - ${format(new Date(shift.scheduledEnd!), 'HH:mm')}`}
+                                                                    (() => {
+                                                                        try {
+                                                                            const s = new Date(shift.scheduledStart!);
+                                                                            const e = new Date(shift.scheduledEnd!);
+                                                                            if (isNaN(s.getTime()) || isNaN(e.getTime())) return 'ERR';
+                                                                            return `${format(s, 'HH:mm')} - ${format(e, 'HH:mm')}`
+                                                                        } catch { return 'ERR' }
+                                                                    })()
+                                                                }
                                                             </div>
                                                         )
                                                     })
