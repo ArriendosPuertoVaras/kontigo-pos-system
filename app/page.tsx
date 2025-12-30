@@ -130,10 +130,26 @@ function POSContent() {
 
   // Fetch Data Live from IndexedDB
   const categories = useLiveQuery(() => db.categories.toArray());
+  // Robust Product Fetching: Handles Type Mismatches AND Duplicate Categories
   const products = useLiveQuery(
     async () => {
-      // Use filter instead of equals to handle String/Number type mismatches from legacy syncs
-      return await db.products.filter(p => p.categoryId == activeCategoryId).toArray();
+      // 1. Get the current active category to find its name
+      const activeCat = await db.categories.get(activeCategoryId);
+      if (!activeCat) return [];
+
+      // 2. Find ALL categories that share this name (handling duplicates/ghosts)
+      const sameNameCategories = await db.categories
+        .filter(c => c.name.trim().toLowerCase() === activeCat.name.trim().toLowerCase())
+        .toArray();
+
+      const targetIds = sameNameCategories.map(c => c.id).filter(id => id !== undefined);
+
+      // 3. Find products belonging to ANY of these versions of the category
+      // We also handle the loose equality check (==) implicitly if we cast or carefully filter
+      return await db.products.filter(p => {
+        // Check if product's categoryId matches ANY of the target IDs (loose check for safety)
+        return targetIds.some(targetId => targetId == p.categoryId);
+      }).toArray();
     },
     [activeCategoryId]
   );
