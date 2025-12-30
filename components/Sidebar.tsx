@@ -78,9 +78,9 @@ export default function Sidebar() {
     }, [showNotifications]);
 
     const handleLogout = () => {
-        localStorage.removeItem('kontigo_staff_id');
-        localStorage.removeItem('kontigo_staff_name');
-        localStorage.removeItem('kontigo_staff_role');
+        sessionStorage.removeItem('kontigo_staff_id');
+        sessionStorage.removeItem('kontigo_staff_name');
+        sessionStorage.removeItem('kontigo_staff_role');
         router.push('/login');
     };
 

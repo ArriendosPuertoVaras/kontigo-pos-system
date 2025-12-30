@@ -83,9 +83,9 @@ export default function LoginPage() {
 
             if (staffMember) {
                 // Success: Existing Staff
-                localStorage.setItem('kontigo_staff_id', staffMember.id!.toString());
-                localStorage.setItem('kontigo_staff_name', staffMember.name);
-                localStorage.setItem('kontigo_staff_role', staffMember.role);
+                sessionStorage.setItem('kontigo_staff_id', staffMember.id!.toString());
+                sessionStorage.setItem('kontigo_staff_name', staffMember.name);
+                sessionStorage.setItem('kontigo_staff_role', staffMember.role);
                 router.push('/tables');
                 toast.success(`Bienvenido, ${staffMember.name}`);
             } else {
@@ -102,9 +102,9 @@ export default function LoginPage() {
                     contractDuration: 'indefinite'
                 });
 
-                localStorage.setItem('kontigo_staff_id', newId.toString());
-                localStorage.setItem('kontigo_staff_name', 'Admin (Dueño)');
-                localStorage.setItem('kontigo_staff_role', 'admin');
+                sessionStorage.setItem('kontigo_staff_id', newId.toString());
+                sessionStorage.setItem('kontigo_staff_name', 'Admin (Dueño)');
+                sessionStorage.setItem('kontigo_staff_role', 'admin');
 
                 router.push('/tables');
                 toast.success("Bienvenido Dueño (Primer Acceso)");

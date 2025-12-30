@@ -27,7 +27,7 @@ function POSContent() {
 
   // --- AUTH & ROUTING CHECK ---
   useEffect(() => {
-    if (!localStorage.getItem('kontigo_staff_id')) {
+    if (!sessionStorage.getItem('kontigo_staff_id')) {
       router.push('/login');
     } else if (!tableIdParam && searchParams.get('mode') !== 'pos') {
       // FORCE REDIRECT TO TABLES IF NO SPECIFIC TABLE IS SELECTED AND NOT IN POS MODE
@@ -122,8 +122,8 @@ function POSContent() {
   const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
-    setStaffName(localStorage.getItem('kontigo_staff_name') || 'Staff');
-    setStaffRole(localStorage.getItem('kontigo_staff_role') || 'Personal');
+    setStaffName(sessionStorage.getItem('kontigo_staff_name') || 'Staff');
+    setStaffRole(sessionStorage.getItem('kontigo_staff_role') || 'Personal');
   }, []);
 
 

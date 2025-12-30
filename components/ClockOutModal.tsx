@@ -36,7 +36,7 @@ export default function ClockOutModal({ isOpen, onClose }: ClockOutModalProps) {
 
             if (!staff) {
                 // DEBUG: Help user find their PIN
-                const currentStaffId = localStorage.getItem('kontigo_staff_id');
+                const currentStaffId = sessionStorage.getItem('kontigo_staff_id');
                 if (currentStaffId) {
                     const actualStaff = await db.staff.get(parseInt(currentStaffId));
                     if (actualStaff) {
@@ -79,9 +79,9 @@ export default function ClockOutModal({ isOpen, onClose }: ClockOutModalProps) {
                 // This implies logging out.
 
                 // If it's the current session user:
-                const sessionStaffId = localStorage.getItem('kontigo_staff_id');
+                const sessionStaffId = sessionStorage.getItem('kontigo_staff_id');
                 if (sessionStaffId && parseInt(sessionStaffId) === staff.id) {
-                    localStorage.removeItem('kontigo_staff_id');
+                    sessionStorage.removeItem('kontigo_staff_id');
                     router.push('/login');
                 } else {
                     // Just close modal if it was someone else (unlikely case but handle it)

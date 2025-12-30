@@ -21,9 +21,9 @@ export default function Header({ title, children, backHref }: HeaderProps) {
     const pathname = usePathname();
     // Live Data Binding for Header Profile
     const { staffName, staffRole } = useLiveQuery(async () => {
-        const id = localStorage.getItem('kontigo_staff_id');
-        const localName = localStorage.getItem('kontigo_staff_name');
-        const localRole = localStorage.getItem('kontigo_staff_role');
+        const id = sessionStorage.getItem('kontigo_staff_id');
+        const localName = sessionStorage.getItem('kontigo_staff_name');
+        const localRole = sessionStorage.getItem('kontigo_staff_role');
 
         if (!id) return { staffName: 'Staff', staffRole: 'Personal' };
 
@@ -57,8 +57,8 @@ export default function Header({ title, children, backHref }: HeaderProps) {
 
         // --- AGGRESSIVE SELF-FIX: "Ghost Buster 2.0" ---
         const fixGhostUser = async () => {
-            const id = localStorage.getItem('kontigo_staff_id');
-            const localName = localStorage.getItem('kontigo_staff_name');
+            const id = sessionStorage.getItem('kontigo_staff_id');
+            const localName = sessionStorage.getItem('kontigo_staff_name');
 
             // Case 1: We are currently logged in as the Ghost (or someone with that name)
             if (localName === 'Admin (Dueño)') {
@@ -70,9 +70,9 @@ export default function Header({ title, children, backHref }: HeaderProps) {
                 if (realUser) {
                     // SWITCH IDENTITY
                     console.log("👻 GHOST BUSTER: Switching to real user:", realUser.name);
-                    localStorage.setItem('kontigo_staff_id', realUser.id!.toString());
-                    localStorage.setItem('kontigo_staff_name', realUser.name);
-                    localStorage.setItem('kontigo_staff_role', realUser.role);
+                    sessionStorage.setItem('kontigo_staff_id', realUser.id!.toString());
+                    sessionStorage.setItem('kontigo_staff_name', realUser.name);
+                    sessionStorage.setItem('kontigo_staff_role', realUser.role);
                     window.location.reload();
                     return;
                 }

@@ -15,7 +15,7 @@ export default function QuickProfileModal({ onClose }: QuickProfileModalProps) {
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        const id = localStorage.getItem('kontigo_staff_id');
+        const id = sessionStorage.getItem('kontigo_staff_id');
         if (id) {
             db.staff.get(parseInt(id)).then(s => {
                 if (s) setStaff(s);

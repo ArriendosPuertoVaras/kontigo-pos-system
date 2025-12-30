@@ -5,7 +5,7 @@ import { PermissionId } from '@/lib/permissions';
 export function usePermission(requiredPermission: PermissionId) {
     const access = useLiveQuery(async () => {
         // 1. Get current role from LocalStorage (Legacy Auth)
-        const currentRoleName = localStorage.getItem('kontigo_staff_role');
+        const currentRoleName = sessionStorage.getItem('kontigo_staff_role');
         if (!currentRoleName) return false;
 
         // 2. Admin/Manager override (Super Admins) - Case Insensitive
