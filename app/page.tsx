@@ -714,27 +714,40 @@ function POSContent() {
                     <h2 className="font-bold text-lg text-white">
                       {activeTable ? activeTable.name : 'Venta Rápida'}
                     </h2>
-                    {/* READY STATUS INDICATOR */}
-                    {activeOrder?.status === 'ready' && !(activeOrder as any).isDelivered && (
-                      <button
-                        onClick={async () => {
-                          if (activeOrder?.id) {
-                            await db.orders.update(activeOrder.id, { isDelivered: true } as any);
+                    {/* READY STATUS INDICATORS (Independent Dots) */}
+                    {!(activeOrder as any)?.isDelivered && (
+                      <div className="flex gap-1 items-center ml-2">
+                        {((activeOrder as any)?.readySections || []).map((s: string, idx: number) => {
+                          const section = s.toLowerCase();
+                          let color = "bg-yellow-500 shadow-yellow-500/50"; // Kitchen/Default
+                          let title = "Cocina Lista";
+                          if (section === 'bar') {
+                            color = "bg-blue-500 shadow-blue-500/50";
+                            title = "Bar Listo";
+                          } else if (section === 'parrilla') {
+                            color = "bg-orange-500 shadow-orange-500/50";
+                            title = "Parrilla Lista";
                           }
-                        }}
-                        className={`w-6 h-6 rounded-full animate-pulse shadow-lg border-2 border-white/20 
-                          ${activeOrder.items.some(i => {
-                          const cat = categories?.find(c => c.id === i.product.categoryId);
-                          return cat?.destination === 'bar';
-                        }) && !activeOrder.items.some(i => {
-                          const cat = categories?.find(c => c.id === i.product.categoryId);
-                          return cat?.destination !== 'bar';
-                        })
-                            ? 'bg-blue-500 shadow-blue-500/50' // Only Bar items -> Blue
-                            : 'bg-yellow-500 shadow-yellow-500/50' // Kitchen or Mixed -> Yellow
-                          }`}
-                        title="Pedido Listo! Clic para confirmar entrega"
-                      />
+                          return (
+                            <button
+                              key={idx}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (activeOrder?.id) {
+                                  // Mark as delivered for this section? 
+                                  // For now, simpler: keep existing "isDelivered" for whole order if clicked,
+                                  // or just show them.
+                                  if (confirm("¿Marcar toda la orden como entregada?")) {
+                                    await db.orders.update(activeOrder.id, { isDelivered: true } as any);
+                                  }
+                                }
+                              }}
+                              className={`w-3.5 h-3.5 rounded-full animate-pulse shadow-lg border border-white/20 ${color}`}
+                              title={`${title}. Clic para confirmar entrega total.`}
+                            />
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                   <span className="text-xs text-gray-400">

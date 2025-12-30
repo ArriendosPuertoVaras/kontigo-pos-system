@@ -249,15 +249,21 @@ export default function OrdersPage() {
 
             // 1. Determine which areas are required for this order
             const categories = await db.categories.toArray();
-            const requiredSections = new Set(order.items.map(item => {
-                const cat = categories.find(c => c.id === item.product.categoryId);
-                return cat?.destination || 'kitchen';
-            }));
+
+            // Helper to get destination robustly (handles number/string ID mismatches)
+            const getDestination = (categoryId: any) => {
+                const cat = categories.find(c => c.id == categoryId || c.name.trim().toLowerCase() === String(categoryId).trim().toLowerCase());
+                return (cat?.destination || 'kitchen').toLowerCase();
+            };
+
+            const requiredSections = new Set(order.items.map(item => getDestination(item.product.categoryId)));
 
             // 2. Update readySections for the current station
-            const currentReady = order.readySections || [];
-            if (!currentReady.includes(viewMode)) {
-                const updatedReady = [...currentReady, viewMode];
+            const currentReady = (order.readySections || []).map(s => s.toLowerCase());
+            const normalizedViewMode = viewMode.toLowerCase();
+
+            if (!currentReady.includes(normalizedViewMode)) {
+                const updatedReady = [...currentReady, normalizedViewMode];
 
                 // 3. Check if all required sections are now ready
                 const allSectionsReady = Array.from(requiredSections).every(s => updatedReady.includes(s));
