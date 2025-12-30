@@ -3,7 +3,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Staff } from '@/lib/db';
 import { calculateSalary } from '@/lib/payroll/chile';
-import { ArrowLeft, User, CreditCard, Save, Calculator, AlertTriangle, Info, Trash2, Settings, Plus, X, ChevronRight, ChevronDown, Download } from 'lucide-react';
+import { ArrowLeft, User, CreditCard, Save, Calculator, AlertTriangle, Info, Trash2, Settings, Plus, X, ChevronRight, ChevronDown, Download, RefreshCw } from 'lucide-react';
 import { PERMISSIONS_LIST } from '@/lib/permissions';
 
 import Link from 'next/link';
@@ -95,11 +95,34 @@ export default function EmployeeDetailPage() {
         }
     };
 
-
     // Sync formData when staff loads
     useEffect(() => {
         if (staff) setFormData(staff);
     }, [staff]);
+
+    // Auto-Sync Roles from Cloud on Modal Open
+    useEffect(() => {
+        if (showRoleManager) {
+            const syncRoles = async () => {
+                try {
+                    const { syncService } = await import('@/lib/sync_service');
+                    await syncService.pullTable(db.jobTitles, 'job_titles');
+                } catch (e) { console.error("Role Sync Failed", e); }
+            };
+            syncRoles();
+        }
+    }, [showRoleManager]);
+
+    const handleForceRefreshRoles = async () => {
+        const toastId = toast.loading("Sincronizando cargos...");
+        try {
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pullTable(db.jobTitles, 'job_titles');
+            toast.success("Cargos actualizados", { id: toastId });
+        } catch (e) {
+            toast.error("Error al sincronizar", { id: toastId });
+        }
+    };
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -712,7 +735,16 @@ export default function EmployeeDetailPage() {
                                 <X className="w-5 h-5" />
                             </button>
 
-                            <h3 className="text-lg font-bold text-white mb-1">Gestionar Cargos</h3>
+                            <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-lg font-bold text-white">Gestionar Cargos</h3>
+                                <button
+                                    onClick={handleForceRefreshRoles}
+                                    className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full text-toast-orange transition-colors"
+                                    title="Forzar actualización desde Nube"
+                                >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                             <p className="text-xs text-gray-400 mb-4">Agrega o elimina cargos disponibles para el personal.</p>
 
                             {/* List of Roles */}
