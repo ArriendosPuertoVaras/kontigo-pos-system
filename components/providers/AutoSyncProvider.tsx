@@ -71,33 +71,8 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
                 const productCount = await db.products.count();
                 const categoryCount = await db.categories.count();
 
-                // REPAIR: If categories are suspiciously empty (e.g. sync wipe), restore basics immediately
-                if (categoryCount <= 2) {
-                    console.log("🦁 Health Check: Critical Menu Damage detected. Auto-Repairing...");
-                    const needed = ["Entradas", "Platos", "Postres", "Bebidas y Jugos", "Copete", "Cafe"];
-                    const existing = await db.categories.toArray();
-                    const existingNames = new Set(existing.map(c => c.name.toLowerCase().trim()));
-                    let maxOrder = 0;
-                    if (existing.length > 0) maxOrder = Math.max(...existing.map(c => c.order || 0));
-
-                    let repaired = 0;
-                    for (const name of needed) {
-                        if (!existingNames.has(name.toLowerCase())) {
-                            maxOrder++;
-                            const dest = (name.includes("Bebidas") || name === "Copete" || name === "Cafe") ? 'bar' : 'kitchen';
-                            await db.categories.add({
-                                name, destination: dest, order: maxOrder
-                            });
-                            repaired++;
-                        }
-                    }
-                    if (repaired > 0) {
-                        toast.success("Estructura de Menú Restaurada", { description: "Se detectaron categorías faltantes y se repararon." });
-                        // Force push the repair
-                        const { syncService } = await import('@/lib/sync_service');
-                        await syncService.pushTable(db.categories, 'categories');
-                    }
-                }
+                // REPAIR: Logic Removed by User Request (No Auto-Seeding)
+                // if (categoryCount <= 2) { ... }
 
                 if (productCount === 0) {
                     console.log("🦁 Smart Sync: Local DB is empty. Checking cloud...");

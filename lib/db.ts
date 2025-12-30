@@ -454,64 +454,20 @@ export async function seedDatabase() {
 
         // ONLY Seed Emergency Admin if absolutely empty (Critical for Login)
         if (staffCount === 0) {
-            console.log("🦁 Nexus: Seeding Default Staff...");
-            await db.staff.bulkAdd([
-                {
-                    name: "Admin",
-                    pin: "0000",
-                    role: "manager",
-                    activeRole: "manager",
-                    contractType: "art-22",
-                    contractDuration: "indefinite",
-                    weeklyHoursLimit: 45,
-                    salaryType: "monthly",
-                    baseSalary: 0,
-                    estimatedTips: 0,
-                    status: 'active'
-                },
-                {
-                    name: "Cocinero",
-                    pin: "1111",
-                    role: "Cocina",
-                    activeRole: "Cocina",
-                    contractType: "44-hours",
-                    contractDuration: "indefinite",
-                    weeklyHoursLimit: 45,
-                    salaryType: "monthly",
-                    baseSalary: 500000,
-                    estimatedTips: 50000,
-                    status: 'active',
-                    avatarColor: "bg-red-500"
-                },
-                {
-                    name: "Garzón",
-                    pin: "2222",
-                    role: "Garzón",
-                    activeRole: "Garzón",
-                    contractType: "part-time",
-                    contractDuration: "indefinite",
-                    weeklyHoursLimit: 30,
-                    salaryType: "hourly",
-                    baseSalary: 2500,
-                    estimatedTips: 150000,
-                    status: 'active',
-                    avatarColor: "bg-blue-500"
-                },
-                {
-                    name: "Barra",
-                    pin: "3333",
-                    role: "Barra",
-                    activeRole: "Barra",
-                    contractType: "44-hours",
-                    contractDuration: "indefinite",
-                    weeklyHoursLimit: 45,
-                    salaryType: "monthly",
-                    baseSalary: 550000,
-                    estimatedTips: 100000,
-                    status: 'active',
-                    avatarColor: "bg-purple-500"
-                }
-            ]);
+            console.log("🦁 Nexus: Seeding Emergency Admin (No other staff)...");
+            await db.staff.add({
+                name: "Admin",
+                pin: "0000",
+                role: "manager",
+                activeRole: "manager",
+                contractType: "art-22",
+                contractDuration: "indefinite",
+                weeklyHoursLimit: 45,
+                salaryType: "monthly",
+                baseSalary: 0,
+                estimatedTips: 0,
+                status: 'active'
+            });
         }
 
     } catch (e) {
@@ -545,85 +501,15 @@ export async function seedDatabase() {
     try {
         const titleCount = await db.jobTitles.count();
         if (titleCount === 0) {
-            console.log("Seeding Default Job Titles...");
+            console.log("Seeding Critical Job Titles...");
             await db.jobTitles.bulkAdd([
                 { name: 'Administrador', active: true },
-                { name: 'Gerente', active: true }, // Added requested role
-                { name: 'Administración', active: true }, // Added requested role
-                { name: 'Admin', active: true }, // Added requested role
-                { name: 'Garzón', active: true },
-                { name: 'Cocina', active: true },
-                { name: 'Barra', active: true },
-                { name: 'Copero', active: true },
-                { name: 'Aseo', active: true },
-                { name: 'Manager', active: true },
-                { name: 'Dueño', active: true }
+                { name: 'Admin', active: true },
+                { name: 'Gerente', active: true }
             ]);
-        } else {
-            // Self-Healing: Ensure specific requested roles exist even if DB is not empty
-            const criticalRoles = ['Gerente', 'Administración', 'Admin', 'Dueño'];
-            for (const roleName of criticalRoles) {
-                const exists = await db.jobTitles.where('name').equals(roleName).count();
-                if (exists === 0) {
-                    console.log(`🦁 Nexus: Restoring missing role '${roleName}'...`);
-                    await db.jobTitles.add({ name: roleName, active: true });
-                }
-            }
         }
     } catch (e) { console.error("Job Title Seed Failed", e); }
 
-    // CHECK: Enable Default Staff if missing (e.g. only Admin exists)
-    try {
-        const cookExists = await db.staff.where('role').equals('Cocina').count();
-        if (cookExists === 0) {
-            console.log("🦁 Nexus: Seeding Missing Default Staff...");
-            await db.staff.bulkAdd([
-                {
-                    name: "Cocinero",
-                    pin: "1111",
-                    role: "Cocina",
-                    activeRole: "Cocina",
-                    contractType: "44-hours",
-                    contractDuration: "indefinite",
-                    weeklyHoursLimit: 45,
-                    salaryType: "monthly",
-                    baseSalary: 500000,
-                    estimatedTips: 50000,
-                    status: 'active',
-                    avatarColor: "bg-red-500"
-                },
-                {
-                    name: "Garzón",
-                    pin: "2222",
-                    role: "Garzón",
-                    activeRole: "Garzón",
-                    contractType: "part-time",
-                    contractDuration: "indefinite",
-                    weeklyHoursLimit: 30,
-                    salaryType: "hourly",
-                    baseSalary: 2500,
-                    estimatedTips: 150000,
-                    status: 'active',
-                    avatarColor: "bg-blue-500"
-                },
-                {
-                    name: "Barra",
-                    pin: "3333",
-                    role: "Barra",
-                    activeRole: "Barra",
-                    contractType: "44-hours",
-                    contractDuration: "indefinite",
-                    weeklyHoursLimit: 45,
-                    salaryType: "monthly",
-                    baseSalary: 550000,
-                    estimatedTips: 100000,
-                    status: 'active',
-                    avatarColor: "bg-purple-500"
-                }
-            ]);
-        }
-    } catch (e) {
-        console.error("Staff Seed Check Failed:", e);
-    }
+    // CHECK: Removed Secondary Staff Seeding logic.
 }
 
