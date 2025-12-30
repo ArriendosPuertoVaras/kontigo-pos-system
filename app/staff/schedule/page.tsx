@@ -4,13 +4,11 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { db } from '@/lib/db';
-import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Clock, Check, X, Trash2, AlertTriangle, Info } from 'lucide-react';
-import { startOfWeek, addDays, format, isSameDay, differenceInMinutes, setHours, setMinutes, parse, getDay } from 'date-fns';
+import { ChevronLeft, ChevronRight, AlertTriangle, Info } from 'lucide-react';
+import { startOfWeek, addDays, format, isSameDay, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Header from '@/components/Header';
-import { usePermission } from '@/hooks/usePermission';
 import Sidebar from '@/components/Sidebar';
-import { toast } from 'sonner';
 
 // Helper to check labor laws (Dynamic)
 function getLaborViolations(staff: any, allShifts: any[], day: Date) {
@@ -72,15 +70,9 @@ function getLaborViolations(staff: any, allShifts: any[], day: Date) {
 }
 
 export default function PublicSchedulePage() {
-    const hasAdminAccess = usePermission('admin:view');
+    // READ ONLY MODE - No Permissions Check for Editing
     const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [weekDays, setWeekDays] = useState<Date[]>([]);
-
-    // Modals
-    const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-    const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
-    const [editingShift, setEditingShift] = useState<any | null>(null);
 
     // View State
     const [viewMode, setViewMode] = useState<'day' | 'week'>('week');
@@ -121,87 +113,6 @@ export default function PublicSchedulePage() {
         setCurrentWeekStart(d => addDays(d, viewMode === 'day' ? -1 : -7));
     };
 
-    const handleCellClick = (staffId: number, day: Date) => {
-        if (!hasAdminAccess) return;
-        setSelectedStaffId(staffId);
-        setSelectedDate(day);
-        setEditingShift(null); // New Shift
-        setIsShiftModalOpen(true);
-    };
-
-    const handleShiftClick = (e: React.MouseEvent, shift: any) => {
-        if (!hasAdminAccess) return;
-        e.stopPropagation(); // Prevent cell click
-        setSelectedStaffId(shift.staffId);
-        setSelectedDate(new Date(shift.scheduledStart));
-        setEditingShift(shift);
-        setIsShiftModalOpen(true);
-    };
-
-    // --- DRAG AND DROP ---
-    const handleDragStart = (e: React.DragEvent, shiftId: number) => {
-        if (!hasAdminAccess) return;
-        e.dataTransfer.setData("shiftId", shiftId.toString());
-        e.dataTransfer.effectAllowed = "move";
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        if (!hasAdminAccess) return;
-        e.preventDefault(); // Necessary to allow dropping
-        e.dataTransfer.dropEffect = "move";
-    };
-
-    const handleDrop = async (e: React.DragEvent, targetStaffId: number, date: Date) => {
-        e.preventDefault();
-        const shiftId = Number(e.dataTransfer.getData("shiftId"));
-        if (!shiftId) return;
-
-        const shift = shifts?.find(s => s.id === shiftId);
-        if (!shift) return;
-
-        // COPY BEHAVIOR (Requested by user: "Duplicate instead of Move")
-        const oldStart = new Date(shift.scheduledStart!);
-        const duration = new Date(shift.scheduledEnd!).getTime() - oldStart.getTime();
-
-        // Calculate new times on the target day
-        const newStart = new Date(date);
-        newStart.setHours(oldStart.getHours(), oldStart.getMinutes());
-        const newEnd = new Date(newStart.getTime() + duration);
-
-        try {
-            // Prevent duplicate exact shifts
-            const duplicate = await db.shifts
-                .where({ staffId: targetStaffId })
-                .filter(s =>
-                    s.scheduledStart?.getTime() === newStart.getTime() &&
-                    s.scheduledEnd?.getTime() === newEnd.getTime()
-                )
-                .first();
-
-            if (duplicate) {
-                toast.warning("Ya existe un turno idéntico ahí");
-                return;
-            }
-
-            // Create NEW shift (Clone)
-            await db.shifts.add({
-                staffId: targetStaffId,
-                startTime: newStart, // Required by Legacy Shift interface
-                scheduledStart: newStart,
-                scheduledEnd: newEnd,
-                type: shift.type,
-                status: 'open', // Correct valid status for new shift
-                restaurantId: shift.restaurantId // Maintain tenant
-            });
-
-            toast.success("Turno duplicado correctamente");
-        } catch (e) {
-            console.error(e);
-            toast.error("Error al duplicar turno");
-        }
-    };
-
-
     // Render Grid Helper
     const renderPlannerGrid = (start: Date, title: string) => {
         const daysToShow = viewMode === 'day' ? 1 : 7;
@@ -214,7 +125,9 @@ export default function PublicSchedulePage() {
                     <span className="text-xs font-bold uppercase tracking-widest px-2 py-1 rounded bg-gray-800 text-gray-400">
                         {title}
                     </span>
-                    {hasAdminAccess && <span className="text-[10px] text-green-500 bg-green-900/20 px-2 py-0.5 rounded border border-green-900">Modo Edición + Arrastrar</span>}
+                    <span className="text-[10px] text-blue-400 bg-blue-900/20 px-2 py-0.5 rounded border border-blue-900 flex items-center gap-1">
+                        <Info className="w-3 h-3" /> Solo Lectura
+                    </span>
                 </div>
 
                 <div className="min-w-full">
@@ -286,33 +199,10 @@ export default function PublicSchedulePage() {
                                         return (
                                             <div
                                                 key={i}
-                                                onClick={() => handleCellClick(staff.id!, day)}
-                                                onDragOver={handleDragOver}
-                                                onDrop={(e) => handleDrop(e, staff.id!, day)}
                                                 className={`
-                                                    border-l border-white/5 p-1 min-h-[60px] relative flex gap-1 overflow-hidden transition-colors group/cell
-                                                    ${hasAdminAccess ? 'cursor-pointer hover:bg-white/10 active:bg-white/20' : ''}
+                                                    border-l border-white/5 p-1 min-h-[60px] relative flex gap-1 overflow-hidden transition-colors
                                                 `}
                                             >
-                                                {hasAdminAccess && (
-                                                    <div
-                                                        className="absolute top-0 right-0 bottom-0 w-8 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity z-50 cursor-pointer bg-black/20 hover:bg-black/60 backdrop-blur-sm group/add-btn"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleCellClick(staff.id!, day);
-                                                        }}
-                                                        title="Agregar otro turno (Turno Cortado)"
-                                                    >
-                                                        <span className="text-xl font-bold text-white drop-shadow-md pb-1 transform group-hover/add-btn:scale-125 transition-transform">+</span>
-                                                    </div>
-                                                )}
-
-                                                {hasAdminAccess && cellShifts.length === 0 && (
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-                                                        <span className="text-xl text-white/10">+</span>
-                                                    </div>
-                                                )}
-
                                                 {cellShifts.length > 0 ? (
                                                     cellShifts.map((shift: any, idx) => {
                                                         let colorClass = 'bg-blue-500/20 text-blue-300 border-blue-500';
@@ -324,13 +214,10 @@ export default function PublicSchedulePage() {
                                                         return (
                                                             <div
                                                                 key={shift.id}
-                                                                draggable={hasAdminAccess}
-                                                                onDragStart={(e) => handleDragStart(e, shift.id!)}
-                                                                onClick={(e) => handleShiftClick(e, shift)}
                                                                 className={`
                                                                     flex-1 rounded p-1 text-[10px] font-bold border-l-2 shadow-sm truncate flex flex-col justify-center items-center 
                                                                     ${colorClass} 
-                                                                    ${hasAdminAccess ? 'hover:scale-95 transition-transform cursor-grab active:cursor-grabbing' : ''}
+                                                                    cursor-default
                                                                 `}
                                                             >
                                                                 {shift.type === 'day_off' ? 'LIB' : shift.type === 'sick' ? 'ENF' :
@@ -366,7 +253,7 @@ export default function PublicSchedulePage() {
 
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Header with Back Button */}
-                <Header title="HORARIOS (PÚBLICO)" backHref={hasAdminAccess ? "/staff" : "/"}>
+                <Header title="HORARIOS (PÚBLICO)">
                     <div className="flex flex-wrap items-center gap-4 justify-center">
                         {/* DATE NAV */}
                         <div className="flex items-center bg-black/20 rounded-lg p-1 border border-white/5">
@@ -392,141 +279,6 @@ export default function PublicSchedulePage() {
                     {renderPlannerGrid(currentWeekStart, "Horario Semanal")}
                 </main>
             </div>
-
-            {/* EDIT SHIFT MODAL */}
-            {isShiftModalOpen && selectedDate && selectedStaffId && (
-                <ShiftModal
-                    staffId={selectedStaffId}
-                    date={selectedDate}
-                    existingShift={editingShift}
-                    onClose={() => setIsShiftModalOpen(false)}
-                />
-            )}
         </div>
     );
-}
-
-// --- SHIFT MODAL COMPONENT ---
-
-function ShiftModal({ staffId, date, existingShift, onClose }: { staffId: number, date: Date, existingShift: any, onClose: () => void }) {
-    const defaultStart = existingShift?.scheduledStart ? format(new Date(existingShift.scheduledStart), 'HH:mm') : "09:00";
-    const defaultEnd = existingShift?.scheduledEnd ? format(new Date(existingShift.scheduledEnd), 'HH:mm') : "17:00";
-
-    // Default to 'work' unless existing shift exists
-    const [type, setType] = useState<'work' | 'day_off' | 'sick'>(existingShift?.type || 'work');
-    const [startStr, setStartStr] = useState(defaultStart);
-    const [endStr, setEndStr] = useState(defaultEnd);
-
-    const handleSave = async () => {
-        try {
-            // Build Dates
-            const [sh, sm] = startStr.split(':').map(Number);
-            const [eh, em] = endStr.split(':').map(Number);
-
-            let sDate = setMinutes(setHours(date, sh), sm);
-            let eDate = setMinutes(setHours(date, eh), em);
-
-            // Handle Overnight
-            if (eDate <= sDate && type === 'work') {
-                eDate = addDays(eDate, 1);
-            }
-
-            const payload = {
-                staffId,
-                type,
-                startTime: sDate, // Legacy/Required by schema (using same for scheduled)
-                scheduledStart: sDate,
-                scheduledEnd: eDate,
-            };
-
-            if (existingShift) {
-                await db.shifts.update(existingShift.id, payload);
-                toast.success("Turno actualizado");
-            } else {
-                await db.shifts.add(payload as any);
-                toast.success("Turno creado");
-            }
-            onClose();
-        } catch (e) {
-            console.error(e);
-            toast.error("Error al guardar turno");
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!existingShift) return;
-        if (!confirm("¿Eliminar este turno?")) return;
-        await db.shifts.delete(existingShift.id);
-        toast.success("Turno eliminado");
-        onClose();
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-[#1e1e1e] rounded-2xl w-full max-w-sm border border-white/10 shadow-2xl overflow-hidden p-6 animate-in zoom-in-95">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold flex items-center gap-2 text-white">
-                        <Clock className="w-5 h-5 text-toast-orange" />
-                        {existingShift ? 'Editar Turno' : 'Nuevo Turno'}
-                    </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="flex gap-2 bg-black/30 p-1 rounded-lg">
-                        {(['work', 'day_off', 'sick'] as const).map(t => (
-                            <button
-                                key={t}
-                                onClick={() => setType(t)}
-                                className={`flex-1 py-1.5 text-xs font-bold uppercase rounded transition-all ${type === t ? 'bg-white text-black shadow' : 'text-gray-500 hover:text-gray-300'}`}
-                            >
-                                {t === 'work' ? 'Trabajo' : t === 'day_off' ? 'Libre' : 'Licencia'}
-                            </button>
-                        ))}
-                    </div>
-
-                    {type === 'work' && (
-                        <div className="flex items-center gap-4">
-                            <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Entrada</label>
-                                <input
-                                    type="time"
-                                    value={startStr}
-                                    onChange={e => setStartStr(e.target.value)}
-                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-center focus:border-toast-orange outline-none"
-                                />
-                            </div>
-                            <span className="text-gray-600 mt-4">-</span>
-                            <div className="flex-1">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Salida</label>
-                                <input
-                                    type="time"
-                                    value={endStr}
-                                    onChange={e => setEndStr(e.target.value)}
-                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-center focus:border-toast-orange outline-none"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="text-center pt-2">
-                        <div className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-1">
-                            {format(date, "EEEE d 'de' MMMM", { locale: es })}
-                        </div>
-                    </div>
-
-                    <div className="flex gap-3 pt-2">
-                        {existingShift && (
-                            <button onClick={handleDelete} className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg">
-                                <Trash2 className="w-5 h-5" />
-                            </button>
-                        )}
-                        <button onClick={handleSave} className="flex-1 bg-toast-orange hover:bg-orange-600 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
-                            <Check className="w-4 h-4" /> Guardar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
 }
