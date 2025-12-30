@@ -915,9 +915,37 @@ function POSContent() {
                   </button>
                 ))}
 
-                {!products || products.length === 0 && (
+                {!products ? (
                   <div className="col-span-full text-center text-gray-500 py-10">Cargando productos...</div>
-                )}
+                ) : products.length === 0 ? (
+                  <div className="col-span-full flex flex-col items-center justify-center py-10 gap-4">
+                    <p className="text-gray-400">No hay productos en esta categoría.</p>
+
+                    {/* DEBUG PANEL */}
+                    <div className="bg-red-900/20 border border-red-500/50 p-4 rounded text-left text-xs font-mono text-red-200 w-full max-w-md">
+                      <p className="font-bold underline mb-2">DIAGNÓSTICO DE ERROR:</p>
+                      <p>Cat. Activa ID: {activeCategoryId}</p>
+                      {categories?.find(c => c.id === activeCategoryId) && (
+                        <p>Cat. Nombre: "{categories.find(c => c.id === activeCategoryId)?.name}"</p>
+                      )}
+                      <hr className="border-red-500/30 my-2" />
+                      <p>Total Productos (Global): {
+                        // We can't access global count easily here without another query, 
+                        // so let's just show a hint.
+                        "Verificando..."
+                      }</p>
+                      <button
+                        onClick={async () => {
+                          const sample = await db.products.toArray();
+                          alert(`Total DB: ${sample.length}\nEjemplo 1: ${JSON.stringify(sample[0])}\nEjemplo 2: ${JSON.stringify(sample[1])}`);
+                        }}
+                        className="mt-2 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                      >
+                        Ver Datos Crudos (Alert)
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Empty Slots Filler (if not enough products) */}
                 {products && products.length < 12 && [...Array(12 - products.length)].map((_, i) => (
