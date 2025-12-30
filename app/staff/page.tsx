@@ -46,6 +46,43 @@ export default function StaffPage() {
         return populated;
     });
 
+    // --- QUERY: TODAY'S SCHEDULED SHIFTS ---
+    const todaySchedule = useLiveQuery(async () => {
+        const today = new Date();
+        const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+        const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+        const scheduled = await db.shifts
+            .where('scheduledStart')
+            .between(startOfDay, endOfDay, true, true)
+            .toArray();
+
+        // Hydrate and determine status
+        const populated = await Promise.all(scheduled.map(async (s) => {
+            const staff = await db.staff.get(s.staffId);
+            if (!staff) return null;
+
+            // STATUS LOGIC
+            let status: 'pending' | 'late' | 'working' | 'finished' = 'pending';
+            const now = new Date();
+            const schedStart = new Date(s.scheduledStart!);
+
+            if (s.endTime) {
+                status = 'finished';
+            } else if (s.startTime) {
+                status = 'working';
+            } else if (now > schedStart) {
+                status = 'late';
+            } else {
+                status = 'pending';
+            }
+
+            return { ...s, staff, status, schedStart };
+        }));
+
+        return populated.filter(Boolean).sort((a: any, b: any) => a.schedStart - b.schedStart);
+    });
+
     useEffect(() => {
         // Load Forecast for "Tomorrow" (Simulation) or Today
         const today = new Date();
@@ -111,6 +148,60 @@ export default function StaffPage() {
 
 
                 {/* ACTIVE SHIFTS SECTION */}
+
+                {/* TODAY'S SCHEDULE SECTION */}
+                <section>
+                    <div className="flex items-center gap-2 mb-4">
+                        <Clock className="text-toast-orange w-5 h-5" />
+                        <h2 className="text-lg font-bold text-gray-200">Programación de Hoy</h2>
+                    </div>
+
+                    <div className="bg-[#2a2a2a] rounded-xl border border-white/5 overflow-hidden flex flex-col max-h-[400px]">
+                        <div className="p-4 border-b border-white/5 flex justify-between items-center bg-[#252525] shrink-0">
+                            <h3 className="font-bold text-gray-200 text-sm">Próximos Turnos & Estado</h3>
+                            <span className="text-xs text-gray-500 italic">{todaySchedule?.length || 0} Registros</span>
+                        </div>
+
+                        <div className="overflow-y-auto">
+                            {todaySchedule?.map((shift: any) => (
+                                <div key={shift.id} className="p-3 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-inner relative ${shift.staff?.avatarColor || 'bg-gray-600'}`}>
+                                            {shift.staff?.name.substring(0, 2).toUpperCase()}
+
+                                            {/* Status Dot */}
+                                            <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#2a2a2a] flex items-center justify-center
+                                                ${shift.status === 'working' ? 'bg-green-500' :
+                                                    shift.status === 'late' ? 'bg-red-500' :
+                                                        shift.status === 'finished' ? 'bg-blue-500' : 'bg-gray-500'}`}>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-sm text-white">{shift.staff?.name}</div>
+                                            <div className="text-xs text-gray-500 flex items-center gap-2 font-mono">
+                                                {formatTime(shift.scheduledStart!)} - {formatTime(shift.scheduledEnd!)}
+
+                                                {shift.status === 'late' && <span className="text-red-400 font-bold bg-red-400/10 px-1 rounded animate-pulse">ATRASADO</span>}
+                                                {shift.status === 'working' && <span className="text-green-400 font-bold bg-green-400/10 px-1 rounded">EN TURNO</span>}
+                                                {shift.status === 'finished' && <span className="text-blue-400 font-bold bg-blue-400/10 px-1 rounded">FINALIZADO</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-gray-500 text-xs text-right">
+                                        {shift.status === 'pending' && <span className="text-gray-400">Todo en orden</span>}
+                                        {shift.status === 'late' && <span className="text-red-400 font-bold">¡Debería haber entrado!</span>}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {(!todaySchedule || todaySchedule.length === 0) && (
+                                <div className="p-8 text-center text-gray-500 italic text-sm">
+                                    No hay turnos programados para hoy.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </section>
                 {/* KPI DASHBOARD SECTION */}
                 <section>
                     <div className="flex items-center gap-2 mb-4">
