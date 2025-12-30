@@ -90,9 +90,14 @@ export default function ManagerPage() {
 
 
 
-    // 4. COMPUTED KPI
-    const totalSales = selectedOrders?.reduce((sum, o) => sum + o.total, 0) || 0;
-    const ticketCount = selectedOrders?.length || 0;
+    // 4. COMPUTED KPI (Sanitized)
+    const sanitizedOrders = selectedOrders?.map(o => ({
+        ...o,
+        createdAt: typeof o.createdAt === 'string' ? new Date(o.createdAt) : o.createdAt
+    })) || [];
+
+    const totalSales = sanitizedOrders.reduce((sum, o) => sum + o.total, 0);
+    const ticketCount = sanitizedOrders.length;
     const avgTicket = ticketCount > 0 ? Math.round(totalSales / ticketCount) : 0;
     const activeStaffCount = activeShifts?.length || 0;
 
@@ -104,9 +109,11 @@ export default function ManagerPage() {
         // HOURLY (00-23)
         chartTitle = "Ventas por Hora";
         const salesByHour = new Array(24).fill(0);
-        selectedOrders?.forEach(order => {
+        sanitizedOrders.forEach(order => {
+            // Defensive check
+            if (!(order.createdAt instanceof Date) || isNaN(order.createdAt.getTime())) return;
             const h = order.createdAt.getHours();
-            salesByHour[h] += order.total;
+            if (h >= 0 && h < 24) salesByHour[h] += order.total;
         });
         chartData = salesByHour.map((val, i) => ({
             label: `${i}:00`,
@@ -118,8 +125,11 @@ export default function ManagerPage() {
         chartTitle = viewMode === 'week' ? "Ventas de la Semana" : "Ventas del Mes";
         const days = eachDayOfInterval({ start, end });
         chartData = days.map(d => {
-            const dayTotal = selectedOrders
-                ?.filter(o => isSameDay(o.createdAt, d))
+            const dayTotal = sanitizedOrders
+                .filter(o => {
+                    if (!(o.createdAt instanceof Date) || isNaN(o.createdAt.getTime())) return false;
+                    return isSameDay(o.createdAt, d);
+                })
                 .reduce((sum, o) => sum + o.total, 0) || 0;
             return {
                 label: viewMode === 'week' ? format(d, 'EEEE', { locale: es }) : format(d, 'd'),
@@ -137,6 +147,9 @@ export default function ManagerPage() {
         hour: d.label, // mapped for chart
         total: d.value
     }));
+
+    // Recharts defensive: Ensure at least empty array if undefined
+    if (!visibleChartData) return null;
 
 
     // NAVIGATION HANDLERS

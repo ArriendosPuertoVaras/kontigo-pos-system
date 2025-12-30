@@ -353,8 +353,16 @@ class SyncService {
             throw error;
         }
 
-        if (!data || data.length === 0) {
-            console.log(`[Sync] No data found in cloud for ${supabaseTableName}. Skipping restore to preserve local data.`);
+        // FIX: If cloud returns empty array, we MUST clear local to mirror it. 
+        // We only skip if 'data' is null/undefined (error case).
+        if (!data) {
+            console.log(`[Sync] No data object returned for ${supabaseTableName}. Skipping.`);
+            return;
+        }
+
+        if (data.length === 0) {
+            console.log(`[Sync] Cloud table ${supabaseTableName} is empty. Clearing local to match...`);
+            await dexieTable.clear();
             return;
         }
 
