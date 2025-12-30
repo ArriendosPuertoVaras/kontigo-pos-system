@@ -22,6 +22,7 @@ export default function KitchenRecipesPage() {
 
     // Permission Check
     const canViewRecipes = usePermission('kds:view_recipes');
+    const canManageRecipes = usePermission('menu:manage');
 
     // Modal State
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
@@ -109,7 +110,7 @@ export default function KitchenRecipesPage() {
                             <ChefHat className="text-toast-orange shrink-0" />
                             <span className="truncate">Fichas</span>
                         </h1>
-                        {canViewRecipes && (
+                        {canManageRecipes && (
                             <button
                                 onClick={() => setIsCreateOpen(true)}
                                 className="bg-toast-orange hover:bg-orange-600 text-white p-2 rounded-lg shadow-lg shadow-orange-500/20 transition-all shrink-0"
@@ -151,7 +152,7 @@ export default function KitchenRecipesPage() {
                             </button>
 
                             {/* ACTION BUTTONS (Only if permitted) */}
-                            {canViewRecipes && (
+                            {canManageRecipes && (
                                 <div className={`absolute right-1 lg:right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-20 
                                     ${selectedProductId === p.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                                     <button
@@ -255,7 +256,7 @@ export default function KitchenRecipesPage() {
                                     </div>
 
                                     {/* MANAGER EDIT BUTTON IN MAIN VIEW TOO */}
-                                    {canViewRecipes && (
+                                    {canManageRecipes && (
                                         <button
                                             onClick={() => setIsBuilderOpen(true)}
                                             className="bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-lg border border-white/10 flex items-center gap-2 transition-colors lg:ml-2 text-xs md:text-sm font-bold"

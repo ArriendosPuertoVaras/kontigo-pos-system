@@ -15,7 +15,7 @@ export const PERMISSIONS_LIST = [
         category: 'Cocina (KDS)',
         items: [
             { id: 'kds:view', label: 'Ver Pantalla KDS' },
-            { id: 'kds:view_recipes', label: 'Ver Fichas Técnicas (Costos)' },
+            { id: 'kds:view_recipes', label: 'Ver Fichas Técnicas (Solo Lectura)' },
             { id: 'kds:complete', label: 'Completar Platos' },
         ]
     },
