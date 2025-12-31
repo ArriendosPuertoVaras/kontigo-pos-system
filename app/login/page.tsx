@@ -43,8 +43,8 @@ export default function LoginPage() {
         try {
             // 1. Authenticate with Supabase (Cloud Truth)
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-                email: credentials.email,
-                password: credentials.password
+                email: credentials.email.trim(),
+                password: credentials.password.trim()
             });
 
             if (authError) throw new Error("Credenciales incorrectas");

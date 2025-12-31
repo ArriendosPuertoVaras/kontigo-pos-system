@@ -19,8 +19,8 @@ export default function CommerceLoginPage() {
         try {
             // 1. Auth with Supabase
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-                email,
-                password
+                email: email.trim(),
+                password: password.trim()
             });
 
             if (authError) throw authError;
