@@ -145,6 +145,10 @@ class SyncService {
                     delete converted.active;
                 }
 
+                // CRITICAL FIX: Ensure 'email' is preserved
+                // (No action needed as we don't delete it, but verifying logic flow)
+
+
                 // 4. HARD DELETE 'active_role' - Local only field, or mismatch
                 if ('active_role' in converted) {
                     delete converted.active_role;
