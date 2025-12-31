@@ -466,7 +466,7 @@ class SyncService {
         }
     }
 
-    async restoreFromCloud(onProgress?: (msg: string) => void) {
+    async restoreFromCloud(onProgress?: (msg: string) => void, preventReload: boolean = false) {
         try {
             onProgress?.("Restaurando Categorías y Plantillas...");
             await this.pullTable(db.categories, 'categories');
@@ -515,7 +515,9 @@ class SyncService {
             await this.rescueOrphans();
 
             onProgress?.("¡Restauración Completada!");
-            window.location.reload(); // Refresh to show data
+            if (!preventReload) {
+                window.location.reload(); // Refresh to show data
+            }
         } catch (error: any) {
             console.error("Restore Failed:", error);
             throw error;

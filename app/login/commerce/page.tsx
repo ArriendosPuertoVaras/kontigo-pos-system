@@ -59,17 +59,23 @@ export default function CommerceLoginPage() {
             localStorage.setItem('kontigo_restaurant_id', restaurantId);
             localStorage.setItem('kontigo_restaurant_name', restaurantName || 'Mi Restaurante');
 
-            // 4. Migrate Legacy Data if needed (Optional hook point)
-            // We could trigger the 'migrateLegacyData(restaurantId)' here if we detect local data has no ID.
+            // 4. PROFESSIONAL AUTO-SYNC: Immediately download entire cloud state
+            // This ensures the device is 100% operational with the latest data without manual steps.
+            toast.info("Vinculación exitosa. Sincronizando datos del restaurante...");
 
-            toast.success(`Dispositivo vinculado a: ${restaurantName}`);
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.restoreFromCloud((msg) => {
+                console.log(`[AutoLinkSync] ${msg}`);
+            }, true);
+
+            toast.success(`Dispositivo listo: ${restaurantName}`);
 
             // 5. Redirect to Staff Login (Operational Layer)
             router.push('/login');
 
         } catch (error: any) {
             console.error("Login Error:", error);
-            toast.error(error.message || "Error al iniciar sesión");
+            toast.error(error.message || "Error al vincular el dispositivo");
             setLoading(false);
         }
     };
