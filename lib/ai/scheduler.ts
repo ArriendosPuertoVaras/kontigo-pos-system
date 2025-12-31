@@ -28,6 +28,24 @@ export async function generateOptimalSchedule(startDate: Date, daysToGenerate: n
         staffWorkDays.set(s.id!, new Set());
     });
 
+    // 1. FETCH EXISTING SHIFTS to prevent Double Booking on top of Manual/Saved shifts
+    // Range: StartDate -> StartDate + daysToGenerate
+    const endGenDate = addDays(startDate, daysToGenerate);
+    const existingShifts = await db.shifts.where('scheduledStart').between(startDate, endGenDate, true, true).toArray();
+
+    existingShifts.forEach(shift => {
+        if (!shift.staffId || !shift.scheduledStart || !shift.scheduledEnd || shift.type !== 'work') return;
+
+        // Update Minutes
+        const mins = differenceInMinutes(shift.scheduledEnd, shift.scheduledStart);
+        const currentMins = staffWeeklyMinutes.get(shift.staffId) || 0;
+        staffWeeklyMinutes.set(shift.staffId, currentMins + mins);
+
+        // Update Work Days
+        const dStr = format(shift.scheduledStart, 'yyyy-MM-dd');
+        staffWorkDays.get(shift.staffId)?.add(dStr);
+    });
+
     const thresholdDate = minDate ? startOfDay(minDate) : startOfDay(new Date());
     const MAX_WEEKLY_MINUTES = LAW_CONSTANTS.MAX_WEEKLY_HOURS * 60;
 
