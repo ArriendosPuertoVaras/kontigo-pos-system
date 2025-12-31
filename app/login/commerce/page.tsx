@@ -59,14 +59,36 @@ export default function CommerceLoginPage() {
             localStorage.setItem('kontigo_restaurant_id', restaurantId);
             localStorage.setItem('kontigo_restaurant_name', restaurantName || 'Mi Restaurante');
 
-            // 4. PROFESSIONAL AUTO-SYNC: Immediately download entire cloud state
+            // 4. PROFESSIONAL AUTO-SYNC / MASTER SETUP
             // This ensures the device is 100% operational with the latest data without manual steps.
-            toast.info("Vinculación exitosa. Sincronizando datos del restaurante...");
+            toast.info("Vinculación exitosa. Sincronizando datos...");
 
             const { syncService } = await import('@/lib/sync_service');
+            const { db } = await import('@/lib/db');
+
+            // 4a. Tag local data with restaurant_id if it's currently untagged (Master Device Setup)
+            const tables = [db.categories, db.products, db.ingredients, db.staff, db.restaurantTables, db.settings];
+            for (const table of tables) {
+                const untagged = await table.filter(item => !item.restaurantId).toArray();
+                if (untagged.length > 0) {
+                    await Promise.all(untagged.map(item =>
+                        // @ts-ignore - Generic update across different table types
+                        table.update(item.id, { restaurantId })
+                    ));
+                }
+            }
+
+            // 4b. Intelligent Pull: Try to get cloud state
             await syncService.restoreFromCloud((msg) => {
                 console.log(`[AutoLinkSync] ${msg}`);
             }, true);
+
+            // 4c. Verify Link: If pulled data is 0, this is the Master Device. Push local to Cloud.
+            const catCount = await db.categories.count();
+            if (catCount === 0) {
+                console.log("[AutoLinkSync] Cloud was empty. Establishing local as Source of Truth...");
+                await syncService.pushAll((msg) => console.log(`[AutoLinkSync-Master] ${msg}`));
+            }
 
             toast.success(`Dispositivo listo: ${restaurantName}`);
 

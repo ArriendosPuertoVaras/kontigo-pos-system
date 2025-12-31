@@ -20,7 +20,7 @@ class SyncService {
         return obj;
     }
 
-    private isSyncing = false;
+    public isSyncing = false;
 
     // Generic push function for a table
     // tableName: Dexie table name
@@ -37,12 +37,19 @@ class SyncService {
 
         // 1. Get all local data
         // FILTER: Only push data belonging to this restaurant (Safety measure)
-        // If local DB has multiple tenants mixed (shouldn't happen with new logic, but good primarily), we filter.
+        // If local DB has multiple tenants mixed, we filter.
         let localData = await dexieTable.filter(item => !item.restaurantId || item.restaurantId === restaurantId).toArray();
 
-        if (localData.length === 0) {
-            console.log(`[Sync] No data in ${dexieTable.name} to sync.`);
-            // Continue to mirror sync to ensure cloud is empty too if local is empty
+        // --- AUTOMATIC TAGGING (Safety Layer 1) ---
+        // If we find items without a restaurantId, we tag them NOW before pushing.
+        const untagged = localData.filter(item => !item.restaurantId);
+        if (untagged.length > 0) {
+            console.log(`[Sync] 🏷️ Auto-tagging ${untagged.length} items for ${dexieTable.name}...`);
+            await Promise.all(untagged.map(item =>
+                dexieTable.update(item.id, { restaurantId })
+            ));
+            // Refresh localData after tagging
+            localData = await dexieTable.filter(item => item.restaurantId === restaurantId).toArray();
         }
 
         // --- ROBUSTNESS: ORPHAN CHECK ---
@@ -440,7 +447,18 @@ class SyncService {
             return camelItem;
         });
 
-        console.log(`[Sync] Pulled ${transformedData.length} records for ${dexieTable.name}. Overwriting local...`);
+        console.log(`[Sync] Pulled ${transformedData.length} records for ${dexieTable.name}.`);
+
+        // --- SAFETY LAYER 2: PREVENT THE "WIPE TRAP" ---
+        // If Cloud returns 0 records but Local has records, we DO NOT clear.
+        // This prevents a new device login from wiping a Master computer that hasn't pushed yet.
+        const localCount = await dexieTable.count();
+        if (transformedData.length === 0 && localCount > 0) {
+            console.warn(`[Sync] 🛡️ Blocked Clear for ${dexieTable.name}: Cloud is empty but Local has ${localCount} items. Pushing Local instead.`);
+            // Trigger a push to fix the cloud!
+            await this.pushTable(dexieTable, supabaseTableName);
+            return;
+        }
 
         // Strategy: Clear and Replace to ensure 100% sync (removes local ghosts)
         await dexieTable.clear();

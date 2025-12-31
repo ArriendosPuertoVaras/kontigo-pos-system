@@ -13,6 +13,8 @@ interface AutoSyncContextType {
     forceSync: () => Promise<void>;
 }
 
+import { initSyncHooks } from '@/lib/sync_hooks';
+
 const AutoSyncContext = createContext<AutoSyncContextType | undefined>(undefined);
 
 export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
@@ -55,6 +57,8 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
 
     // Initial Sync on Mount (Recover from offline close) or SMART RESTORE
     useEffect(() => {
+        initSyncHooks();
+
         // Wait a bit for app to settle
         const timer = setTimeout(async () => {
             if (typeof window === 'undefined') return;
