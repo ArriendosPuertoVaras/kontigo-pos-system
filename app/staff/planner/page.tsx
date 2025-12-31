@@ -292,8 +292,14 @@ export default function PlannerPage() {
                                                 {staff.role}
                                             </span>
                                             <span
-                                                className={`text-[10px] font-mono font-bold ml-auto flex items-center gap-1 ${periodHours > 44 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}
-                                                title={periodHours > 44 ? `ALERTA LEGAL: Excede límite de 44 horas (${periodHours.toFixed(1)}h)` : ''}
+                                                className={`text-[10px] font-mono font-bold ml-auto flex items-center gap-1 cursor-pointer transition-all ${periodHours > 44 ? 'text-red-500 animate-pulse scale-110' : 'text-gray-400'}`}
+                                                title={periodHours > 44 ? `ALERTA LEGAL: Excede límite de 44 horas (${periodHours.toFixed(1)}h)` : 'Horas totales en el periodo'}
+                                                onClick={(e) => {
+                                                    if (periodHours > 44) {
+                                                        e.stopPropagation();
+                                                        alert(`ALERTA LEGAL: Este colaborador tiene ${periodHours.toFixed(1)} horas en el periodo, superando el límite legal de 44 horas.`);
+                                                    }
+                                                }}
                                             >
                                                 {periodHours > 44 && <AlertTriangle className="w-3 h-3" />}
                                                 {Number(periodHours.toFixed(1))}h
@@ -374,16 +380,26 @@ export default function PlannerPage() {
                                                                     e.dataTransfer.effectAllowed = 'copy';
                                                                 }}
                                                                 onClick={(e) => {
+                                                                    e.stopPropagation(); // ALWAYS stop propagation to prevent cell modal
                                                                     if (shift.isGhost) {
-                                                                        e.stopPropagation();
                                                                         confirmGhostShift(shift);
                                                                     }
                                                                 }}
-                                                                className={`flex-1 rounded p-1 text-[10px] font-bold border-l-2 shadow-sm truncate flex flex-col justify-center items-center hover:brightness-110 cursor-grab active:cursor-grabbing ${colorClass}`}
+                                                                className={`flex-1 rounded p-1 text-[10px] font-bold border-l-2 shadow-sm truncate flex flex-col justify-center items-center hover:brightness-110 cursor-grab active:cursor-grabbing relative group/shift ${colorClass}`}
                                                             >
                                                                 {shift.isGhost && <div className="text-[8px] uppercase tracking-tighter mb-0.5 diff-glow text-purple-200">✨</div>}
-                                                                {shift.type === 'day_off' ? 'LIB' : shift.type === 'sick' ? 'ENF' :
-                                                                    `${format(new Date(shift.scheduledStart!), 'HH:mm')} - ${format(new Date(shift.scheduledEnd!), 'HH:mm')}`}
+                                                                <div className="truncate w-full text-center">
+                                                                    {shift.type === 'day_off' ? 'LIB' : shift.type === 'sick' ? 'ENF' :
+                                                                        `${format(new Date(shift.scheduledStart!), 'HH:mm')} - ${format(new Date(shift.scheduledEnd!), 'HH:mm')}`}
+                                                                </div>
+                                                                {!shift.isGhost && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteShift(shift.id!); }}
+                                                                        className="absolute -top-1 -right-1 bg-red-600 rounded-full p-0.5 opacity-0 group-hover/shift:opacity-100 transition-opacity z-20"
+                                                                    >
+                                                                        <X className="w-2 h-2" />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         )
                                                     })
