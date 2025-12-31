@@ -505,6 +505,7 @@ export async function seedDatabase() {
     } catch (e) { console.error("Role Migration Failed:", e); }
 
     // Seed Job Titles if empty OR missing critical roles
+    /*
     try {
         const titleCount = await db.jobTitles.count();
         if (titleCount === 0) {
@@ -516,6 +517,7 @@ export async function seedDatabase() {
             ]);
         }
     } catch (e) { console.error("Job Title Seed Failed", e); }
+    */
 
     // CHECK: Removed Secondary Staff Seeding logic.
 }
