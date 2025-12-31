@@ -21,6 +21,7 @@ class SyncService {
     }
 
     public isSyncing = false;
+    public isReady = false; // Flag to enable auto-sync only after initial pull
 
     // Generic push function for a table
     // tableName: Dexie table name
@@ -218,93 +219,14 @@ class SyncService {
 
         console.log(`[Sync] synced ${localData.length} rows to ${supabaseTableName}.`);
 
-        // 4. MIRROR SYNC: Delete records in Cloud that are NOT in Local
-        const SAFE_TO_MIRROR = [
-            'restaurant_staff', 'job_titles', 'ingredients', 'products', 'categories', 'suppliers', 'restaurant_tables',
-            'purchase_orders', 'waste_logs', 'accounts', 'journal_entries',
-            'shifts', 'customers', 'dtes', 'cash_counts', 'daily_closes', 'modifier_templates'
-        ];
-
-        if (SAFE_TO_MIRROR.includes(supabaseTableName)) {
-            // --- SAFETY LAYER 3: PREVENT EMPTY WIPE ---
-            // If local is 100% empty, we DO NOT mirror (delete).
-            // This prevents a new device from wiping a populated Cloud.
-            if (localData.length === 0) {
-                console.warn(`[Sync] 🛡️ Mirror-Delete Skipped for ${supabaseTableName}: Local is empty. Cloud is preserved.`);
-                return;
-            }
-
-            try {
-                // SPECIAL CASE: job_titles must match by NAME, because local ID (number) != cloud ID (int8)
-                // and we strip IDs on push.
-                if (supabaseTableName === 'job_titles') {
-                    const { data: remoteRows, error: fetchError } = await supabase
-                        .from(supabaseTableName)
-                        .select('id, name')
-                        .eq('restaurant_id', restaurantId);
-
-                    if (fetchError) throw fetchError;
-
-                    if (remoteRows && remoteRows.length > 0) {
-                        const localNames = new Set(localData.map(d => d.name)); // Match by Name
-                        const idsToDelete = remoteRows
-                            .filter(r => !localNames.has(r.name))
-                            .map(r => r.id);
-
-                        if (idsToDelete.length > 0) {
-                            console.log(`[Sync] Mirroring (by Name): Deleting ${idsToDelete.length} obsolete roles from ${supabaseTableName}...`);
-                            await supabase.from(supabaseTableName).delete().in('id', idsToDelete);
-                        }
-                    }
-                    return; // Exit here for job_titles
-                }
-
-
-                // STANDARD MIRROR (By ID)
-                // Get all IDs currently in Supabase FOR THIS RESTAURANT
-                const { data: remoteIds, error: fetchError } = await supabase
-                    .from(supabaseTableName)
-                    .select('id')
-                    .eq('restaurant_id', restaurantId);
-
-                if (fetchError) throw fetchError;
-
-                if (remoteIds && remoteIds.length > 0) {
-                    const localIds = new Set(localData.map(d => d.id));
-                    // Identify IDs that exist in Remote but NOT in Local
-                    const idsToDelete = remoteIds
-                        .filter(r => !localIds.has(r.id)) // Standard ID Match
-                        .map(r => r.id);
-
-                    if (idsToDelete.length > 0) {
-                        console.log(`[Sync] Mirroring: Deleting ${idsToDelete.length} obsolete records from ${supabaseTableName}...`);
-
-                        // SAFETY NET: If deleting categories, ensure products are unlinked first (Double Check)
-                        if (supabaseTableName === 'categories') {
-                            // Attempt to NULLIFY category_id for products pointing to these to-be-deleted categories
-                            // This handles any race condition or stray references
-                            await supabase
-                                .from('products')
-                                .update({ category_id: null })
-                                .in('category_id', idsToDelete);
-                        }
-
-                        const { error: deleteError } = await supabase
-                            .from(supabaseTableName)
-                            .delete()
-                            .in('id', idsToDelete);
-
-                        if (deleteError) {
-                            console.error(`[Sync] Warning: Failed to clean up ${supabaseTableName}:`, JSON.stringify(deleteError, null, 2));
-                        } else {
-                            console.log(`[Sync] Cleanup successful.`);
-                        }
-                    }
-                }
-            } catch (cleanupError) {
-                console.error(`[Sync] Mirror cleanup failed for ${supabaseTableName}`, cleanupError);
-            }
-        }
+        // 4. MIRROR SYNC (DEPRECATED): We no longer delete cloud records automatically
+        // to match local state. This is to ensure a Cloud-First architecture where
+        // local devices can never 'wipe' the master database.
+        /*
+        const SAFE_TO_MIRROR = [ ... ];
+        if (SAFE_TO_MIRROR.includes(supabaseTableName)) { ... }
+        */
+        console.log(`[Sync] ${supabaseTableName} push complete (Non-destructive).`);
     }
 
     async pushAll(onProgress?: (msg: string) => void) {

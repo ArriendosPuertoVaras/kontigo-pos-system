@@ -59,67 +59,51 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         initSyncHooks();
 
-        // Wait a bit for app to settle
-        const timer = setTimeout(async () => {
+        // --- STARTUP HANDSHAKE: Cloud-First Protocol ---
+        const handshake = async () => {
             if (typeof window === 'undefined') return;
+            const { syncService } = await import('@/lib/sync_service');
+            const { db } = await import('@/lib/db');
+
+            const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+            if (!restaurantId) return; // Login screen
 
             if (navigator.onLine) {
-                // 0. GATEKEEPER: Do nothing if we are not logged in (No Restaurant ID)
-                const restaurantId = localStorage.getItem('kontigo_restaurant_id');
-                if (!restaurantId) {
-                    // We are at Login Screen (or just setup). Do NOT try to sync or restore.
-                    return;
+                console.log("☁️ Cloud-First: Initiating Startup Handshake...");
+                setStatus('saving');
+                const loadingToast = toast.loading("Sincronizando con la Nube...");
+
+                try {
+                    // 1. FORCE PULL: Download the truth from Supabase
+                    // We use preventReload: true to handle the UI state manually
+                    await syncService.restoreFromCloud((msg) => console.log(msg), true);
+
+                    // 2. MARK AS READY: Enable Auto-Sync hooks
+                    syncService.isReady = true;
+
+                    setStatus('saved');
+                    setLastSyncedAt(new Date());
+                    toast.dismiss(loadingToast);
+                    toast.success("✅ Conectado y Sincronizado");
+
+                    console.log("☁️ Cloud-First: Handshake Complete. Device is Ready.");
+                } catch (e) {
+                    console.error("Cloud-First Handshake Failed:", e);
+                    setStatus('error');
+                    toast.dismiss(loadingToast);
+                    toast.error("Error al sincronizar. Trabajando en modo local.");
+                    // Allow local work as fallback
+                    syncService.isReady = true;
                 }
-
-                // 1. SMART CHECK: Health Check & Repair
-                const productCount = await db.products.count();
-                const categoryCount = await db.categories.count();
-
-                // REPAIR: Logic Removed by User Request (No Auto-Seeding)
-                // if (categoryCount <= 2) { ... }
-
-                if (productCount === 0) {
-                    console.log("🦁 Smart Sync: Local DB is empty. Checking cloud...");
-                    try {
-                        // Dynamically import service
-                        const { syncService } = await import('@/lib/sync_service');
-                        const hasCloud = await syncService.hasCloudData();
-
-                        if (hasCloud) {
-                            console.log("☁️ Smart Sync: Found data in cloud! Auto-Restoring...");
-                            setStatus('saving');
-                            toast.info("Descargando datos de la nube...");
-
-                            try {
-                                await syncService.restoreFromCloud((msg) => console.log(msg));
-                                toast.success("✅ Datos recuperados exitosamente");
-                                window.location.reload();
-                                return;
-                            } catch (e) {
-                                console.error("Smart Sync Restore Failed:", e);
-                                toast.error("Error al restaurar datos");
-                                setStatus('error');
-                            }
-                        } else {
-                            console.log("🦁 Smart Sync: Cloud appears empty.");
-                            toast("Sistema listo (Modo Local)", {
-                                description: "No se encontraron datos en la nube para sincronizar.",
-                                duration: 5000
-                            });
-                        }
-                    } catch (importError) {
-                        console.error("Smart Sync Import Failed:", importError);
-                        // Likely env vars missing or network error on script load
-                        toast.error("Error de Configuración", {
-                            description: "No se pudo conectar a los servicios de nube."
-                        });
-                    }
-                } else {
-                    console.log("🚀 Initial App Sync: Ensuring cloud consistency...");
-                    performSync();
-                }
+            } else {
+                console.log("📡 Offline: Enabling local mode.");
+                setStatus('offline');
+                syncService.isReady = true;
             }
-        }, 1500); // 1.5s is enough
+        };
+
+        // Wait a bit for DB to be available
+        const timer = setTimeout(handshake, 1000);
         return () => clearTimeout(timer);
     }, [performSync]);
 

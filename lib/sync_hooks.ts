@@ -48,6 +48,7 @@ export function initSyncHooks() {
 
         // 2. AUTO-PUSH: Trigger sync on any change
         const triggerSync = () => {
+            if (!syncService.isReady) return; // DO NOT SYNC UNTIL INITIAL DOWNLOAD IS DONE
             if (syncService.isSyncing) return; // Prevent loops
 
             // Debounce or just trigger
