@@ -15,7 +15,7 @@ import {
     eachDayOfInterval
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { generateMockData } from '@/lib/mock_generator';
+// import { generateMockData } from '@/lib/mock_generator'; // DISABLED
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';

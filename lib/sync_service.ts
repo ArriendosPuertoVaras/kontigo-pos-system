@@ -584,7 +584,9 @@ class SyncService {
             }
             // -------------------------------------------------------------
 
-            // --- EMERGENCY RESTORE: If categories are missing (e.g. data loss), restore defaults ---
+            // --- EMERGENCY RESTORE: DISABLED FOR CLOUD-FIRST PURITY ---
+            // We no longer want to inject "defaults" if the user has a small menu.
+            /*
             const currentCount = await db.categories.count();
             if (currentCount <= 2) {
                 console.log("[Sync] Detectada pérdida de categorías. Restaurando Básicos...");
@@ -606,6 +608,7 @@ class SyncService {
                     }
                 }
             }
+            */
             // -------------------------------------------------------------
 
             // 2. Process Groups (Standard Dedupe)

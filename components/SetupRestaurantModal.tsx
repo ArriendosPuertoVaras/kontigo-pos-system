@@ -193,7 +193,7 @@ export default function SetupRestaurantModal({ isOpen, onClose, onComplete }: Se
                             </div>
 
                             <p className="text-xs text-[#9CA3AF] bg-[#e4f229]/5 border border-[#e4f229]/20 p-4 rounded-xl flex gap-2">
-                                <span className="text-[#e4f229]">ℹ️</span> Al registrar, se borrarán los usuarios de demostración (Cocinero, Garzón, Barra) para dejar tu sistema limpio.
+                                <span className="text-[#e4f229]">ℹ️</span> Al registrar, se iniciará con una base de datos limpia y configurada a tu nombre.
                             </p>
 
                             <div className="flex gap-4 pt-4">
