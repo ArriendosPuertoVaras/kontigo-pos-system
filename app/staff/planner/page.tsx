@@ -154,18 +154,26 @@ export default function PlannerPage() {
 
     // CONFIRM GHOST SHIFT
     const confirmGhostShift = async (shift: any) => {
-        await db.shifts.add({
-            staffId: shift.staffId,
-            type: shift.type,
-            scheduledStart: shift.scheduledStart,
-            scheduledEnd: shift.scheduledEnd,
-            startTime: shift.scheduledStart // Required by TS
-        });
-        await syncService.autoSync(db.shifts, 'shifts');
+        // OPTIMISTIC UI: Remove from list immediately using a more robust comparison
+        setSuggestedShifts(prev => prev.filter(s =>
+            !(s.staffId === shift.staffId &&
+                s.scheduledStart?.getTime() === shift.scheduledStart?.getTime() &&
+                s.scheduledEnd?.getTime() === shift.scheduledEnd?.getTime())
+        ));
 
-        // Remove from suggestions
-        setSuggestedShifts(prev => prev.filter(s => s !== shift)); // Simple ref check might fail
-        // View State
+        try {
+            await db.shifts.add({
+                staffId: shift.staffId,
+                type: shift.type,
+                scheduledStart: shift.scheduledStart,
+                scheduledEnd: shift.scheduledEnd,
+                startTime: shift.scheduledStart // Required by TS
+            });
+            await syncService.autoSync(db.shifts, 'shifts');
+        } catch (e) {
+            console.error("Failed to confirm shift:", e);
+            // Re-add on failure? Usually better to just show error.
+        }
     };
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
 
@@ -283,7 +291,10 @@ export default function PlannerPage() {
                                             <span className="text-[9px] uppercase font-bold text-gray-500 bg-black/30 px-1 rounded">
                                                 {staff.role}
                                             </span>
-                                            <span className={`text-[10px] font-mono font-bold ml-auto flex items-center gap-1 ${periodHours > 44 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
+                                            <span
+                                                className={`text-[10px] font-mono font-bold ml-auto flex items-center gap-1 ${periodHours > 44 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}
+                                                title={periodHours > 44 ? `ALERTA LEGAL: Excede límite de 44 horas (${periodHours.toFixed(1)}h)` : ''}
+                                            >
                                                 {periodHours > 44 && <AlertTriangle className="w-3 h-3" />}
                                                 {Number(periodHours.toFixed(1))}h
                                             </span>
@@ -299,6 +310,7 @@ export default function PlannerPage() {
                                             return acc + differenceInMinutes(s.scheduledEnd, s.scheduledStart);
                                         }, 0);
                                         const isDailyViolation = dailyMinutes > 600; // > 10h
+                                        const dailyViolationMsg = isDailyViolation ? `ALERTA LEGAL: Excede límite de 10 horas diarias (${(dailyMinutes / 60).toFixed(1)}h)` : '';
 
                                         return (
                                             <div
@@ -328,7 +340,18 @@ export default function PlannerPage() {
                                                 }}
                                                 className={`border-l border-white/5 p-1 min-h-[60px] relative cursor-pointer hover:bg-white/5 flex gap-1 overflow-hidden transition-all ${isFuture ? 'bg-purple-900/5' : ''} ${isDailyViolation ? 'bg-red-900/20 border-red-500/50' : ''}`}
                                             >
-                                                {isDailyViolation && <div className="absolute top-0 right-0 p-0.5"><AlertTriangle className="w-3 h-3 text-red-500" /></div>}
+                                                {isDailyViolation && (
+                                                    <div
+                                                        className="absolute top-0 right-0 p-0.5 z-10"
+                                                        title={dailyViolationMsg}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            alert(dailyViolationMsg);
+                                                        }}
+                                                    >
+                                                        <AlertTriangle className="w-3 h-3 text-red-500" />
+                                                    </div>
+                                                )}
                                                 {cellShifts.length > 0 ? (
                                                     cellShifts.map((shift: any, idx) => {
                                                         let colorClass = 'bg-blue-500/20 text-blue-300 border-blue-500';
