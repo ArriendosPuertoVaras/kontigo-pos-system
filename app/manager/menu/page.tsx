@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Category, Product, ModifierTemplate } from '@/lib/db';
-import { ArrowLeft, Plus, Trash2, Edit, Save, X, Package, LayoutGrid, Tag, Layers } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Save, X, Package, LayoutGrid, Tag, Layers, Cloud, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { usePermission } from '@/hooks/usePermission';
 import { Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export default function MenuManagerPage() {
     const hasAccess = usePermission('menu:manage');
@@ -256,6 +257,46 @@ function CategoriesView() {
                     <LayoutGrid className="text-toast-orange" /> Categorías
                 </h2>
                 <div className="flex gap-2">
+                    <button
+                        title="Subir datos locales a KONTIGO-STGO"
+                        onClick={async () => {
+                            if (!confirm("🚨 EMERGENCIA: Esto forzará que tus datos actuales se suban a KONTIGO-STGO. ¿Estás en el local correcto y con los datos ya limpios?")) return;
+
+                            toast.loading("Sincronizando con KONTIGO-STGO...");
+                            try {
+                                const STGO_ID = "e72836f6-edce-462d-a36f-27e0303eae94";
+                                // 1. Set context
+                                localStorage.setItem('kontigo_restaurant_id', STGO_ID);
+
+                                // 2. Tag local data (Self-healing bridge)
+                                const cats = await db.categories.toArray();
+                                for (const c of cats) {
+                                    if (c.restaurantId !== STGO_ID) await db.categories.update(c.id!, { restaurantId: STGO_ID });
+                                }
+
+                                const products = await db.products.toArray();
+                                for (const p of products) {
+                                    if (p.restaurantId !== STGO_ID) await db.products.update(p.id!, { restaurantId: STGO_ID });
+                                }
+
+                                // 3. Push
+                                const { syncService } = await import('@/lib/sync_service');
+                                await syncService.pushAll();
+
+                                toast.dismiss();
+                                toast.success("✅ Datos subidos exitosamente a KONTIGO-STGO");
+
+                                // Reset nuclear local state to clear any ghosts that might reactivate
+                                setTimeout(() => window.location.reload(), 2000);
+                            } catch (e: any) {
+                                toast.error("Error: " + e.message);
+                            }
+                        }}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-900/40"
+                    >
+                        <Cloud className="w-4 h-4" />
+                        SUBIR A STGO
+                    </button>
                     <button
                         onClick={async (e) => {
                             if (!confirm("⚠️ ¿Detectar y fusionar categorías duplicadas? (Ej: 'Bebidas' repetido 3 veces)")) return;
