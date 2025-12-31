@@ -51,8 +51,21 @@ class SyncService {
             const validCategories = await db.categories.toArray();
             const validIds = new Set(validCategories.map(c => c.id));
 
+            // HEALER: If categoryId is a string or invalid ID, try to find by name
+            for (const p of localData) {
+                if (!validIds.has(p.categoryId as any)) {
+                    const match = validCategories.find(c =>
+                        c.name.trim().toLowerCase() === String(p.categoryId).trim().toLowerCase()
+                    );
+                    if (match && match.id) {
+                        console.log(`[Sync] 🚑 Healing product ${p.name}: category '${p.categoryId}' -> ID ${match.id}`);
+                        p.categoryId = match.id;
+                    }
+                }
+            }
+
             const originalCount = localData.length;
-            localData = localData.filter(p => validIds.has(p.categoryId));
+            localData = localData.filter(p => validIds.has(p.categoryId as any));
 
             if (localData.length < originalCount) {
                 console.warn(`[Sync] ⚠️ Skipped ${originalCount - localData.length} Orphan Products (Invalid Category ID). Run Database Cleanup.`);
@@ -518,10 +531,26 @@ class SyncService {
             const allCategories = await db.categories.toArray();
             const validCategoryIds = new Set(allCategories.map(c => c.id));
 
+            // FIRST PASS: TRY TO HEAL PRODUCTS WITH INVALID IDS (match by Name)
+            let healedCount = 0;
+            for (const p of allProducts) {
+                if (!validCategoryIds.has(p.categoryId as any)) {
+                    const match = allCategories.find(c =>
+                        c.name.trim().toLowerCase() === String(p.categoryId).trim().toLowerCase()
+                    );
+                    if (match && match.id) {
+                        await db.products.update(p.id!, { categoryId: match.id });
+                        p.categoryId = match.id; // Update local ref
+                        healedCount++;
+                    }
+                }
+            }
+            if (healedCount > 0) console.log(`[Sync] 🚑 Rescued ${healedCount} products by mapping category names.`);
+
             const orphans = allProducts.filter(p => !validCategoryIds.has(p.categoryId));
 
             if (orphans.length > 0) {
-                console.log(`[Sync] 🚑 Found ${orphans.length} ORPHAN products. Rescuing...`);
+                console.log(`[Sync] 🚑 Found ${orphans.length} ORPHAN products. Rescuing to category...`);
 
                 // Create Rescue Category if needed
                 let rescueCat = allCategories.find(c => c.name === "⚠️ RESCATADOS");
@@ -541,7 +570,7 @@ class SyncService {
                 for (const p of orphans) {
                     await db.products.update(p.id!, { categoryId: rescueId });
                 }
-                console.log(`[Sync] 🚑 Rescued ${orphans.length} products to '⚠️ RESCATADOS'`);
+                console.log(`[Sync] 🚑 Moved ${orphans.length} products to '⚠️ RESCATADOS'`);
                 // Force push changes so they are saved to cloud
                 await this.pushTable(db.categories, 'categories');
                 await this.pushTable(db.products, 'products');
