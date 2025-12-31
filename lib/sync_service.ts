@@ -483,52 +483,63 @@ class SyncService {
         try {
             const allProducts = await db.products.toArray();
             const allCategories = await db.categories.toArray();
-            const validCategoryIds = new Set(allCategories.map(c => c.id));
 
-            // FIRST PASS: TRY TO HEAL PRODUCTS WITH INVALID IDS (match by Name)
+            // Loose ID Set for comparison (handles "1" vs 1)
+            const validCategoryIds = new Set(allCategories.map(c => String(c.id)));
+            const firstValidCatId = allCategories[0]?.id;
+
+            // FIRST PASS: TRY TO HEAL PRODUCTS WITH INVALID IDS (match by Name or loose ID)
             let healedCount = 0;
             for (const p of allProducts) {
-                if (!validCategoryIds.has(p.categoryId as any)) {
-                    const match = allCategories.find(c =>
-                        c.name.trim().toLowerCase() === String(p.categoryId).trim().toLowerCase()
-                    );
-                    if (match && match.id) {
-                        await db.products.update(p.id!, { categoryId: match.id });
-                        p.categoryId = match.id; // Update local ref
-                        healedCount++;
-                    }
+                const pCatIdStr = String(p.categoryId);
+
+                // If ID is valid (strictly or loosely), ensure strict number type if needed
+                if (validCategoryIds.has(pCatIdStr)) {
+                    // Ensure type consistency if needed, but Dexie handles mixed types fine usually.
+                    // If p.categoryId is string "5", but ID is 5, it matches now.
+                    continue;
+                }
+
+                // If invalid, try to match by Name
+                const match = allCategories.find(c =>
+                    c.name.trim().toLowerCase() === String(p.categoryId).trim().toLowerCase()
+                );
+
+                if (match && match.id) {
+                    await db.products.update(p.id!, { categoryId: match.id });
+                    p.categoryId = match.id;
+                    healedCount++;
+                    continue;
+                }
+
+                // If still invalid, and we have a valid category, move to first one (Emergency)
+                // Instead of creating "RESCATADOS" which annoys the user, we default to the first one.
+                if (firstValidCatId) {
+                    await db.products.update(p.id!, { categoryId: firstValidCatId });
+                    healedCount++;
+                    console.log(`[Sync] 🚑 Moved orphan product ${p.name} to first valid category (${allCategories[0].name})`);
                 }
             }
-            if (healedCount > 0) console.log(`[Sync] 🚑 Rescued ${healedCount} products by mapping category names.`);
-
-            const orphans = allProducts.filter(p => !validCategoryIds.has(p.categoryId));
-
-            if (orphans.length > 0) {
-                console.log(`[Sync] 🚑 Found ${orphans.length} ORPHAN products. Rescuing to category...`);
-
-                // Create Rescue Category if needed
-                let rescueCat = allCategories.find(c => c.name === "⚠️ RESCATADOS");
-                let rescueId: number;
-
-                if (!rescueCat) {
-                    rescueId = await db.categories.add({
-                        name: "⚠️ RESCATADOS",
-                        destination: 'kitchen',
-                        order: 0
-                    }) as number;
-                } else {
-                    rescueId = rescueCat.id!;
-                }
-
-                // Move orphans
-                for (const p of orphans) {
-                    await db.products.update(p.id!, { categoryId: rescueId });
-                }
-                console.log(`[Sync] 🚑 Moved ${orphans.length} products to '⚠️ RESCATADOS'`);
-                // Force push changes so they are saved to cloud
-                await this.pushTable(db.categories, 'categories');
+            if (healedCount > 0) {
+                console.log(`[Sync] 🚑 Rescued ${healedCount} products.`);
+                // Force push changes
                 await this.pushTable(db.products, 'products');
             }
+
+            // REMOVE "RESCATADOS" if it exists and is empty? 
+            // The user wants it gone.
+            const jail = allCategories.find(c => c.name === "⚠️ RESCATADOS");
+            if (jail) {
+                // Check if empty
+                const inmates = await db.products.where('categoryId').equals(jail.id!).count();
+                if (inmates === 0) {
+                    await db.categories.delete(jail.id!);
+                    // Push deletion
+                    await this.pushTable(db.categories, 'categories');
+                    console.log("[Sync] 🧹 Deleted empty '⚠️ RESCATADOS' category.");
+                }
+            }
+
         } catch (e) {
             console.error("Rescue failed:", e);
         }
