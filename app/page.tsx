@@ -714,64 +714,39 @@ function POSContent() {
           `}>
               {/* Ticket Header */}
 
-              <div className="p-4 bg-toast-charcoal-dark border-b border-white/5 flex justify-between items-center shrink-0">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="font-bold text-lg text-white">
+              <div className="p-3 md:p-4 bg-toast-charcoal-dark border-b border-white/5 flex justify-between items-center shrink-0">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-base md:text-lg text-white">
                       {activeTable ? activeTable.name : 'Venta Rápida'}
                     </h2>
-                    {/* READY STATUS INDICATORS (Independent Dots) */}
-                    <div className="flex gap-1 items-center ml-2">
+                    {/* READY STATUS INDICATORS */}
+                    <div className="flex gap-1 items-center">
                       {((activeOrder as any)?.readySections || [])
                         .filter((s: string) => !((activeOrder as any)?.deliveredSections || []).includes(s.toLowerCase()))
                         .map((s: string, idx: number) => {
                           const section = s.toLowerCase();
-                          let color = "bg-yellow-500 shadow-yellow-500/50"; // Kitchen/Default
-                          let title = "Cocina Lista";
-                          if (section === 'bar') {
-                            color = "bg-blue-500 shadow-blue-500/50";
-                            title = "Bar Listo";
-                          } else if (section === 'parrilla') {
-                            color = "bg-orange-500 shadow-orange-500/50";
-                            title = "Parrilla Lista";
-                          }
+                          let color = "bg-yellow-500";
+                          if (section === 'bar') color = "bg-blue-500";
+                          else if (section === 'parrilla') color = "bg-orange-500";
                           return (
-                            <button
-                              key={idx}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (activeOrder?.id) {
-                                  const currentDelivered = (activeOrder as any).deliveredSections || [];
-                                  if (!currentDelivered.includes(section)) {
-                                    await db.orders.update(activeOrder.id, {
-                                      deliveredSections: [...currentDelivered, section]
-                                    });
-                                  }
-                                }
-                              }}
-                              className={`w-3.5 h-3.5 rounded-full animate-pulse shadow-lg border border-white/20 ${color}`}
-                              title={`${title}. Clic para confirmar entrega de esta área.`}
-                            />
+                            <div key={idx} className={`w-2.5 h-2.5 rounded-full animate-pulse ${color}`} />
                           );
                         })}
                     </div>
                   </div>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-[10px] md:text-xs text-gray-500">
                     {activeOrder ? `Orden #${activeOrder.id}` : 'Nueva Venta'}
                   </span>
                 </div>
-                <div className="flex gap-2">
-                  {/* Mobile Back to Menu */}
+                <div className="flex gap-1.5 md:gap-2">
                   <button onClick={() => setViewMode('menu')} className="md:hidden p-2 text-toast-orange hover:bg-toast-orange/10 rounded-lg flex items-center gap-1 font-bold">
-                    <ArrowLeft className="w-5 h-5" />
-                    <span className="text-xs">VOLVER</span>
+                    <ArrowLeft className="w-4 h-4" />
+                    <span className="text-[10px]">VOLVER</span>
                   </button>
 
-                  <button onClick={handleCloseTable} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded transition-colors" title="Cerrar Mesa / Cancelar">
+                  <button onClick={handleCloseTable} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded transition-colors">
                     <Trash2 className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => router.push('/tables')} className="text-toast-blue text-sm font-bold uppercase tracking-wide px-3 py-1 hover:bg-white/5 rounded hidden md:block">
-                    Ver Mesas
                   </button>
                 </div>
               </div>
@@ -839,45 +814,33 @@ function POSContent() {
               </div>
 
               {/* Breakdown */}
-              <div className="bg-[#2e2e2e] p-4 border-t border-white/5 space-y-2 relative z-10 shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
-                {/* SPLIT BILL UI */}
+              <div className="bg-[#2e2e2e] p-3 md:p-4 border-t border-white/5 space-y-1 md:space-y-2 relative z-10 shadow-[0_-5px_15px_rgba(0,0,0,0.3)] shrink-0">
+                {/* SPLIT BILL UI - Very Compact */}
                 {activeOrder?.covers && activeOrder.covers > 1 && (
-                  <div className="flex justify-between items-center text-xs text-blue-300 bg-blue-500/10 p-2 rounded mb-2 border border-blue-500/20">
-                    <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Dividir ({activeOrder.covers})</span>
+                  <div className="flex justify-between items-center text-[10px] text-blue-300 bg-blue-500/10 py-1 px-2 rounded mb-1 border border-blue-500/20">
+                    <span className="flex items-center gap-1"><Users className="w-2.5 h-2.5" /> Dividir ({activeOrder.covers})</span>
                     <span className="font-bold">{formatPrice(total / activeOrder.covers)} / pers</span>
                   </div>
                 )}
 
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Neto</span>
+                <div className="hidden md:flex justify-between text-xs text-gray-500">
+                  <span>Subtotal Neto</span>
                   <span>{formatPrice(net)}</span>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500 border-b border-white/5 pb-2">
-                  <span>IVA (19%)</span>
-                  <span>{formatPrice(iva)}</span>
-                </div>
-                <div className="flex justify-between text-sm font-semibold text-gray-300 pt-1">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
-                </div>
 
-                {/* TIPS SECTION */}
-                {/* TIPS SECTION - REMOVED LEGACY BUTTONS */}
-                {/* Tip is now handled in PaymentModal per payment */}
-                <div className="flex justify-between text-sm text-toast-green items-center mt-2 pt-2 border-t border-white/5 border-dashed">
-                  <span>Propinas Recaudadas</span>
-                  {/* Show total collected tip from payments */}
+                <div className="flex justify-between text-xs text-toast-green items-center">
+                  <span>Propinas</span>
                   <span>{formatPrice(activeOrder?.payments?.reduce((acc, p) => acc + p.tip, 0) || 0)}</span>
                 </div>
 
-                <div className="flex justify-between text-xl font-bold text-white mt-1 pt-2 border-t border-white/10">
+                <div className="flex justify-between text-lg md:text-xl font-bold text-white mt-0.5 pt-1 border-t border-white/10">
                   <span>Total</span>
                   <span>{formatPrice(total)}</span>
                 </div>
               </div>
 
-              {/* ACTION BAR */}
-              <div className="p-3 bg-toast-charcoal-dark grid grid-cols-3 gap-3 border-t border-white/10 shrink-0">
+              {/* ACTION BAR - Compacted and Padded for Mobile Nav */}
+              <div className="p-2 md:p-3 bg-toast-charcoal-dark grid grid-cols-3 gap-2 md:gap-3 border-t border-white/10 shrink-0 mb-[65px] md:mb-0">
                 <ActionButton color="gray" icon={Check} label="GUARDAR" onClick={() => handleSaveOrder(true)} />
                 <ActionButton color="gray" icon={ChefHat} label="MARCHAR" onClick={handleMarchar} />
                 <ActionButton color="orange" icon={DollarSign} label="PAGAR" onClick={handlePay} />
