@@ -308,8 +308,8 @@ export default function OrdersPage() {
 
     return (
         <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
-            {/* SIDEBAR */}
-            <aside className="w-[90px] bg-toast-charcoal-dark flex flex-col items-center py-6 border-r border-white/5 z-20 shadow-xl">
+            {/* SIDEBAR (Desktop Only) */}
+            <aside className="hidden md:flex w-[90px] bg-toast-charcoal-dark flex-col items-center py-6 border-r border-white/5 z-20 shadow-xl">
                 <div className="mb-10 scale-110">
                     <div className="w-12 h-12 bg-gradient-to-br from-toast-orange to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
                         <ClipboardList className="text-white w-7 h-7" />
@@ -414,14 +414,14 @@ export default function OrdersPage() {
                     </div>
                 )}
 
-                <div className="flex-1 p-4 overflow-y-auto">
+                <div className="flex-1 p-4 overflow-y-auto pb-[80px]">
                     {!orders || orders.length === 0 ? (
                         <div className="h-full flex items-center justify-center flex-col gap-4 text-gray-500">
                             <Clock className="w-12 h-12 opacity-20" />
                             <p className="text-base font-medium">Sin comandas pendientes</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                             {orders
                                 .filter(order => !(order.readySections || []).includes(viewMode))
                                 .map(order => (
@@ -429,6 +429,31 @@ export default function OrdersPage() {
                                 ))}
                         </div>
                     )}
+                </div>
+
+                {/* MOBILE TACTICAL NAVIGATION (Bottom Bar) */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 bg-toast-charcoal-dark border-t border-white/10 grid grid-cols-3 h-[65px] z-50">
+                    <button
+                        onClick={() => window.location.href = '/tables'}
+                        className="flex flex-col items-center justify-center gap-0.5 text-gray-400 hover:text-white"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase">Volver</span>
+                    </button>
+                    <button
+                        onClick={handleOpenSettings}
+                        className={`flex flex-col items-center justify-center gap-0.5 ${isSettingsOpen ? 'text-toast-orange' : 'text-gray-400'}`}
+                    >
+                        <Settings className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase">Config</span>
+                    </button>
+                    <button
+                        onClick={() => window.location.href = '/orders/recipes'}
+                        className="flex flex-col items-center justify-center gap-0.5 text-gray-400 hover:text-white"
+                    >
+                        <Book className="w-5 h-5" />
+                        <span className="text-[10px] font-bold uppercase">Recetas</span>
+                    </button>
                 </div>
             </main>
         </div>
