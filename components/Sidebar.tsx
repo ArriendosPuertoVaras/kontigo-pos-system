@@ -100,11 +100,11 @@ export default function Sidebar() {
                 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
             `}>
                 {/* LOGO */}
-                <div className="mb-6 scale-90">
+                <Link href="/" className="mb-6 scale-90 transition-transform hover:scale-100 active:scale-95">
                     <div className="w-10 h-10 bg-gradient-to-br from-toast-orange to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
                         <UtensilsCrossed className="text-white w-6 h-6" />
                     </div>
-                </div>
+                </Link>
 
                 <nav className="flex flex-col gap-1 w-full px-2 flex-1 overflow-y-auto no-scrollbar">
                     <NavItem href="/tables" icon={<LayoutGrid />} label="Mesas" isActive={pathname === '/tables'} />
