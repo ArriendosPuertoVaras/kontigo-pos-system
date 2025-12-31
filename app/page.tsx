@@ -1,7 +1,7 @@
 'use client';
 // --- COMPONENTS ---
 import { useEffect, useState, useRef, Suspense } from 'react';
-import { LayoutGrid, UtensilsCrossed, ClipboardList, Settings, LogOut, Bell, Wifi, X, Check, Package, Truck, ShoppingCart, Trash2, Users, Plus, MessageSquare } from 'lucide-react';
+import { LayoutGrid, UtensilsCrossed, ClipboardList, Settings, LogOut, Bell, Wifi, X, Check, Package, Truck, ShoppingCart, Trash2, Users, Plus, MessageSquare, ArrowLeft, Send, DollarSign, ChefHat } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -37,7 +37,7 @@ function POSContent() {
 
   const [activeCategoryId, setActiveCategoryId] = useState(0); // 0 = Loading / None Selected
   const [ticket, setTicket] = useState<TicketItem[]>([]);
-  const [showMobileTicket, setShowMobileTicket] = useState(false);
+  const [viewMode, setViewMode] = useState<'menu' | 'ticket'>('menu'); // 'menu' = default for iPad/Phone
 
   // Table State
   const activeTable = useLiveQuery<RestaurantTable | undefined>(
@@ -707,11 +707,9 @@ function POSContent() {
           <div className="flex-1 p-3 flex flex-col md:grid md:grid-cols-12 gap-3 h-full overflow-hidden bg-[#2a2a2a] relative">
 
             {/* LEFT: TICKET VIEW (Order Summary) */}
-            {/* Mobile: Hidden by default, shown via state/overlay. Desktop: Always visible col-span-4 */}
             <div className={`
-              bg-toast-charcoal flex flex-col h-full rounded-lg shadow-2xl border border-white/5 overflow-hidden
-              absolute md:static inset-0 z-40 md:z-auto transition-transform duration-300
-              ${showMobileTicket ? 'translate-y-0' : 'translate-y-[110%] md:translate-y-0'}
+              bg-toast-charcoal flex flex-col h-full md:rounded-lg shadow-2xl md:border border-white/5 overflow-hidden
+              ${viewMode === 'ticket' ? 'flex' : 'hidden md:flex'}
               md:col-span-4
           `}>
               {/* Ticket Header */}
@@ -763,9 +761,10 @@ function POSContent() {
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  {/* Mobile Close Button */}
-                  <button onClick={() => setShowMobileTicket(false)} className="md:hidden p-2 text-white/50 hover:text-white bg-white/10 rounded-lg">
-                    <X className="w-5 h-5" />
+                  {/* Mobile Back to Menu */}
+                  <button onClick={() => setViewMode('menu')} className="md:hidden p-2 text-toast-orange hover:bg-toast-orange/10 rounded-lg flex items-center gap-1 font-bold">
+                    <ArrowLeft className="w-5 h-5" />
+                    <span className="text-xs">VOLVER</span>
                   </button>
 
                   <button onClick={handleCloseTable} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-2 rounded transition-colors" title="Cerrar Mesa / Cancelar">
@@ -878,15 +877,15 @@ function POSContent() {
               </div>
 
               {/* ACTION BAR */}
-              <div className="p-3 bg-toast-charcoal-dark grid grid-cols-3 gap-3 border-t border-white/10">
-                <ActionButton color="red" label="GUARDAR" onClick={() => handleSaveOrder(true)} />
-                <ActionButton color="gray" label="ENVIAR" onClick={handleMarchar} />
-                <ActionButton color="orange" label="PAGAR" onClick={handlePay} />
+              <div className="p-3 bg-toast-charcoal-dark grid grid-cols-3 gap-3 border-t border-white/10 shrink-0">
+                <ActionButton color="gray" icon={Check} label="GUARDAR" onClick={() => handleSaveOrder(true)} />
+                <ActionButton color="gray" icon={ChefHat} label="MARCHAR" onClick={handleMarchar} />
+                <ActionButton color="orange" icon={DollarSign} label="PAGAR" onClick={handlePay} />
               </div>
             </div>
 
             {/* RIGHT: MENU GRID */}
-            <div className="w-full md:col-span-8 flex flex-col gap-3 h-full overflow-hidden">
+            <div className={`w-full md:col-span-8 flex flex-col gap-3 h-full overflow-hidden ${viewMode === 'menu' ? 'flex' : 'hidden md:flex'}`}>
               {/* Breadcrumbs / Categories */}
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {categories?.slice().sort((a, b) => (a.order ?? 999) - (b.order ?? 999)).map((cat) => (
@@ -973,15 +972,45 @@ function POSContent() {
             </div>
           )}
 
-          {/* MOBILE FLOATING ACTION BUTTON (View Ticket) */}
-          {!showMobileTicket && ticket.length > 0 && (
+          {/* MOBILE NAVIGATION TABS (Tabbed View for Garzones) */}
+          <div className="md:hidden fixed bottom-0 left-0 right-0 bg-toast-charcoal-dark border-t border-white/10 grid grid-cols-2 h-[65px] z-50">
             <button
-              onClick={() => setShowMobileTicket(true)}
-              className="md:hidden fixed bottom-4 left-4 right-4 bg-toast-orange text-white py-4 rounded-xl shadow-2xl z-50 flex items-center justify-between px-6 font-bold animate-in slide-in-from-bottom-5"
+              onClick={() => setViewMode('menu')}
+              className={`flex flex-col items-center justify-center gap-0.5 ${viewMode === 'menu' ? 'text-toast-orange border-t-2 border-toast-orange bg-white/5' : 'text-gray-500'}`}
             >
-              <span className="bg-white/20 px-2 py-0.5 rounded text-sm">{ticket.reduce((a, b) => a + b.quantity, 0)} items</span>
-              <span>Ver Pedido</span>
-              <span>{formatPrice(total)}</span>
+              <LayoutGrid className="w-5 h-5" />
+              <span className="text-[10px] font-bold uppercase">Carta</span>
+            </button>
+            <button
+              onClick={() => setViewMode('ticket')}
+              className={`flex flex-col items-center justify-center gap-0.5 relative ${viewMode === 'ticket' ? 'text-toast-orange border-t-2 border-toast-orange bg-white/5' : 'text-gray-500'}`}
+            >
+              <ClipboardList className="w-5 h-5" />
+              <span className="text-[10px] font-bold uppercase">Comanda</span>
+              {ticket.length > 0 && (
+                <span className="absolute top-2 right-[30%] bg-toast-orange text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-toast-charcoal-dark">
+                  {ticket.reduce((a, b) => a + b.quantity, 0)}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* MOBILE FLOATING SAVE/SEND BUTTON (Visibility helper when in Menu mode) */}
+          {viewMode === 'menu' && ticket.length > 0 && (
+            <button
+              onClick={() => setViewMode('ticket')}
+              className="md:hidden fixed bottom-[80px] left-4 right-4 bg-toast-green text-white py-4 rounded-xl shadow-2xl z-50 flex items-center justify-between px-6 font-bold animate-in slide-in-from-bottom-5 border-2 border-white/20"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center text-xs">
+                  {ticket.reduce((a, b) => a + b.quantity, 0)}
+                </div>
+                <span>Items en Comanda</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{formatPrice(total)}</span>
+                <Check className="w-5 h-5 animate-pulse" />
+              </div>
             </button>
           )}
         </>
@@ -1072,7 +1101,7 @@ function CategoryTab({ label, active, onClick }: { label: string, active?: boole
   )
 }
 
-function ActionButton({ color, label, onClick }: { color: 'red' | 'orange' | 'gray', label: string, onClick?: () => void }) {
+function ActionButton({ color, label, onClick, icon: Icon }: { color: 'red' | 'orange' | 'gray', label: string, onClick?: () => void, icon?: any }) {
   const styles = {
     red: 'bg-toast-charcoal-dark text-toast-red border-toast-red hover:bg-toast-red/10',
     orange: 'bg-toast-orange text-white border-toast-orange hover:brightness-110 shadow-lg shadow-orange-500/20',
@@ -1082,9 +1111,10 @@ function ActionButton({ color, label, onClick }: { color: 'red' | 'orange' | 'gr
   return (
     <button
       onClick={onClick}
-      className={`${styles[color]} border-2 py-4 rounded-lg font-bold text-lg tracking-wide uppercase transition-all active:scale-95 flex items-center justify-center`}
+      className={`${styles[color]} border-2 py-3 md:py-4 rounded-lg font-bold text-sm md:text-lg tracking-wide uppercase transition-all active:scale-95 flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2`}
     >
-      {label}
+      {Icon && <Icon className="w-4 h-4 md:w-5 md:h-5" />}
+      <span className="text-[10px] md:text-xs lg:text-sm">{label}</span>
     </button>
   )
 }
