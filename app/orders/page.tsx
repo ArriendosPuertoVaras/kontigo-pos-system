@@ -276,6 +276,10 @@ export default function OrdersPage() {
         } else {
             db.orders.update(id, { status });
         }
+
+        // AUTO SYNC
+        const { syncService } = await import('@/lib/sync_service');
+        await syncService.autoSync(db.orders, 'orders');
     };
 
     if (hasAccess === false) {

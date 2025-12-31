@@ -1,18 +1,20 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Supplier } from '@/lib/db';
-import { UtensilsCrossed, LayoutGrid, ClipboardList, Package, Bell, Settings, LogOut, Search, Plus, Truck, Mail, Phone, Clock, ArrowLeft, Lock } from 'lucide-react';
+import { UtensilsCrossed, Settings, Truck, Mail, Phone, Clock, ArrowLeft, Lock, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { usePermission } from '@/hooks/usePermission';
 import Sidebar from '@/components/Sidebar';
 
 export default function SuppliersPage() {
     const hasAccess = usePermission('admin:view');
-
-    const [isFormatModalOpen, setIsFormatModalOpen] = useState(false); // Helper for demo
+    const router = useRouter();
     const suppliers = useLiveQuery(() => db.suppliers.toArray());
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState<Partial<Supplier>>({});
 
     if (hasAccess === false) {
         return (
@@ -35,15 +37,26 @@ export default function SuppliersPage() {
             </div>
         );
     }
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState<Partial<Supplier>>({});
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (formData.name && formData.category) {
-            await db.suppliers.add(formData as Supplier);
+            const id = await db.suppliers.add({
+                name: formData.name,
+                category: formData.category,
+                email: "",
+                phone: "",
+                contactName: "",
+                leadTimeDays: 1
+            } as Supplier);
+
+            // Trigger sync
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.autoSync(db.suppliers, 'suppliers');
+
             setIsModalOpen(false);
             setFormData({});
+            router.push(`/suppliers/${id}`);
         }
     };
 
@@ -66,9 +79,6 @@ export default function SuppliersPage() {
 
             {/* MAIN CONTENT */}
             <main className="flex-1 flex flex-col h-full bg-[#2a2a2a] overflow-hidden">
-
-                {/* HEADER */}
-                {/* HEADER */}
                 <Header title="Gestión de Proveedores">
                     <button
                         onClick={() => setIsModalOpen(true)}
@@ -88,6 +98,15 @@ export default function SuppliersPage() {
                                     <Truck />
                                 </div>
 
+                                {/* Edit Actions */}
+                                <div className="absolute z-20 top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Link href={`/suppliers/${supplier.id}`}>
+                                        <button className="bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white backdrop-blur-sm">
+                                            <Settings className="w-4 h-4" />
+                                        </button>
+                                    </Link>
+                                </div>
+
                                 <div className="relative z-10">
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
@@ -101,22 +120,22 @@ export default function SuppliersPage() {
                                     <div className="space-y-3 text-gray-400 text-sm">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                                                <span className="font-bold text-white/70">{supplier.contactName.slice(0, 2).toUpperCase()}</span>
+                                                <span className="font-bold text-white/70">{(supplier.contactName || '?').slice(0, 2).toUpperCase()}</span>
                                             </div>
                                             <div>
-                                                <p className="text-white font-medium">{supplier.contactName}</p>
+                                                <p className="text-white font-medium">{supplier.contactName || 'Sin Contacto'}</p>
                                                 <p className="text-xs">Contacto Principal</p>
                                             </div>
                                         </div>
                                         <div className="h-px bg-white/5 my-2"></div>
                                         <div className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer">
-                                            <Mail className="w-4 h-4" /> {supplier.email}
+                                            <Mail className="w-4 h-4" /> {supplier.email || '-'}
                                         </div>
                                         <div className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer">
-                                            <Phone className="w-4 h-4" /> {supplier.phone}
+                                            <Phone className="w-4 h-4" /> {supplier.phone || '-'}
                                         </div>
                                         <div className="flex items-center gap-2 text-yellow-500/80">
-                                            <Clock className="w-4 h-4" /> Entrega: {supplier.leadTimeDays} {supplier.leadTimeDays === 1 ? 'día' : 'días'}
+                                            <Clock className="w-4 h-4" /> Entrega: {supplier.leadTimeDays || 1} {supplier.leadTimeDays === 1 ? 'día' : 'días'}
                                         </div>
                                     </div>
                                 </div>
@@ -137,7 +156,7 @@ export default function SuppliersPage() {
             {/* MODAL */}
             {isModalOpen && (
                 <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <form onSubmit={handleSubmit} className="bg-toast-charcoal-dark w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl p-8 animate-in zoom-in-95">
+                    <form onSubmit={handleSubmit} className="bg-toast-charcoal-dark w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-8 animate-in zoom-in-95">
                         <h2 className="text-2xl font-bold text-white mb-6">Nuevo Proveedor</h2>
 
                         <div className="space-y-4">
@@ -146,50 +165,16 @@ export default function SuppliersPage() {
                                 <input required type="text" placeholder="Ej: Distribuidora Central"
                                     className="w-full bg-toast-charcoal border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-toast-orange focus:ring-1 focus:ring-toast-orange transition-all"
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    autoFocus
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoría</label>
-                                    <input required type="text" placeholder="Ej: Carnes"
-                                        className="w-full bg-toast-charcoal border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-toast-orange transition-all"
-                                        onChange={e => setFormData({ ...formData, category: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Días Entrega</label>
-                                    <input required type="number" placeholder="1"
-                                        className="w-full bg-toast-charcoal border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-toast-orange transition-all"
-                                        onChange={e => setFormData({ ...formData, leadTimeDays: parseInt(e.target.value) })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="pt-4 border-t border-white/5 space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre Contacto</label>
-                                    <input required type="text" placeholder="Ej: Juan Pérez"
-                                        className="w-full bg-toast-charcoal border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-toast-orange transition-all"
-                                        onChange={e => setFormData({ ...formData, contactName: e.target.value })}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
-                                        <input required type="email" placeholder="@empresa.cl"
-                                            className="w-full bg-toast-charcoal border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-toast-orange transition-all"
-                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono</label>
-                                        <input required type="tel" placeholder="+569..."
-                                            className="w-full bg-toast-charcoal border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-toast-orange transition-all"
-                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoría</label>
+                                <input required type="text" placeholder="Ej: Carnes"
+                                    className="w-full bg-toast-charcoal border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-toast-orange transition-all"
+                                    onChange={e => setFormData({ ...formData, category: e.target.value })}
+                                />
                             </div>
                         </div>
 
@@ -198,7 +183,7 @@ export default function SuppliersPage() {
                                 Cancelar
                             </button>
                             <button type="submit" className="flex-1 bg-toast-orange hover:brightness-110 text-white font-bold py-3 rounded-lg shadow-lg">
-                                Guardar
+                                Crear & Editar
                             </button>
                         </div>
                     </form>

@@ -34,6 +34,10 @@ export default function PreparationsPage() {
             category: 'Preparaciones'
         });
 
+        // AUTO-SYNC
+        const { syncService } = await import('@/lib/sync_service');
+        await syncService.autoSync(db.ingredients, 'ingredients');
+
         router.push(`/inventory/preparations/${id}`);
     };
 

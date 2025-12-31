@@ -7,26 +7,8 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
-import { ArrowLeft, Save, Trash2, Plus, Calculator, DollarSign, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Plus, Calculator, RefreshCw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-
-// New Helper to calculate cost recursively
-// NOTE: In production, move to a shared lib/costing.ts
-const calculateRecipeCost = async (recipeItems: RecipeItem[]) => {
-    let total = 0;
-    if (!recipeItems) return 0;
-
-    for (const item of recipeItems) {
-        const ing = await db.ingredients.get(item.ingredientId);
-        if (ing && ing.cost) {
-            // Basic unit conversion logic (Simplified)
-            // Ideally we need a robust converter.
-            // Assuming cost is per 'unit' and quantity matches.
-            total += (ing.cost * item.quantity);
-        }
-    }
-    return total;
-};
 
 export default function PreparationEditor({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -39,9 +21,14 @@ export default function PreparationEditor({ params }: { params: Promise<{ id: st
     const [form, setForm] = useState<Partial<Ingredient>>({});
     const [items, setItems] = useState<RecipeItem[]>([]);
 
+    // Auto-Save State
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
     // Derived Cost State
     const [calculatedCost, setCalculatedCost] = useState(0);
 
+    // Initial Load
     useEffect(() => {
         if (preparation) {
             setForm(preparation);
@@ -49,7 +36,7 @@ export default function PreparationEditor({ params }: { params: Promise<{ id: st
         }
     }, [preparation]);
 
-    // Live Cost Calculation Effect
+    // Live Cost Calculation
     useEffect(() => {
         const calc = async () => {
             let total = 0;
@@ -75,27 +62,47 @@ export default function PreparationEditor({ params }: { params: Promise<{ id: st
         calc();
     }, [items, allIngredients]);
 
+    // --- AUTO-SAVE ---
+    useEffect(() => {
+        if (!preparationId || !form.name) return;
 
-    const handleSave = async () => {
-        if (!form.name) return;
+        // Skip initial load
+        if (Object.keys(form).length === 0) return;
 
-        // Auto-update cost based on recipe if it's a preparation
-        await db.ingredients.update(preparationId, {
-            ...form,
-            recipe: items,
-            cost: calculatedCost, // SAVE THE CALCULATED COST!
-            isPreparation: true
-        });
+        const timer = setTimeout(async () => {
+            setIsSaving(true);
+            try {
+                await db.ingredients.update(preparationId, {
+                    ...form,
+                    recipe: items,
+                    cost: calculatedCost,
+                    isPreparation: true
+                });
 
-        // Trigger Finance Sync (Inventory Valuation)
-        KontigoFinance.recalculateInventoryValuation().catch(console.error);
+                // Trigger Finance Sync (Inventory Valuation)
+                KontigoFinance.recalculateInventoryValuation().catch(console.error);
 
-        // AUTO-SYNC
-        syncService.autoSync(db.products, 'products').catch(console.error);
-        syncService.autoSync(db.ingredients, 'ingredients').catch(console.error);
+                // AUTO-SYNC
+                await syncService.autoSync(db.ingredients, 'ingredients');
 
-        toast.success("Preparación Guardada y Costo Actualizado");
-        router.back();
+                setLastSaved(new Date());
+            } catch (error) {
+                console.error("Auto-save failed", error);
+            } finally {
+                setIsSaving(false);
+            }
+        }, 1000); // 1s debounce for recipe edits
+
+        return () => clearTimeout(timer);
+    }, [form, items, calculatedCost, preparationId]);
+
+    const handleDelete = async () => {
+        if (confirm("¿Eliminar esta preparación?")) {
+            await db.ingredients.delete(preparationId);
+            // AUTO-SYNC
+            await syncService.pushAll();
+            router.push('/inventory/preparations');
+        }
     };
 
     const addItem = () => {
@@ -116,13 +123,45 @@ export default function PreparationEditor({ params }: { params: Promise<{ id: st
 
     const availableIngredients = allIngredients?.filter(i => i.id !== preparationId) || [];
 
-    if (!preparation) return <div className="text-white p-10">Cargando Receta...</div>;
+    if (!preparation) return <div className="text-white p-10 flex items-center justify-center">Cargando...</div>;
 
     return (
         <div className="flex h-screen w-full bg-[#1a1a1a] text-white font-sans relative">
             <Sidebar />
             <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <Header title={`Editando: ${preparation.name}`} backHref="/inventory/preparations" />
+                {/* Custom Header with Status */}
+                <header className="px-8 py-6 flex items-center justify-between border-b border-white/5 bg-[#1e1e1e]">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400">
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <h1 className="text-xl font-bold">{form.name || 'Nueva Preparación'}</h1>
+                            <p className="text-xs text-toast-orange font-mono">ID: {preparationId}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        {isSaving ? (
+                            <span className="text-xs text-toast-orange font-bold animate-pulse flex items-center gap-1">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Guardando...
+                            </span>
+                        ) : lastSaved ? (
+                            <span className="text-xs text-green-500 font-bold flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" />
+                                Sincronizado
+                            </span>
+                        ) : null}
+
+                        <button
+                            onClick={handleDelete}
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all border border-red-500/20">
+                            <Trash2 className="w-4 h-4" />
+                            Eliminar
+                        </button>
+                    </div>
+                </header>
 
                 <div className="flex-1 overflow-y-auto p-4 lg:p-8">
                     <div className="max-w-4xl mx-auto space-y-6">
@@ -271,14 +310,8 @@ export default function PreparationEditor({ params }: { params: Promise<{ id: st
 
                         </div>
 
-                        {/* ACTIONS */}
-                        <div className="flex gap-4 pt-4">
-                            <button onClick={() => router.back()} className="flex-1 py-4 bg-white/5 hover:bg-white/10 rounded-xl font-bold text-gray-300">
-                                Cancelar
-                            </button>
-                            <button onClick={handleSave} className="flex-1 py-4 bg-green-600 hover:bg-green-500 rounded-xl font-bold text-white shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
-                                <Save className="w-5 h-5" /> Guardar Preparación
-                            </button>
+                        <div className="text-center text-xs text-gray-500 pt-6">
+                            Todos los cambios se guardan automáticamente.
                         </div>
 
                     </div>

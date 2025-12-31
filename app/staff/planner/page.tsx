@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { db, Staff, Shift } from '@/lib/db';
+import { syncService } from '@/lib/sync_service';
 import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, Plus, Save, X, Check, Trash2, AlertTriangle, BrainCircuit, ChevronDown } from 'lucide-react';
 import { startOfWeek, addDays, format, isSameDay, differenceInMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -86,6 +87,7 @@ export default function PlannerPage() {
 
     const handleDeleteShift = async (id: number) => {
         await db.shifts.delete(id);
+        await syncService.pushAll(); // Sync deletion
     }
 
     const handleSaveShift = async () => {
@@ -124,6 +126,9 @@ export default function PlannerPage() {
             type: shiftType,
         });
 
+        // AUTO SYNC
+        await syncService.autoSync(db.shifts, 'shifts');
+
         // Don't close immediately if adding multiple? User wants to see it. 
         // For now, let's keep modal open or close? Usually close is better UX.
         // User asked for "add block", implies staying in modal? 
@@ -157,6 +162,7 @@ export default function PlannerPage() {
             scheduledEnd: shift.scheduledEnd,
             startTime: shift.scheduledStart // Required by TS
         });
+        await syncService.autoSync(db.shifts, 'shifts');
 
         // Remove from suggestions
         setSuggestedShifts(prev => prev.filter(s => s !== shift)); // Simple ref check might fail
@@ -311,6 +317,7 @@ export default function PlannerPage() {
                                                         scheduledEnd: end,
                                                         startTime: start
                                                     });
+                                                    await syncService.autoSync(db.shifts, 'shifts');
                                                 }}
                                                 className={`border-l border-white/5 p-1 min-h-[60px] relative cursor-pointer hover:bg-white/5 flex gap-1 overflow-hidden ${isFuture ? 'bg-purple-900/5' : ''}`}
                                             >

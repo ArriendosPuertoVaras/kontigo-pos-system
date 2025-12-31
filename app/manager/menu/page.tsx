@@ -552,160 +552,30 @@ function CategoriesView() {
 
 function ProductsView() {
     const categories = useLiveQuery(() => db.categories.toArray());
-    const templates = useLiveQuery(() => db.modifierTemplates.toArray());
     const [selectedCat, setSelectedCat] = useState<number | 'all'>('all');
+    const router = useRouter();
 
-    // UI State
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Modal State
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-
-    // Form State
-    const [formData, setFormData] = useState<Partial<Product>>({
-        name: '', price: 0, categoryId: 0, image: '', isAvailable: true, modifiers: []
-    });
-
-    const resetForm = () => {
-        setFormData({ name: '', price: 0, categoryId: categories?.[0]?.id || 0, image: '', isAvailable: true, modifiers: [] });
-        setEditingProduct(null);
-    };
-
-    const generateDemoBurgers = async () => {
-        try {
-            // 1. Ensure Category
-            let catId = categories?.find(c => c.name.toLowerCase().includes("hamb"))?.id;
-            if (!catId) {
-                catId = await db.categories.add({
-                    name: "Hamburguesas",
-                    destination: 'kitchen',
-                    order: (categories?.length || 0) + 1
-                }) as number;
-            }
-
-            // 2. Ensure Modifiers (Upsert logic to ensure new options exist)
-            const puntoOptions = [
-                { id: crypto.randomUUID(), name: "A la Inglesa", price: 0 },
-                { id: crypto.randomUUID(), name: "A Punto", price: 0 },
-                { id: crypto.randomUUID(), name: "3/4", price: 0 },
-                { id: crypto.randomUUID(), name: "Bien Cocida", price: 0 }
-            ];
-
-            let puntoId = templates?.find(t => t.name.includes("Punto"))?.id;
-            if (puntoId) {
-                // Update existing to have new options
-                await db.modifierTemplates.update(puntoId, { options: puntoOptions });
-            } else {
-                puntoId = await db.modifierTemplates.add({
-                    name: "Punto de Carne",
-                    minSelect: 1,
-                    maxSelect: 1,
-                    options: puntoOptions
-                }) as number;
-            }
-
-            const extraOptions = [
-                { id: crypto.randomUUID(), name: "Bacon Extra", price: 1000 },
-                { id: crypto.randomUUID(), name: "Queso Cheddar", price: 1000 },
-                { id: crypto.randomUUID(), name: "Huevo Frito", price: 800 },
-                { id: crypto.randomUUID(), name: "Pepinillos", price: 500 },
-                { id: crypto.randomUUID(), name: "Palta", price: 1200 },
-                { id: crypto.randomUUID(), name: "Tomate", price: 500 },
-                { id: crypto.randomUUID(), name: "Cebolla Caramelizada", price: 800 },
-                { id: crypto.randomUUID(), name: "Jalapeños", price: 600 }
-            ];
-
-            let extraId = templates?.find(t => t.name.includes("Agregados"))?.id;
-            if (extraId) {
-                await db.modifierTemplates.update(extraId, { options: extraOptions });
-            } else {
-                extraId = await db.modifierTemplates.add({
-                    name: "Agregados Premium",
-                    minSelect: 0,
-                    maxSelect: 8,
-                    options: extraOptions
-                }) as number;
-            }
-
-            // Fetch full templates to attach
-            const puntoTpl = await db.modifierTemplates.get(puntoId!);
-            const extraTpl = await db.modifierTemplates.get(extraId!);
-
-            // Use fresh IDs for the link to avoid conflicts if previously linked to other products
-            const modifiers = [
-                { ...puntoTpl!, id: crypto.randomUUID() },
-                { ...extraTpl!, id: crypto.randomUUID() }
-            ];
-
-            // 3. Create Products
-            const burgers = [
-                { name: "Hamburguesa Clásica", price: 8990 },
-                { name: "Cheese Burger", price: 9990 },
-                { name: "Bacon Delight", price: 11990 },
-                { name: "Royal Burger", price: 12500 }
-            ];
-
-            for (const b of burgers) {
-                // Check if already exists to avoid spamming
-                const exists = await db.products.where('name').equals(b.name).first();
-                if (!exists) {
-                    await db.products.add({
-                        ...b,
-                        categoryId: catId!,
-                        image: "",
-                        isAvailable: true,
-                        modifiers: modifiers
-                    });
-                }
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    };
-
-    const openNew = () => {
-        resetForm();
+    const handleCreate = async () => {
         // Default to first category if none selected or 'all' selected
         const defaultCat = (selectedCat !== 'all' ? selectedCat : categories?.[0]?.id) || 0;
-        setFormData(prev => ({ ...prev, categoryId: defaultCat }));
-        setIsModalOpen(true);
-    };
 
-    const openEdit = (prod: Product) => {
-        setEditingProduct(prod);
-        setFormData({ ...prod });
-        setIsModalOpen(true);
-    };
-
-    const { triggerChange } = useAutoSync(); // Hook for auto-save
-
-    const handleSave = async () => {
-        if (!formData.name || !formData.price || !formData.categoryId) return alert("Nombre, precio y categoría son obligatorios");
-        if (isSubmitting) return;
-
-        setIsSubmitting(true);
         try {
-            const payload = {
-                name: formData.name,
-                price: Number(formData.price),
-                categoryId: Number(formData.categoryId),
-                image: formData.image,
-                isAvailable: formData.isAvailable,
-                modifiers: formData.modifiers // Save attached modifiers
-            };
+            const id = await db.products.add({
+                name: "Nuevo Producto",
+                price: 0,
+                categoryId: defaultCat,
+                image: "",
+                isAvailable: true,
+                modifiers: []
+            } as Product);
 
-            if (editingProduct?.id) {
-                await db.products.update(editingProduct.id, payload);
-            } else {
-                await db.products.add(payload as Product);
-            }
-            triggerChange(); // 🚀 TRIGGER AUTO-SYNC
-            setIsModalOpen(false);
+            // Sync
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.autoSync(db.products, 'products');
+
+            router.push(`/manager/menu/products/${id}`);
         } catch (error) {
-            console.error("Error saving product:", error);
-        } finally {
-            setIsSubmitting(false);
+            console.error("Failed to create product", error);
         }
     };
 
@@ -714,7 +584,8 @@ function ProductsView() {
         e.stopPropagation();
         if (confirm("¿Borrar producto?")) {
             await db.products.delete(id);
-            triggerChange(); // 🚀 TRIGGER AUTO-SYNC
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pushAll();
         }
     };
 
@@ -723,29 +594,6 @@ function ProductsView() {
         if (selectedCat === 'all') return db.products.toArray();
         return db.products.where('categoryId').equals(selectedCat).toArray();
     }, [selectedCat]);
-
-    const toggleModifier = (tpl: ModifierTemplate) => {
-        setFormData(prev => {
-            const current = prev.modifiers || [];
-            const exists = current.find(m => m.name === tpl.name); // Simple match by name/structure
-
-            if (exists) {
-                return { ...prev, modifiers: current.filter(m => m.name !== tpl.name) };
-            } else {
-                // Clone template to product modifier group
-                return {
-                    ...prev,
-                    modifiers: [...current, {
-                        id: crypto.randomUUID(), // New ID for instance
-                        name: tpl.name,
-                        minSelect: tpl.minSelect,
-                        maxSelect: tpl.maxSelect,
-                        options: tpl.options
-                    }]
-                };
-            }
-        });
-    };
 
     return (
         <div className="max-w-4xl mx-auto relative">
@@ -757,7 +605,7 @@ function ProductsView() {
                     </h2>
 
                     <button
-                        onClick={openNew}
+                        onClick={handleCreate}
                         className="bg-toast-orange hover:bg-orange-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg hover:shadow-orange-500/20 transition-all text-sm">
                         <Plus className="w-4 h-4" /> Nuevo Producto
                     </button>
@@ -793,7 +641,11 @@ function ProductsView() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
                 {products?.map(prod => (
-                    <div key={prod.id} className="bg-white/5 rounded-xl border border-white/5 p-4 flex gap-4 hover:border-white/20 transition-all group relative overflow-hidden">
+                    <div
+                        key={prod.id}
+                        onClick={() => router.push(`/manager/menu/products/${prod.id}`)}
+                        className="bg-white/5 rounded-xl border border-white/5 p-4 flex gap-4 hover:border-white/20 transition-all group relative overflow-hidden cursor-pointer"
+                    >
                         {/* Image or Placeholder */}
                         <div className="w-16 h-16 rounded-lg bg-black/40 flex items-center justify-center overflow-hidden shrink-0">
                             {prod.image ? (
@@ -807,8 +659,8 @@ function ProductsView() {
                             <h4 className="font-bold text-white truncate">{prod.name}</h4>
                             <p className="text-toast-orange font-mono">${prod.price.toLocaleString()}</p>
                             <div className="flex gap-2 mt-2">
-                                <button onClick={() => openEdit(prod)} className="text-xs text-gray-400 hover:text-white underline">Editar</button>
-                                <button onClick={(e) => handleDelete(e, prod.id!)} className="text-xs text-red-400 hover:text-red-300 underline">Eliminar</button>
+                                <span className="text-xs text-gray-400 group-hover:text-white underline">Editar</span>
+                                <button onClick={(e) => handleDelete(e, prod.id!)} className="text-xs text-red-500 hover:text-red-300 underline z-10">Eliminar</button>
                             </div>
                         </div>
                     </div>
@@ -819,114 +671,6 @@ function ProductsView() {
                     </div>
                 )}
             </div>
-
-            {/* MODAL */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="bg-[#1e1e1e] rounded-2xl w-full max-w-lg border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="p-6 border-b border-white/5 flex justify-between items-center shrink-0">
-                            <h3 className="text-xl font-bold flex items-center gap-2">
-                                {editingProduct ? <Edit className="w-5 h-5 text-toast-orange" /> : <Plus className="w-5 h-5 text-toast-orange" />}
-                                {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
-                            </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
-                        </div>
-
-                        <div className="p-6 space-y-4 overflow-y-auto">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 mb-1">Nombre</label>
-                                <input
-                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-toast-orange outline-none"
-                                    value={formData.name}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                />
-                            </div>
-
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-gray-400 mb-1">Precio</label>
-                                    <input
-                                        type="number"
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-toast-orange outline-none"
-                                        value={formData.price}
-                                        onChange={e => setFormData({ ...formData, price: Number(e.target.value) })}
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-gray-400 mb-1">Categoría</label>
-                                    <select
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-toast-orange outline-none appearance-none"
-                                        value={formData.categoryId}
-                                        onChange={e => setFormData({ ...formData, categoryId: Number(e.target.value) })}
-                                    >
-                                        {categories?.map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* MODIFIERS SECTION */}
-                            <div className="border-t border-white/5 pt-4">
-                                <label className="block text-xs font-bold text-gray-400 mb-3 flex items-center justify-between">
-                                    <span>Modificadores (Extras)</span>
-                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded">Opcional</span>
-                                </label>
-
-                                {templates?.length === 0 ? (
-                                    <p className="text-xs text-gray-500 italic">No hay grupos creados. Ve a la pestaña "Modificadores" para crear uno.</p>
-                                ) : (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {templates?.map(tpl => {
-                                            const isActive = formData.modifiers?.some(m => m.name === tpl.name);
-                                            return (
-                                                <button
-                                                    key={tpl.id}
-                                                    onClick={() => toggleModifier(tpl)}
-                                                    className={`text-left px-3 py-2 rounded-lg border text-sm transition-all flex justify-between items-center ${isActive
-                                                        ? 'bg-toast-orange/20 border-toast-orange text-white'
-                                                        : 'bg-white/5 border-white/5 text-gray-400 hover:border-white/20'
-                                                        }`}
-                                                >
-                                                    <span className="truncate">{tpl.name}</span>
-                                                    {isActive && <div className="w-2 h-2 rounded-full bg-toast-orange"></div>}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 mb-1">URL Imagen (Opcional)</label>
-                                <input
-                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:border-toast-orange outline-none"
-                                    value={formData.image || ''}
-                                    onChange={e => setFormData({ ...formData, image: e.target.value })}
-                                    placeholder="https://..."
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.isAvailable ?? true}
-                                    onChange={e => setFormData({ ...formData, isAvailable: e.target.checked })}
-                                    className="w-5 h-5 accent-toast-orange"
-                                />
-                                <span className="text-sm font-medium">Disponible (Stock)</span>
-                            </div>
-                        </div>
-
-                        <div className="p-6 pt-0 flex gap-3 shrink-0">
-                            <button onClick={() => setIsModalOpen(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-bold transition-colors">Cancelar</button>
-                            <button onClick={handleSave} disabled={isSubmitting} className="flex-1 bg-toast-orange hover:bg-orange-500 disabled:opacity-50 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-orange-500/20">
-                                {isSubmitting ? 'Guardando...' : 'Guardar'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
@@ -987,12 +731,18 @@ function ModifiersView() {
         } else {
             await db.modifierTemplates.add(formData as ModifierTemplate);
         }
+        // SYNC
+        const { syncService } = await import('@/lib/sync_service');
+        await syncService.autoSync(db.modifierTemplates, 'modifier_templates');
+
         setIsModalOpen(false);
     };
 
     const handleDelete = async (id: number) => {
         if (confirm("¿Borrar este grupo de modificadores?")) {
             await db.modifierTemplates.delete(id);
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pushAll();
         }
     };
 

@@ -366,7 +366,7 @@ export default function InventoryPage() {
                                         <td className="px-4 py-2 whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
-                                                    onClick={() => setEditingIngredient(item)}
+                                                    onClick={() => router.push(`/inventory/${item.id}`)}
                                                     className="text-gray-500 hover:text-white p-1 rounded hover:bg-white/5 transition-all"
                                                     title="Editar"
                                                 >
@@ -398,34 +398,16 @@ export default function InventoryPage() {
                     />
                 )
             }
-
-            {/* EDIT MODAL */}
-            {
-                editingIngredient && (
-                    <EditInventoryItemModal
-                        ingredient={editingIngredient}
-                        onClose={() => setEditingIngredient(null)}
-                        existingSubFamilies={uniqueSubFamilies}
-                    />
-                )
-            }
         </div >
     )
 }
 
 function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () => void, existingSubFamilies: string[] }) {
+    const router = useRouter();
     const [name, setName] = useState("");
     const [family, setFamily] = useState("Abarrotes");
-    const [subFamily, setSubFamily] = useState("");
-    const [storage, setStorage] = useState("Bodega Seca");
-    const [unit, setUnit] = useState("un");
-    const [stock, setStock] = useState(0);
-    const [minStock, setMinStock] = useState(5);
-    const [cost, setCost] = useState(0);
-    const [yieldPercent, setYieldPercent] = useState(100); // UI uses 0-100, DB uses 0.0-1.0
-    const [code, setCode] = useState("");
-    const [isInfinite, setIsInfinite] = useState(false);
 
+    // Minimal initial data for creation
     const generateSKU = (n: string, c: string) => {
         const catCode = (c || 'GEN').substring(0, 3).toUpperCase();
         const nameCode = (n || 'UNK').substring(0, 3).toUpperCase();
@@ -433,42 +415,40 @@ function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () =
         return `${catCode}-${nameCode}-${random}`;
     };
 
-    const handleNameChange = (val: string) => {
-        setName(val);
-        if (!code) setCode(generateSKU(val, family));
-    };
-
-    const handleFamilyChange = (val: string) => {
-        setFamily(val);
-        // Regenerate if code seems auto-generated (contains hyphen)
-        if (code.includes('-')) setCode(generateSKU(name, val));
-    };
-
-    const handleSave = async () => {
+    const handleCreate = async () => {
         if (!name.trim()) return alert("El nombre es obligatorio");
 
-        await db.ingredients.add({
+        const id = await db.ingredients.add({
             name,
             family,
-            subFamily,
-            storage,
-            stock: Number(stock),
-            unit,
-            category: family, // Fallback/Sync
-            cost: Number(cost),
-            purchaseUnit: unit, // Default
-            conversionFactor: 1, // Default
-            code: code || generateSKU(name, family),
-            isInfinite,
-            yieldPercent: yieldPercent / 100,
-            minStock: Number(minStock)
+            category: family,
+            subFamily: "",
+            storage: "Bodega Seca",
+            stock: 0,
+            unit: "un",
+            cost: 0,
+            purchaseUnit: "un",
+            conversionFactor: 1,
+            code: generateSKU(name, family),
+            isInfinite: false,
+            yieldPercent: 1,
+            minStock: 5
         });
+
+        // Sync immediately so it exists in cloud? 
+        // Or let the detail page handle it? 
+        // Safer to let sync service pick it up via autoSync or next push.
+        // But for "cloud first" maybe we trigger a sync?
+        const { syncService } = await import('@/lib/sync_service');
+        await syncService.autoSync(db.ingredients, 'ingredients');
+
         onClose();
+        router.push(`/inventory/${id}`);
     };
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#1e1e1e] rounded-2xl w-full max-w-md border border-white/10 shadow-2xl p-6">
+            <div className="bg-[#1e1e1e] rounded-2xl w-full max-w-sm border border-white/10 shadow-2xl p-6">
                 <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                     <Plus className="text-green-500" /> Nuevo Ingrediente
                 </h3>
@@ -476,120 +456,37 @@ function CreateIngredientModal({ onClose, existingSubFamilies }: { onClose: () =
                 <div className="space-y-4">
                     <div>
                         <label className="block text-xs font-bold text-gray-400 mb-1">Nombre</label>
-                        <input className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none" value={name} onChange={e => handleNameChange(e.target.value)} placeholder="Ej. Tomates, Pan..." autoFocus />
-                    </div>
-
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Familia (Categoría)</label>
-                            <select
-                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none appearance-none"
-                                value={family}
-                                onChange={e => handleFamilyChange(e.target.value)}
-                            >
-                                <option value="Abarrotes">Abarrotes</option>
-                                <option value="Frutas y Verduras">Frutas y Verduras</option>
-                                <option value="Carnes y Cecinas">Carnes y Cecinas</option>
-                                <option value="Lácteos y Huevos">Lácteos y Huevos</option>
-                                <option value="Bebidas y Licores">Bebidas y Licores</option>
-                                <option value="Congelados">Congelados</option>
-                                <option value="Limpieza">Limpieza</option>
-                                <option value="Otros">Otros</option>
-                            </select>
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Sub-Familia</label>
-                            <input
-                                list="create-subfamilies"
-                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none"
-                                value={subFamily}
-                                onChange={e => setSubFamily(e.target.value)}
-                                placeholder="Ej. Harinas"
-                            />
-                            <datalist id="create-subfamilies">
-                                {existingSubFamilies.map(sf => (
-                                    <option key={sf} value={sf} />
-                                ))}
-                            </datalist>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Almacenamiento</label>
-                            <select
-                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none appearance-none"
-                                value={storage}
-                                onChange={e => setStorage(e.target.value)}
-                            >
-                                <option value="Bodega Seca">Bodega Seca</option>
-                                <option value="Refrigerado">Refrigerado (0° a 5°C)</option>
-                                <option value="Congelado">Congelado (-18°C)</option>
-                                <option value="Fresco">Fresco / Ambiente</option>
-                            </select>
-                        </div>
-                        <div className="w-24">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Código</label>
-                            <input
-                                readOnly
-                                className="w-full bg-white/5 border border-white/5 rounded-lg px-3 py-2 text-gray-400 font-mono outline-none cursor-not-allowed text-xs"
-                                value={code}
-                                placeholder="AUTO"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Stock Inicial</label>
-                            <div className="flex">
-                                <input type="number" className="w-full bg-black/30 border border-white/10 rounded-l-lg px-3 py-2 text-white focus:border-green-500 outline-none" value={stock} onChange={e => setStock(Number(e.target.value))} />
-                                <select className="bg-black/30 border border-white/10 border-l-0 rounded-r-lg px-2 py-2 text-white focus:border-green-500 outline-none text-xs" value={unit} onChange={e => setUnit(e.target.value)}>
-                                    <option value="un">un</option>
-                                    <option value="kg">kg</option>
-                                    <option value="l">l</option>
-                                    <option value="gr">gr</option>
-                                    <option value="ml">ml</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Costo Unitario ($)</label>
-                            <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none" value={cost} onChange={e => setCost(Number(e.target.value))} />
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Stock Mínimo</label>
-                            <input type="number" className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none" value={minStock} onChange={e => setMinStock(Number(e.target.value))} />
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">Rendimiento (%)</label>
-                            <div className="relative">
-                                <input
-                                    type="number"
-                                    max={100}
-                                    min={1}
-                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none"
-                                    value={yieldPercent}
-                                    onChange={e => setYieldPercent(Number(e.target.value))}
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">%</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-2">
                         <input
-                            type="checkbox"
-                            checked={isInfinite}
-                            onChange={e => setIsInfinite(e.target.checked)}
-                            className="w-4 h-4 rounded border-gray-600 bg-black/30 text-green-600 focus:ring-offset-0 focus:ring-0 cursor-pointer"
+                            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            placeholder="Ej. Tomates, Pan..."
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                         />
-                        <span className="text-sm text-gray-300">Es Servicio / Stock Infinito (Ej. Agua, Gas)</span>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-400 mb-1">Familia</label>
+                        <select
+                            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white focus:border-green-500 outline-none appearance-none"
+                            value={family}
+                            onChange={e => setFamily(e.target.value)}
+                        >
+                            <option value="Abarrotes">Abarrotes</option>
+                            <option value="Frutas y Verduras">Frutas y Verduras</option>
+                            <option value="Carnes y Cecinas">Carnes y Cecinas</option>
+                            <option value="Lácteos y Huevos">Lácteos y Huevos</option>
+                            <option value="Bebidas y Licores">Bebidas y Licores</option>
+                            <option value="Congelados">Congelados</option>
+                            <option value="Limpieza">Limpieza</option>
+                            <option value="Otros">Otros</option>
+                        </select>
                     </div>
 
                     <div className="flex gap-3 pt-4">
                         <button onClick={onClose} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-bold">Cancelar</button>
-                        <button onClick={handleSave} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold">Guardar</button>
+                        <button onClick={handleCreate} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold">Crear & Editar</button>
                     </div>
                 </div>
             </div>
