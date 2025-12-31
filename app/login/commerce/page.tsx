@@ -66,27 +66,34 @@ export default function CommerceLoginPage() {
             const { syncService } = await import('@/lib/sync_service');
             const { db } = await import('@/lib/db');
 
-            // 4a. Tag local data with restaurant_id if it's currently untagged (Master Device Setup)
+            // 4a. Identification: Is this a Master Device? (Had untagged data BEFORE joining the cloud)
+            let isMaster = false;
             const tables = [db.categories, db.products, db.ingredients, db.staff, db.restaurantTables, db.settings];
+
+            for (const table of tables) {
+                const untaggedCount = await table.filter(item => !item.restaurantId).count();
+                if (untaggedCount > 0) isMaster = true;
+            }
+
+            // 4b. Tag local data with restaurant_id
             for (const table of tables) {
                 const untagged = await table.filter(item => !item.restaurantId).toArray();
                 if (untagged.length > 0) {
                     await Promise.all(untagged.map(item =>
-                        // @ts-ignore - Generic update across different table types
-                        table.update(item.id, { restaurantId })
+                        // @ts-ignore
+                        table.update(item.id!, { restaurantId })
                     ));
                 }
             }
 
-            // 4b. Intelligent Pull: Try to get cloud state
+            // 4c. Intelligent Pull: Try to get cloud state
             await syncService.restoreFromCloud((msg) => {
                 console.log(`[AutoLinkSync] ${msg}`);
             }, true);
 
-            // 4c. Verify Link: If pulled data is 0, this is the Master Device. Push local to Cloud.
-            const catCount = await db.categories.count();
-            if (catCount === 0) {
-                console.log("[AutoLinkSync] Cloud was empty. Establishing local as Source of Truth...");
+            // 4d. Verify Link: If it was a Master Device, FORCE PUSH to ensure Cloud has the data.
+            if (isMaster) {
+                console.log("[AutoLinkSync] Master Device detected. Establishing cloud mirror...");
                 await syncService.pushAll((msg) => console.log(`[AutoLinkSync-Master] ${msg}`));
             }
 

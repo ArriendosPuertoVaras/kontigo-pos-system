@@ -226,6 +226,14 @@ class SyncService {
         ];
 
         if (SAFE_TO_MIRROR.includes(supabaseTableName)) {
+            // --- SAFETY LAYER 3: PREVENT EMPTY WIPE ---
+            // If local is 100% empty, we DO NOT mirror (delete).
+            // This prevents a new device from wiping a populated Cloud.
+            if (localData.length === 0) {
+                console.warn(`[Sync] 🛡️ Mirror-Delete Skipped for ${supabaseTableName}: Local is empty. Cloud is preserved.`);
+                return;
+            }
+
             try {
                 // SPECIAL CASE: job_titles must match by NAME, because local ID (number) != cloud ID (int8)
                 // and we strip IDs on push.
