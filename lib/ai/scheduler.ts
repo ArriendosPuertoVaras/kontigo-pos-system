@@ -68,9 +68,13 @@ export async function generateOptimalSchedule(startDate: Date, daysToGenerate: n
                 const daysWorkedSet = staffWorkDays.get(staff.id!)!;
 
                 // RULES CHECK
-                // 1. Max 6 Days
-                if (!daysWorkedSet.has(dateStr) && daysWorkedSet.size >= 6) continue; // Force Day Off
-                // 2. Max Hours
+                // 1. Double Booking: If already working TODAY, skip (Max 1 role per day)
+                if (daysWorkedSet.has(dateStr)) continue;
+
+                // 2. Max 6 Days
+                if (daysWorkedSet.size >= 6) continue;
+
+                // 3. Max Hours
                 if (usedMinutes >= MAX_WEEKLY_MINUTES) continue;
 
                 // DEFINE PATTERN

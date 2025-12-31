@@ -283,7 +283,8 @@ export default function PlannerPage() {
                                             <span className="text-[9px] uppercase font-bold text-gray-500 bg-black/30 px-1 rounded">
                                                 {staff.role}
                                             </span>
-                                            <span className="text-[9px] font-mono text-gray-400 ml-auto">
+                                            <span className={`text-[10px] font-mono font-bold ml-auto flex items-center gap-1 ${periodHours > 44 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
+                                                {periodHours > 44 && <AlertTriangle className="w-3 h-3" />}
                                                 {Number(periodHours.toFixed(1))}h
                                             </span>
                                         </div>
@@ -292,6 +293,13 @@ export default function PlannerPage() {
                                     {/* Days */}
                                     {days.map((day, i) => {
                                         const cellShifts = getShiftsFor(staff.id!, day);
+                                        // Calculate Daily Compliance
+                                        const dailyMinutes = cellShifts.reduce((acc, s) => {
+                                            if (s.type !== 'work' || !s.scheduledStart || !s.scheduledEnd) return acc;
+                                            return acc + differenceInMinutes(s.scheduledEnd, s.scheduledStart);
+                                        }, 0);
+                                        const isDailyViolation = dailyMinutes > 600; // > 10h
+
                                         return (
                                             <div
                                                 key={i}
@@ -318,8 +326,9 @@ export default function PlannerPage() {
                                                     });
                                                     await syncService.autoSync(db.shifts, 'shifts');
                                                 }}
-                                                className={`border-l border-white/5 p-1 min-h-[60px] relative cursor-pointer hover:bg-white/5 flex gap-1 overflow-hidden ${isFuture ? 'bg-purple-900/5' : ''}`}
+                                                className={`border-l border-white/5 p-1 min-h-[60px] relative cursor-pointer hover:bg-white/5 flex gap-1 overflow-hidden transition-all ${isFuture ? 'bg-purple-900/5' : ''} ${isDailyViolation ? 'bg-red-900/20 border-red-500/50' : ''}`}
                                             >
+                                                {isDailyViolation && <div className="absolute top-0 right-0 p-0.5"><AlertTriangle className="w-3 h-3 text-red-500" /></div>}
                                                 {cellShifts.length > 0 ? (
                                                     cellShifts.map((shift: any, idx) => {
                                                         let colorClass = 'bg-blue-500/20 text-blue-300 border-blue-500';
