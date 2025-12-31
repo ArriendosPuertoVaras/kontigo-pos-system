@@ -526,18 +526,32 @@ class SyncService {
                 await this.pushTable(db.products, 'products');
             }
 
-            // REMOVE "RESCATADOS" if it exists and is empty? 
-            // The user wants it gone.
+            // AGGRESSIVE CLEANUP: "RESCATADOS" MUST DIE
+            // The user hates this category. If it exists, we empty it and kill it.
             const jail = allCategories.find(c => c.name === "⚠️ RESCATADOS");
             if (jail) {
-                // Check if empty
-                const inmates = await db.products.where('categoryId').equals(jail.id!).count();
-                if (inmates === 0) {
-                    await db.categories.delete(jail.id!);
-                    // Push deletion
-                    await this.pushTable(db.categories, 'categories');
-                    console.log("[Sync] 🧹 Deleted empty '⚠️ RESCATADOS' category.");
+                // 1. Check for inmates
+                const inmates = await db.products.where('categoryId').equals(jail.id!).toArray();
+
+                if (inmates.length > 0) {
+                    console.log(`[Sync] 🧹 Creating amnesty for ${inmates.length} items in 'RESCATADOS'...`);
+                    // Move them to a safe haven (First legitimate category)
+                    // We prefer "Kitchen" dest categories if possible, but first valid is fine as fallback.
+                    const safeHaven = allCategories.find(c => c.id !== jail.id!) || allCategories[0];
+
+                    if (safeHaven) {
+                        for (const inmate of inmates) {
+                            await db.products.update(inmate.id!, { categoryId: safeHaven.id });
+                        }
+                        console.log(`[Sync] 🚑 Moved ${inmates.length} items from 'RESCATADOS' to '${safeHaven.name}'`);
+                        await this.pushTable(db.products, 'products');
+                    }
                 }
+
+                // 2. Delete the jail
+                await db.categories.delete(jail.id!);
+                await this.pushTable(db.categories, 'categories');
+                console.log("[Sync] 🧹 Deleted '⚠️ RESCATADOS' category permanently.");
             }
 
         } catch (e) {
