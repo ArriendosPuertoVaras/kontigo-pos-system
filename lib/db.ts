@@ -174,6 +174,7 @@ export interface Order {
     createdAt: Date;
     closedAt?: Date;
     readySections?: string[]; // Tracking independent KDS station readiness
+    deliveredSections?: string[]; // Tracking independent delivery per station
     restaurantId?: string;
 }
 

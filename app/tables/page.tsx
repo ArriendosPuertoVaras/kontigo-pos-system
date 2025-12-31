@@ -209,16 +209,18 @@ export default function TablesPage() {
                                         waitTimeLabel = getOrderWaitTimeFormatted(order.createdAt);
 
                                         // CHECK FOR READY STATUS & DELIVERY
-                                        // CHECK FOR READY STATUS per Section
+                                        // CHECK FOR READY STATUS per Section (Independent delivery)
                                         const readySections = (order as any).readySections || [];
-                                        if (!(order as any).isDelivered) {
-                                            readySections.forEach((s: string) => {
-                                                const section = s.toLowerCase();
-                                                if (section === 'bar') hasBarReady = true;
-                                                else if (section === 'parrilla') hasParrillaReady = true;
-                                                else hasKitchenReady = true; // Default/Kitchen
-                                            });
-                                        }
+                                        const deliveredSections = (order as any).deliveredSections || [];
+
+                                        readySections.forEach((s: string) => {
+                                            const section = s.toLowerCase();
+                                            if (deliveredSections.includes(section)) return; // Skip if already delivered
+
+                                            if (section === 'bar') hasBarReady = true;
+                                            else if (section === 'parrilla') hasParrillaReady = true;
+                                            else hasKitchenReady = true; // Default/Kitchen
+                                        });
                                     }
                                     const status = getWaitStatus(waitTime);
 

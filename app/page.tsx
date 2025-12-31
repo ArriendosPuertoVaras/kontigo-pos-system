@@ -715,9 +715,10 @@ function POSContent() {
                       {activeTable ? activeTable.name : 'Venta Rápida'}
                     </h2>
                     {/* READY STATUS INDICATORS (Independent Dots) */}
-                    {!(activeOrder as any)?.isDelivered && (
-                      <div className="flex gap-1 items-center ml-2">
-                        {((activeOrder as any)?.readySections || []).map((s: string, idx: number) => {
+                    <div className="flex gap-1 items-center ml-2">
+                      {((activeOrder as any)?.readySections || [])
+                        .filter((s: string) => !((activeOrder as any)?.deliveredSections || []).includes(s.toLowerCase()))
+                        .map((s: string, idx: number) => {
                           const section = s.toLowerCase();
                           let color = "bg-yellow-500 shadow-yellow-500/50"; // Kitchen/Default
                           let title = "Cocina Lista";
@@ -734,16 +735,20 @@ function POSContent() {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 if (activeOrder?.id) {
-                                  await db.orders.update(activeOrder.id, { isDelivered: true } as any);
+                                  const currentDelivered = (activeOrder as any).deliveredSections || [];
+                                  if (!currentDelivered.includes(section)) {
+                                    await db.orders.update(activeOrder.id, {
+                                      deliveredSections: [...currentDelivered, section]
+                                    });
+                                  }
                                 }
                               }}
                               className={`w-3.5 h-3.5 rounded-full animate-pulse shadow-lg border border-white/20 ${color}`}
-                              title={`${title}. Clic para confirmar entrega total.`}
+                              title={`${title}. Clic para confirmar entrega de esta área.`}
                             />
                           );
                         })}
-                      </div>
-                    )}
+                    </div>
                   </div>
                   <span className="text-xs text-gray-400">
                     {activeOrder ? `Orden #${activeOrder.id}` : 'Nueva Venta'}
