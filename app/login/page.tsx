@@ -89,25 +89,7 @@ export default function LoginPage() {
                 router.push('/tables');
                 toast.success(`Bienvenido, ${staffMember.name}`);
             } else {
-                // FALLBACK: Admin Access for Owner (Only if truly no match found)
-                const newId = await db.staff.add({
-                    name: 'Admin (Dueño)',
-                    email: credentials.email,
-                    role: 'admin',
-                    activeRole: 'admin',
-                    pin: '0000',
-                    status: 'active',
-                    weeklyHoursLimit: 45,
-                    contractType: 'art-22',
-                    contractDuration: 'indefinite'
-                });
-
-                sessionStorage.setItem('kontigo_staff_id', newId.toString());
-                sessionStorage.setItem('kontigo_staff_name', 'Admin (Dueño)');
-                sessionStorage.setItem('kontigo_staff_role', 'admin');
-
-                router.push('/tables');
-                toast.success("Bienvenido Dueño (Primer Acceso)");
+                throw new Error("No tienes una ficha de personal vinculada a este restaurante. Contacta al administrador para ser agregado.");
             }
 
         } catch (error: any) {

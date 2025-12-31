@@ -34,6 +34,7 @@ export interface Product {
     cookTime?: string; // Cooking time
     totalTime?: string; // Total time to client
     restaurantId?: string; // Multi-Tenant Isolation
+    deletedAt?: Date | null;
 }
 
 export interface Ingredient {
@@ -82,6 +83,7 @@ export interface Category {
     course?: 'starter' | 'main' | 'dessert' | 'beverage';
     order?: number;
     restaurantId?: string; // Multi-Tenant Isolation
+    deletedAt?: Date | null;
 }
 
 
@@ -94,6 +96,7 @@ export interface Supplier {
     leadTimeDays: number;
     category: string;
     restaurantId?: string;
+    deletedAt?: Date | null;
 }
 
 export interface PurchaseOrderItem {
@@ -447,39 +450,16 @@ export class KontigoDatabase extends Dexie {
             shifts: '++id, staffId, startTime, scheduledStart, restaurantId'
         });
 
-        // Populate if empty
-        this.on('populate', () => seedDatabase());
+        // Populate if empty - DISABLED to prevent Ghost Data
+        // this.on('populate', () => seedDatabase());
     }
 }
 
 export const db = new KontigoDatabase();
 
-// --- Seeder Function ---
+// --- Initialization & Migrations ---
 export async function seedDatabase() {
-    try {
-        const staffCount = await db.staff.count();
-
-        // ONLY Seed Emergency Admin if absolutely empty (Critical for Login)
-        if (staffCount === 0) {
-            console.log("🦁 Nexus: Seeding Emergency Admin (No other staff)...");
-            await db.staff.add({
-                name: "Admin",
-                pin: "0000",
-                role: "manager",
-                activeRole: "manager",
-                contractType: "art-22",
-                contractDuration: "indefinite",
-                weeklyHoursLimit: 45,
-                salaryType: "monthly",
-                baseSalary: 0,
-                estimatedTips: 0,
-                status: 'active'
-            });
-        }
-
-    } catch (e) {
-        console.error("Database Check Failed:", e);
-    }
+    // This function is now only for MIGRATIONS, not for SEEDING MOCKS.
 
     // MIGRATION: Ensure all staff have 'status' (Fix for "Loading..." issue)
     try {
@@ -500,25 +480,8 @@ export async function seedDatabase() {
                 role: s.role === 'waiter' ? 'Garzón' : s.role,
                 activeRole: s.activeRole === 'waiter' ? 'Garzón' : s.activeRole
             }));
-            await db.staff.bulkPut(updates as any); // Type cast if needed
+            await db.staff.bulkPut(updates as any);
         }
     } catch (e) { console.error("Role Migration Failed:", e); }
-
-    // Seed Job Titles if empty OR missing critical roles
-    /*
-    try {
-        const titleCount = await db.jobTitles.count();
-        if (titleCount === 0) {
-            console.log("Seeding Critical Job Titles...");
-            await db.jobTitles.bulkAdd([
-                { name: 'Administrador', active: true },
-                { name: 'Admin', active: true },
-                { name: 'Gerente', active: true }
-            ]);
-        }
-    } catch (e) { console.error("Job Title Seed Failed", e); }
-    */
-
-    // CHECK: Removed Secondary Staff Seeding logic.
 }
 

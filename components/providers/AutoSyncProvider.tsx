@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { db } from '@/lib/db';
+import { Loader2, Cloud, ShieldCheck } from 'lucide-react';
 
 type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
 
@@ -21,6 +22,7 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
     const [status, setStatus] = useState<SyncStatus>('saved');
     const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
     const [pendingChanges, setPendingChanges] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(false);
 
     // Ref to hold the timer ID so we can clear it
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -63,18 +65,26 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
         const handshake = async () => {
             if (typeof window === 'undefined') return;
             const { syncService } = await import('@/lib/sync_service');
-            const { db } = await import('@/lib/db');
+            const { db, seedDatabase } = await import('@/lib/db');
 
             const restaurantId = localStorage.getItem('kontigo_restaurant_id');
-            if (!restaurantId) return; // Login screen
+            if (!restaurantId) {
+                setIsInitializing(false);
+                return; // Login screen - no block
+            }
+
+            setIsInitializing(true);
 
             if (navigator.onLine) {
                 console.log("☁️ Cloud-First: Initiating Startup Handshake...");
                 setStatus('saving');
-                const loadingToast = toast.loading("Sincronizando con la Nube...");
 
                 try {
+                    // 0. RUN MIGRATIONS: ensure DB schema is healthy
+                    await seedDatabase();
+
                     // 1. FORCE PULL: Download the truth from Supabase
+                    // Overwrites local state with the cloud truth. Zero local injection.
                     // We use preventReload: true to handle the UI state manually
                     await syncService.restoreFromCloud((msg) => console.log(msg), true);
 
@@ -83,34 +93,35 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
 
                     setStatus('saved');
                     setLastSyncedAt(new Date());
-                    toast.dismiss(loadingToast);
-                    toast.success("✅ Conectado y Sincronizado");
 
                     console.log("☁️ Cloud-First: Handshake Complete. Device is Ready.");
                 } catch (e) {
                     console.error("Cloud-First Handshake Failed:", e);
                     setStatus('error');
-                    toast.dismiss(loadingToast);
-                    toast.error("Error al sincronizar. Trabajando en modo local.");
+                    toast.error("Error de conexión. Iniciando en modo offline.", {
+                        description: "Los cambios locales se guardarán y sincronizarán al recuperar internet."
+                    });
                     // Allow local work as fallback
                     syncService.isReady = true;
+                } finally {
+                    setIsInitializing(false);
                 }
             } else {
                 console.log("📡 Offline: Enabling local mode.");
                 setStatus('offline');
                 syncService.isReady = true;
+                setIsInitializing(false);
             }
         };
 
-        // Wait a bit for DB to be available
-        const timer = setTimeout(handshake, 1000);
-        return () => clearTimeout(timer);
+        // Start handshake IMMEDIATELY (No 1s delay to prevent Race Conditions)
+        handshake();
     }, [performSync]);
 
     // Function called by components when they mutate data
     const triggerChange = useCallback(() => {
-        setPendingChanges(true); // UI can show "Waiting..." or similar if needed
-        setStatus('saving'); // Immediately show activity or "Unsaved" state? Let's say "saving" icon appears or "unsaved dot"
+        setPendingChanges(true);
+        setStatus('saving');
 
         // Clear existing timer
         if (debounceTimerRef.current) {
@@ -148,6 +159,30 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <AutoSyncContext.Provider value={{ status, lastSyncedAt, triggerChange, forceSync }}>
+            {/* Blocking Handshake Overlay */}
+            {isInitializing && (
+                <div className="fixed inset-0 z-[9999] bg-[#1a1a1a] flex flex-col items-center justify-center text-white">
+                    <div className="relative mb-8">
+                        <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full"></div>
+                        <div className="relative bg-[#252525] p-6 rounded-3xl border border-white/10 shadow-2xl">
+                            <div className="relative flex items-center justify-center">
+                                <Cloud className="w-16 h-16 text-toast-orange animate-pulse" />
+                                <Loader2 className="absolute w-24 h-24 text-toast-orange/30 animate-spin" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 className="text-2xl font-bold tracking-tight mb-2">Sincronizando con Kontigo Cloud</h2>
+                    <p className="text-gray-400 text-sm max-w-xs text-center leading-relaxed">
+                        Estamos validando tu información para asegurar que este dispositivo tenga la versión más actualizada de tu restaurante.
+                    </p>
+
+                    <div className="mt-8 flex items-center gap-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest border-t border-white/5 pt-8">
+                        <ShieldCheck className="w-4 h-4 text-green-500" />
+                        Protocolo de Integridad Perfecto Activo
+                    </div>
+                </div>
+            )}
             {children}
         </AutoSyncContext.Provider>
     );

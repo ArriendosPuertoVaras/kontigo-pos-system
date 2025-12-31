@@ -322,11 +322,12 @@ class SyncService {
 
         console.log(`[Sync] Restoring ${supabaseTableName} from Cloud for Restaurant ${restaurantId}...`);
 
-        // FILTER: ONLY DOWNLOAD DATA FOR MY RESTAURANT
+        // FILTER: ONLY DOWNLOAD DATA FOR MY RESTAURANT AND NOT DELETED
         const { data, error } = await supabase
             .from(supabaseTableName)
             .select('*')
-            .eq('restaurant_id', restaurantId);
+            .eq('restaurant_id', restaurantId)
+            .is('deleted_at', null);
 
         if (error) {
             console.error(`[Sync] Error fetching ${supabaseTableName}:`, error);
@@ -376,6 +377,11 @@ class SyncService {
             if (supabaseTableName === 'staff') { // or restaurant_staff
                 if ('startDate' in camelItem && typeof camelItem.startDate === 'string') camelItem.startDate = new Date(camelItem.startDate);
                 if ('birthDate' in camelItem && typeof camelItem.birthDate === 'string') camelItem.birthDate = new Date(camelItem.birthDate);
+            }
+
+            // Logically deleted items transformation
+            if ('deletedAt' in camelItem && typeof camelItem.deletedAt === 'string') {
+                camelItem.deletedAt = new Date(camelItem.deletedAt);
             }
 
             return camelItem;
@@ -449,8 +455,8 @@ class SyncService {
             await this.pullTable(db.purchaseOrders, 'purchase_orders');
             await this.pullTable(db.wasteLogs, 'waste_logs');
             await this.pullTable(db.dtes, 'dtes');
-            await this.pushTable(db.cashCounts, 'cash_counts');
-            await this.pushTable(db.dailyCloses, 'daily_closes');
+            await this.pullTable(db.cashCounts, 'cash_counts');
+            await this.pullTable(db.dailyCloses, 'daily_closes');
 
             // 6. Finance
             onProgress?.("Restaurando Finanzas...");
@@ -548,10 +554,10 @@ class SyncService {
                     }
                 }
 
-                // 2. Delete the jail
-                await db.categories.delete(jail.id!);
+                // 2. Delete the jail LOGICALLY so it syncs to cloud
+                await db.categories.update(jail.id!, { deletedAt: new Date() });
                 await this.pushTable(db.categories, 'categories');
-                console.log("[Sync] 🧹 Deleted '⚠️ RESCATADOS' category permanently.");
+                console.log("[Sync] 🧹 Marked '⚠️ RESCATADOS' for deletion in cloud.");
             }
 
         } catch (e) {
@@ -661,8 +667,8 @@ class SyncService {
                             for (const p of affectedProducts) {
                                 await db.products.update(p.id!, { categoryId: winner.id });
                             }
-                            // Delete duplicate
-                            await db.categories.delete(loser.id!);
+                            // LOGICAL DELETE: mark as deleted instead of wiping from DB
+                            await db.categories.update(loser.id!, { deletedAt: new Date() });
                             mergedCount++;
                         }
                     }
@@ -670,7 +676,7 @@ class SyncService {
             });
 
             if (mergedCount > 0 || changesMade) {
-                console.log(`[Sync] Cleanup/Restore complete. Pushing changes to cloud...`);
+                console.log(`[Sync] 🤝 Consolidated ${mergedCount} duplicate categories.`);
                 // Push changes back to cloud to fix it there too
                 await this.pushTable(db.categories, 'categories');
                 await this.pushTable(db.products, 'products');

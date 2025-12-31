@@ -11,6 +11,41 @@ export default function CommerceLoginPage() {
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [availableRestaurants, setAvailableRestaurants] = useState<any[]>([]);
+
+    const linkDeviceToRestaurant = async (restaurantId: string, restaurantName: string) => {
+        setLoading(true);
+        try {
+            // 3. Save Device Context
+            localStorage.setItem('kontigo_restaurant_id', restaurantId);
+            localStorage.setItem('kontigo_restaurant_name', restaurantName || 'Mi Restaurante');
+
+            // 4. PROFESSIONAL CLEAN START (Nuclear Reset)
+            toast.info("Vinculación exitosa. Limpiando dispositivo...");
+
+            const { db } = await import('@/lib/db');
+            const { syncService } = await import('@/lib/sync_service');
+
+            // Nuclear Reset: Shutdown, Delete and Re-open
+            await db.delete();
+            await db.open();
+
+            toast.info("Sincronizando con la nube...");
+
+            // Mandatory Pull: Download the actual truth from Supabase
+            await syncService.restoreFromCloud((msg) => {
+                console.log(`[AutoLinkSync] ${msg}`);
+            }, true);
+
+            toast.success(`Dispositivo listo: ${restaurantName}`);
+            router.push('/login');
+        } catch (error: any) {
+            console.error("Link Error:", error);
+            toast.error(error.message || "Error al vincular el dispositivo");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,88 +61,97 @@ export default function CommerceLoginPage() {
             if (authError) throw authError;
             if (!authData.user) throw new Error("No user found");
 
-            // 2. Find Linked Restaurant
-            // We check the relational table 'restaurant_staff' to see which restaurant this owner manages
-            const { data: linkData, error: linkError } = await supabase
+            // 2. Find ALL Linked Restaurants
+            // We check the relational table 'restaurant_staff' to see which restaurants this user manages
+            const { data: links, error: linkError } = await supabase
                 .from('restaurant_staff')
-                .select('restaurant_id, restaurants(name, plan_status)')
-                .eq('user_id', authData.user.id)
-                .single();
+                .select('restaurant_id, restaurants(name, code, plan_status)')
+                .eq('user_id', authData.user.id);
 
-            let restaurantId = linkData?.restaurant_id;
-            // @ts-ignore: Supabase join inference is tricky
-            let restaurantName = linkData?.restaurants?.name;
+            if (linkError) throw linkError;
 
-            // FALLBACK FOR MIGRATION/FIRST USE: 
-            // If the user logs in but has no link yet (maybe they are just 'auth.users'), 
-            // we might want option to 'Create' or 'Select' if they have multiple.
-            // For now, assuming 1-to-1 or creating one if missing logic could go here or in a separate step.
+            // Flatten links
+            const restaurants = (links || []).map(l => ({
+                id: l.restaurant_id,
+                // @ts-ignore
+                name: l.restaurants?.name,
+                // @ts-ignore
+                code: l.restaurants?.code
+            }));
 
-            if (!restaurantId) {
-                // Temporary: fetch ANY restaurant if the link table is empty (Legacy support)
-                // In production, force them to create one or have an invite.
-                const { data: fallback } = await supabase.from('restaurants').select('id, name').limit(1).single();
-                if (fallback) {
-                    restaurantId = fallback.id;
-                    restaurantName = fallback.name;
-                } else {
-                    throw new Error("No Restaurante asociado a esta cuenta.");
-                }
+            // ALSO check if they are the owner directly in the restaurants table (Backup logic)
+            const { data: owned } = await supabase
+                .from('restaurants')
+                .select('id, name, code')
+                .eq('owner_email', authData.user.email);
+
+            const allRestaurants = [...restaurants, ...(owned || [])];
+
+            // Unique results by ID
+            const uniqueRestaurants = Array.from(new Map(allRestaurants.map(r => [r.id, r])).values());
+
+            if (uniqueRestaurants.length === 0) {
+                throw new Error("No tienes restaurantes vinculados a esta cuenta.");
             }
 
-            // 3. Save Device Context
-            localStorage.setItem('kontigo_restaurant_id', restaurantId);
-            localStorage.setItem('kontigo_restaurant_name', restaurantName || 'Mi Restaurante');
-
-            // 4. PROFESSIONAL AUTO-SYNC / MASTER SETUP
-            // This ensures the device is 100% operational with the latest data without manual steps.
-            toast.info("Vinculación exitosa. Sincronizando datos...");
-
-            const { syncService } = await import('@/lib/sync_service');
-            const { db } = await import('@/lib/db');
-
-            // 4a. Identification: Is this a Master Device? (Had untagged data BEFORE joining the cloud)
-            let isMaster = false;
-            const tables = [db.categories, db.products, db.ingredients, db.staff, db.restaurantTables, db.settings];
-
-            for (const table of tables) {
-                const untaggedCount = await table.filter(item => !item.restaurantId).count();
-                if (untaggedCount > 0) isMaster = true;
+            if (uniqueRestaurants.length === 1) {
+                await linkDeviceToRestaurant(uniqueRestaurants[0].id, uniqueRestaurants[0].name);
+            } else {
+                setAvailableRestaurants(uniqueRestaurants);
+                setLoading(false);
+                toast.info("Múltiples restaurantes encontrados. Selecciona uno.");
             }
-
-            // 4b. Tag local data with restaurant_id
-            for (const table of tables) {
-                const untagged = await table.filter(item => !item.restaurantId).toArray();
-                if (untagged.length > 0) {
-                    await Promise.all(untagged.map(item =>
-                        // @ts-ignore
-                        table.update(item.id!, { restaurantId })
-                    ));
-                }
-            }
-
-            // 4c. Intelligent Pull: Try to get cloud state
-            await syncService.restoreFromCloud((msg) => {
-                console.log(`[AutoLinkSync] ${msg}`);
-            }, true);
-
-            // 4d. Verify Link: If it was a Master Device, FORCE PUSH to ensure Cloud has the data.
-            if (isMaster) {
-                console.log("[AutoLinkSync] Master Device detected. Establishing cloud mirror...");
-                await syncService.pushAll((msg) => console.log(`[AutoLinkSync-Master] ${msg}`));
-            }
-
-            toast.success(`Dispositivo listo: ${restaurantName}`);
-
-            // 5. Redirect to Staff Login (Operational Layer)
-            router.push('/login');
 
         } catch (error: any) {
             console.error("Login Error:", error);
-            toast.error(error.message || "Error al vincular el dispositivo");
+            toast.error(error.message || "Error al iniciar sesión");
             setLoading(false);
         }
     };
+
+    if (availableRestaurants.length > 0) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--toast-charcoal-dark)] p-4">
+                <div className="bg-[var(--toast-charcoal)] p-8 rounded-2xl shadow-2xl w-full max-w-md border border-[var(--toast-charcoal-light)]">
+                    <div className="flex flex-col items-center mb-6">
+                        <div className="bg-[var(--toast-orange)] p-4 rounded-full mb-4">
+                            <Store className="w-10 h-10 text-white" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-white text-center">
+                            Selecciona tu Negocio
+                        </h1>
+                        <p className="text-[var(--toast-text-gray)] text-center mt-2">
+                            Hemos encontrado varios locales asociados a tu cuenta.
+                        </p>
+                    </div>
+
+                    <div className="space-y-3">
+                        {availableRestaurants.map(res => (
+                            <button
+                                key={res.id}
+                                onClick={() => linkDeviceToRestaurant(res.id, res.name)}
+                                className="w-full bg-[var(--toast-charcoal-light)] hover:bg-[var(--toast-orange)]/20 text-left p-4 rounded-xl border border-white/5 hover:border-[var(--toast-orange)]/50 transition-all group"
+                            >
+                                <div className="font-bold text-white group-hover:text-[var(--toast-orange)]">
+                                    {res.name}
+                                </div>
+                                <div className="text-xs text-gray-500 uppercase tracking-widest mt-1">
+                                    Código: {res.code || 'N/A'}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    <button
+                        onClick={() => setAvailableRestaurants([])}
+                        className="w-full mt-6 text-sm text-gray-500 hover:text-white transition-colors"
+                    >
+                        Volver al login
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[var(--toast-charcoal-dark)] p-4">
@@ -185,3 +229,4 @@ export default function CommerceLoginPage() {
         </div>
     );
 }
+
