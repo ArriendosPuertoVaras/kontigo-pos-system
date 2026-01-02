@@ -725,12 +725,15 @@ class SyncService {
      * Listens for changes in Supabase and updates local Dexie.
      * Use this for critical shared state like 'restaurant_tables' or 'orders'.
      */
+    // --- NEXUS REALTIME ENGINE (Supabase Channels) ---
+    private channels: Map<string, any> = new Map(); // Multiple channels for isolated table sync
+
     async subscribeToTable(tableName: string, dexieTable: Table, onUpdate?: (payload: any) => void) {
         let restaurantId = localStorage.getItem('kontigo_restaurant_id');
 
         // HEALER: Remove unexpected quotes if they exist
         if (restaurantId) {
-            restaurantId = restaurantId.replace(/^["'](.+)["']$/, '$1');
+            restaurantId = restaurantId.replace(/^[\"\'](.+)[\"\']$/, '$1');
         }
 
         // Store for later if ID is missing (e.g. session starting)
@@ -749,29 +752,25 @@ class SyncService {
         this.healNexusHealth(restaurantId).catch(console.error);
 
         const supabaseTableName = tableName === 'restaurantTables' ? 'restaurant_tables' : tableName;
-        const listenerKey = `${supabaseTableName}:ALL`;
+        const channelKey = `nexus:${supabaseTableName}`;
 
-        if (this.activeListeners.has(listenerKey)) {
-            console.log(`📡 [Realtime] Listener for ${supabaseTableName} already active.`);
-            return;
-        }
-
-        if (!this.channel || this.channel.state === 'closed' || this.channel.state === 'errored') {
-            if (this.channel) {
-                console.log("📡 [Realtime] Cleaning up stale channel before reconnecting...");
-                supabase.removeChannel(this.channel);
+        // Cleanup existing channel for this table if it exists
+        if (this.channels.has(channelKey)) {
+            const oldChannel = this.channels.get(channelKey);
+            if (oldChannel.state === 'joined' || oldChannel.state === 'joining') {
+                console.log(`📡 [Realtime] Channel for ${supabaseTableName} already active.`);
+                return;
             }
-
-            console.log(`📡 [Realtime] Creating Nexus Channel for restaurant ${restaurantId}...`);
-            this.channel = supabase.channel('kontigo-realtime-nexus');
-            this.channelStatus = 'connecting';
-            this.activeListeners.clear();
+            supabase.removeChannel(oldChannel);
+            this.channels.delete(channelKey);
         }
 
-        this.activeListeners.add(listenerKey);
-        console.log(`📡 [Realtime] Applying filter for ${supabaseTableName}: restaurant_id=eq.${restaurantId}`);
+        console.log(`📡 [Realtime] Creating Isolated Nexus Channel for ${supabaseTableName}...`);
+        const channel = supabase.channel(channelKey);
+        this.channels.set(channelKey, channel);
+        this.channelStatus = 'connecting';
 
-        this.channel
+        channel
             .on(
                 'postgres_changes',
                 {
@@ -808,23 +807,22 @@ class SyncService {
             );
 
         // Always attempt to subscribe (it's idempotent if already joined)
-        this.channel.subscribe((status: string, err?: any) => {
-            console.log(`📡 [Realtime] Nexus Channel Status: ${status}`, err || '');
+        channel.subscribe((status: string, err?: any) => {
+            console.log(`📡 [Realtime] [${supabaseTableName}] Status: ${status}`, err || '');
+
+            // Global status management (Aggregated)
             if (status === 'SUBSCRIBED') {
                 this.channelStatus = 'connected';
                 this.lastError = null;
             } else if (status === 'TIMED_OUT') {
                 this.channelStatus = 'timed_out';
-                this.lastError = "Nexus: Tiempo de espera agotado";
-                console.warn("📡 [Realtime] Nexus Timeout. Reconnecting...");
-                setTimeout(() => this.retrySubscriptions(), 5000);
-            } else if (status === 'CLOSED') {
-                this.channelStatus = 'disconnected';
-            } else {
+                this.lastError = `Nexus ${tableName}: Timeout`;
+                setTimeout(() => this.subscribeToTable(tableName, dexieTable, onUpdate), 5000);
+            } else if (status === 'CHANNEL_ERROR') {
                 this.channelStatus = 'error';
-                const errorMsg = err?.message || err || 'Error desconocido';
-                this.lastError = `Nexus: ${status} (${errorMsg})`;
-                console.error(`📡 [Realtime] Nexus Error: ${status}`, err);
+                const errorDetail = err?.message || err || 'Error de vinculación RLS/Canal';
+                this.lastError = `Nexus ${tableName}: Error (${errorDetail})`;
+                console.error(`📡 [Realtime] ${tableName} Error:`, err);
             }
         });
     }
