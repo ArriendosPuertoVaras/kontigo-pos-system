@@ -27,11 +27,13 @@ export default function TablesPage() {
     const [now, setNow] = useState(Date.now());
     const { status: autoSyncStatus } = useAutoSync();
     const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error' | 'timed_out'>('connecting');
+    const [lastNexusError, setLastNexusError] = useState<string | null>(null);
 
-    // Monitor Realtime Status
+    // Monitor Realtime Status and Errors
     useEffect(() => {
         const interval = setInterval(() => {
             setRealtimeStatus(syncService.channelStatus as any);
+            setLastNexusError(syncService.lastError);
         }, 1000);
         return () => clearInterval(interval);
     }, []);
@@ -191,25 +193,36 @@ export default function TablesPage() {
                 <Header title="Mapa de Mesas">
                     <div className="flex items-center gap-6 w-full justify-between">
                         <div className="hidden lg:flex gap-3">
-                            <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full shadow-[0_0_8px] 
-                                    ${realtimeStatus === 'connected' ? 'bg-blue-500 shadow-blue-500/50' :
-                                        realtimeStatus === 'error' ? 'bg-red-500 shadow-red-500/50' :
-                                            realtimeStatus === 'timed_out' ? 'bg-orange-500 shadow-orange-500/50' :
-                                                'bg-gray-500 animate-pulse'}`}></span>
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                            <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1 min-w-[140px] transition-all">
+                                <div className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full shadow-[0_0_8px] 
+                                        ${realtimeStatus === 'connected' ? 'bg-blue-500 shadow-blue-500/50' :
+                                            realtimeStatus === 'error' ? 'bg-red-500 shadow-red-500/50' :
+                                                realtimeStatus === 'timed_out' ? 'bg-orange-500 shadow-orange-500/50' :
+                                                    'bg-gray-500 animate-pulse'}`}></span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
                                         {realtimeStatus === 'connected' ? 'Nexus Live' :
                                             realtimeStatus === 'error' ? 'Nexus Error' :
                                                 realtimeStatus === 'timed_out' ? 'Nexus Timeout' :
                                                     'Nexus Connecting...'}
                                     </span>
-                                    {realtimeStatus === 'error' && syncService.lastError && (
-                                        <span className="text-[8px] text-red-400 font-medium leading-none">
-                                            {syncService.lastError}
-                                        </span>
-                                    )}
                                 </div>
+
+                                {realtimeStatus === 'error' && lastNexusError && (
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[9px] text-red-500 font-bold leading-tight line-clamp-2">
+                                            {lastNexusError}
+                                        </span>
+                                        {lastNexusError.includes('sesión') || lastNexusError.includes('Sesión') ? (
+                                            <button
+                                                onClick={() => router.push('/login')}
+                                                className="text-[8px] bg-red-500/20 text-red-400 hover:bg-red-500/40 px-2 py-0.5 rounded border border-red-500/30 font-bold transition-all w-fit mt-1"
+                                            >
+                                                RE-INICIAR SESIÓN
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                )}
                             </div>
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>

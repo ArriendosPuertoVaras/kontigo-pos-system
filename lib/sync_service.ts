@@ -843,10 +843,17 @@ class SyncService {
      */
     async healNexusHealth(localRestaurantId: string) {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+            if (sessionError) {
+                console.error("🕵️ Nexus Health: Session error detected.", sessionError);
+                this.lastError = `Error de sesión: ${sessionError.message}`;
+                return;
+            }
+
             if (!session) {
-                console.error("🕵️ Nexus Health: No Supabase Session. Realtime will be blocked by RLS.");
-                this.lastError = "No hay sesión activa en Supabase";
+                console.warn("🕵️ Nexus Health: No Supabase Session found. RLS will block and trigger Red Status.");
+                this.lastError = "No hay sesión activa de Supabase. Re-inicia sesión.";
                 return;
             }
 
@@ -865,12 +872,13 @@ class SyncService {
                     .upsert({
                         id: session.user.id,
                         restaurant_id: localRestaurantId,
-                        role: 'manager' // Default to manager if healing
+                        role: 'manager',
+                        name: session.user.user_metadata?.full_name || 'Admin'
                     });
 
                 if (patchError) {
                     console.error("🕵️ Nexus Healing: Failed to patch profile.", patchError);
-                    this.lastError = "Error de permisos en la nube";
+                    this.lastError = "Error de permisos: No se pudo marcar perfil";
                 } else {
                     console.log("🕵️ Nexus Healing: ✅ Cloud profile updated successfully.");
                     this.lastError = null;
@@ -878,11 +886,12 @@ class SyncService {
                     setTimeout(() => this.retrySubscriptions(), 1000);
                 }
             } else {
-                console.log("🕵️ Nexus Health: ✅ Cloud session and profile are synced.");
+                console.log("🕵️ Nexus Health: ✅ Session and Profile are synced.");
                 this.lastError = null;
             }
         } catch (err) {
-            console.error("🕵️ Nexus Health Check failed:", err);
+            console.error("🕵️ Nexus Health Check crashed:", err);
+            this.lastError = "Fallo en diagnóstico Nexus";
         }
     }
 }
