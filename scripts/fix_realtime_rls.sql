@@ -36,4 +36,12 @@ USING (
 ALTER TABLE public.restaurant_tables REPLICA IDENTITY FULL;
 ALTER TABLE public.orders REPLICA IDENTITY FULL;
 
+-- 5. Enable Profile Self-Management (For Nexus Auto-Healing)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Nexus: Users can manage own profile" ON public.profiles;
+CREATE POLICY "Nexus: Users can manage own profile" 
+ON public.profiles 
+FOR ALL 
+USING (auth.uid() = id);
+
 SELECT '✅ SUCCESS: Realtime RLS policies applied' as status;

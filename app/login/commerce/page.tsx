@@ -20,6 +20,18 @@ export default function CommerceLoginPage() {
             localStorage.setItem('kontigo_restaurant_id', restaurantId);
             localStorage.setItem('kontigo_restaurant_name', restaurantName || 'Mi Restaurante');
 
+            // --- NEW: CLOUD CONTEXT SYNC (Nexus Auto-Link) ---
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                console.log("🦁 Nexus: Automatically linking cloud profile to restaurant...");
+                await supabase.from('profiles').upsert({
+                    id: user.id,
+                    restaurant_id: restaurantId,
+                    name: user.user_metadata?.full_name || 'Admin',
+                    role: 'manager'
+                });
+            }
+
             // 4. PROFESSIONAL CLEAN START (Nuclear Reset)
             toast.info("Vinculación exitosa. Limpiando dispositivo...");
 

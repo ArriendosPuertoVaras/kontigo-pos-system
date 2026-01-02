@@ -745,8 +745,8 @@ class SyncService {
             return;
         }
 
-        // --- NEW: NEXUS HEALTH CHECK (Cloud Auth vs Local context) ---
-        this.checkNexusHealth(restaurantId).catch(console.error);
+        // --- NEW: NEXUS SELF-HEALING (Cloud Auth vs Local context) ---
+        this.healNexusHealth(restaurantId).catch(console.error);
 
         const supabaseTableName = tableName === 'restaurantTables' ? 'restaurant_tables' : tableName;
         const listenerKey = `${supabaseTableName}:ALL`;
@@ -837,10 +837,11 @@ class SyncService {
     }
 
     /**
-     * Diagnostic: Verifies that the user is actually AUTHENTICATED in Supabase
+     * SELF-HEALING: Verifies that the user is authenticated in Supabase
      * and that their Cloud Profile is linked to the correct restaurant.
+     * If there's a mismatch, it ATTEMPTS TO FIX IT automatically.
      */
-    async checkNexusHealth(localRestaurantId: string) {
+    async healNexusHealth(localRestaurantId: string) {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
@@ -855,16 +856,27 @@ class SyncService {
                 .eq('id', session.user.id)
                 .single();
 
-            if (error || !profile) {
-                console.error("🕵️ Nexus Health: Could not load cloud profile.", error);
-                this.lastError = "Perfil de nube no encontrado";
-                return;
-            }
+            // HEAL: If profile missing or mismatching, update it!
+            if (error || !profile || profile.restaurant_id !== localRestaurantId) {
+                console.warn(`🕵️ Nexus Healing: Mismatch detected. Attempting to update cloud profile...`);
 
-            if (profile.restaurant_id !== localRestaurantId) {
-                console.warn(`🕵️ Nexus Health: Mismatch! Local: ${localRestaurantId} | Cloud: ${profile.restaurant_id}`);
-                this.lastError = `Tu cuenta está vinculada a otro restaurante en la nube.`;
-                console.warn("Realtime updates for THIS restaurant will be rejected by Supabase RLS.");
+                const { error: patchError } = await supabase
+                    .from('profiles')
+                    .upsert({
+                        id: session.user.id,
+                        restaurant_id: localRestaurantId,
+                        role: 'manager' // Default to manager if healing
+                    });
+
+                if (patchError) {
+                    console.error("🕵️ Nexus Healing: Failed to patch profile.", patchError);
+                    this.lastError = "Error de permisos en la nube";
+                } else {
+                    console.log("🕵️ Nexus Healing: ✅ Cloud profile updated successfully.");
+                    this.lastError = null;
+                    // Trigger a re-subscription attempt now that RLS is happy
+                    setTimeout(() => this.retrySubscriptions(), 1000);
+                }
             } else {
                 console.log("🕵️ Nexus Health: ✅ Cloud session and profile are synced.");
                 this.lastError = null;
