@@ -221,8 +221,8 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[#1e1e1e] rounded-2xl border border-white/10 w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200">
+            <div className="bg-[#1e1e1e] rounded-none md:rounded-2xl border-none md:border md:border-white/10 w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-full md:h-auto md:max-h-[90vh]">
 
                 {/* LEFT: PAYMENT INPUT */}
                 <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -230,12 +230,12 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                         <X className="w-4 h-4" />
                     </button>
 
-                    <div className="p-4 pb-0 flex-none">
-                        <h2 className="text-lg font-bold text-white mb-0.5">Registrar Pago</h2>
-                        <p className="text-gray-400 text-xs">Selecciona el monto y método</p>
+                    <div className="p-4 pb-2 flex-none bg-[#1e1e1e]">
+                        <h2 className="text-xl font-bold text-white mb-0.5">Registrar Pago</h2>
+                        <p className="text-gray-400 text-xs">Selecciona el monto y método de pago</p>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 pt-2 space-y-3 min-h-0 scrollbar-hide">
+                    <div className="flex-1 overflow-y-auto p-4 pt-2 space-y-4 min-h-0">
 
                         {/* Amount Input Section */}
                         <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2">
@@ -415,29 +415,35 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                         </div>
 
                         {/* Method Selection */}
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Método de Pago</label>
-                            <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-3 py-2">
+                            <label className="text-[10px] font-bold text-toast-orange uppercase tracking-wider">Método de Pago</label>
+                            <div className="grid grid-cols-3 gap-3">
                                 <button
                                     onClick={() => setPaymentMethod('card')}
-                                    className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all gap-1
-                                ${paymentMethod === 'card' ? 'bg-blue-500/20 text-blue-400 border-blue-500' : 'bg-[#2a2a2a] text-gray-400 border-transparent hover:bg-white/5'}`}>
-                                    <CreditCard className="w-4 h-4" />
-                                    <span className="text-[9px] font-bold uppercase">Tarjeta</span>
+                                    className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 transition-all gap-2
+                                ${paymentMethod === 'card' ? 'bg-blue-600/30 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-[#2a2a2a] text-gray-400 border-white/5 hover:bg-white/5'}`}>
+                                    <div className={`p-2 rounded-full ${paymentMethod === 'card' ? 'bg-blue-500 text-white' : 'bg-white/5 text-gray-500'}`}>
+                                        <CreditCard className="w-5 h-5" />
+                                    </div>
+                                    <span className={`text-[11px] font-black uppercase tracking-tight ${paymentMethod === 'card' ? 'text-white' : 'text-gray-400'}`}>Tarjeta</span>
                                 </button>
                                 <button
                                     onClick={() => setPaymentMethod('cash')}
-                                    className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all gap-1
-                                ${paymentMethod === 'cash' ? 'bg-green-500/20 text-green-400 border-green-500' : 'bg-[#2a2a2a] text-gray-400 border-transparent hover:bg-white/5'}`}>
-                                    <Banknote className="w-4 h-4" />
-                                    <span className="text-[9px] font-bold uppercase">Efectivo</span>
+                                    className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 transition-all gap-2
+                                ${paymentMethod === 'cash' ? 'bg-green-600/30 border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.2)]' : 'bg-[#2a2a2a] text-gray-400 border-white/5 hover:bg-white/5'}`}>
+                                    <div className={`p-2 rounded-full ${paymentMethod === 'cash' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-500'}`}>
+                                        <Banknote className="w-5 h-5" />
+                                    </div>
+                                    <span className={`text-[11px] font-black uppercase tracking-tight ${paymentMethod === 'cash' ? 'text-white' : 'text-gray-400'}`}>Efectivo</span>
                                 </button>
                                 <button
                                     onClick={() => setPaymentMethod('transfer')}
-                                    className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all gap-1
-                                ${paymentMethod === 'transfer' ? 'bg-purple-500/20 text-purple-400 border-purple-500' : 'bg-[#2a2a2a] text-gray-400 border-transparent hover:bg-white/5'}`}>
-                                    <Smartphone className="w-4 h-4" />
-                                    <span className="text-[9px] font-bold uppercase">Webpay</span>
+                                    className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 transition-all gap-2
+                                ${paymentMethod === 'transfer' ? 'bg-purple-600/30 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'bg-[#2a2a2a] text-gray-400 border-white/5 hover:bg-white/5'}`}>
+                                    <div className={`p-2 rounded-full ${paymentMethod === 'transfer' ? 'bg-purple-500 text-white' : 'bg-white/5 text-gray-500'}`}>
+                                        <Smartphone className="w-5 h-5" />
+                                    </div>
+                                    <span className={`text-[11px] font-black uppercase tracking-tight ${paymentMethod === 'transfer' ? 'text-white' : 'text-gray-400'}`}>Webpay</span>
                                 </button>
                             </div>
 
@@ -499,27 +505,27 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-4 pt-2 border-t border-white/10 flex-none bg-[#1e1e1e] z-10 space-y-2">
-                        <div className="flex justify-between items-center">
-                            <div className="text-gray-400 text-xs text uppercase tracking-wider font-bold">Total a cobrar</div>
-                            <div className="text-2xl font-bold text-white">{formatPrice(totalCharge)}</div>
+                    <div className="p-4 pt-4 border-t border-white/10 flex-none bg-[#1a1a1a] shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-20 space-y-3 rounded-t-2xl md:rounded-none">
+                        <div className="flex justify-between items-center px-1">
+                            <div className="text-gray-400 text-[10px] uppercase tracking-widest font-black">Total a cobrar</div>
+                            <div className="text-3xl font-black text-white">{formatPrice(totalCharge)}</div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                             <button
                                 onClick={onClose}
-                                className="px-4 py-3 rounded-xl font-bold text-sm text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
+                                className="px-6 py-4 rounded-xl font-bold text-xs tracking-widest text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors uppercase"
                             >
                                 CANCELAR
                             </button>
                             <button
                                 disabled={isProcessing || totalCharge <= 0 || !activeSession}
                                 onClick={handlePayment}
-                                className={`flex-1 py-2.5 rounded-xl font-bold text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2
+                                className={`flex-1 py-4 rounded-xl font-black text-xs tracking-widest shadow-xl transition-all flex items-center justify-center gap-2 uppercase
                                 ${isProcessing || totalCharge <= 0 || !activeSession
-                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-toast-orange to-orange-600 text-white hover:brightness-110 active:scale-95 shadow-orange-500/20'}`}
+                                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-toast-orange to-orange-600 text-white hover:brightness-110 active:scale-[0.98] shadow-orange-500/30'}`}
                             >
-                                {!activeSession ? '⛔ CAJA CERRADA' : (isProcessing ? 'Generando DTE...' : 'CONFIRMAR PAGO')}
+                                {!activeSession ? '⛔ CAJA CERRADA' : (isProcessing ? 'Procesando...' : 'CONFIRMAR PAGO')}
                             </button>
                         </div>
                         {!activeSession && (
@@ -558,23 +564,23 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto">
-                        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Historial de Pagos</h3>
+                    <div className="flex-1 overflow-y-auto min-h-[200px]">
+                        <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Historial de Pagos</h3>
                         {payments.length === 0 ? (
-                            <div className="text-center text-gray-600 py-8 italic">
+                            <div className="text-center text-gray-600 py-8 italic text-xs">
                                 No hay pagos registrados
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 {[...payments].reverse().map((p) => (
-                                    <div key={p.id} className="bg-[#2a2a2a] p-3 rounded border border-white/5 flex flex-col gap-1">
+                                    <div key={p.id} className="bg-[#1a1a1a] p-3 rounded-xl border border-white/5 flex flex-col gap-1 shadow-sm">
                                         <div className="flex justify-between items-center text-white font-bold">
-                                            <span>{formatPrice(p.amount)}</span>
-                                            <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded uppercase text-gray-300">{p.method}</span>
+                                            <span className="text-sm">{formatPrice(p.amount)}</span>
+                                            <span className="text-[8px] bg-white/10 px-2 py-0.5 rounded-full uppercase text-gray-400 font-black tracking-widest">{p.method}</span>
                                         </div>
-                                        <div className="flex justify-between items-center text-xs text-gray-400">
+                                        <div className="flex justify-between items-center text-[10px] text-gray-500">
                                             <span>Propina: {formatPrice(p.tip)}</span>
-                                            <span>{p.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            <span className="font-mono">{p.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
                                     </div>
                                 ))}

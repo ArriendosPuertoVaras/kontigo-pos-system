@@ -73,11 +73,20 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
                 return; // Login screen - no block
             }
 
-            setIsInitializing(true);
+            // --- STARTUP HANDSHAKE: Cloud-First Protocol ---
+            const isHandshakeDone = sessionStorage.getItem('kontigo_handshake_done') === 'true';
 
             if (navigator.onLine) {
-                console.log("☁️ Cloud-First: Initiating Startup Handshake...");
-                setStatus('saving');
+                console.log("☁️ Cloud-First: Checking Startup Handshake...");
+
+                // Only show overlay if handshake wasn't done in this session
+                if (!isHandshakeDone) {
+                    setIsInitializing(true);
+                    setStatus('saving');
+                    console.log("☁️ Cloud-First: Initiating Visual Handshake...");
+                } else {
+                    console.log("☁️ Cloud-First: Handshake already done. Syncing in background.");
+                }
 
                 try {
                     // 0. RUN MIGRATIONS: ensure DB schema is healthy
@@ -88,8 +97,11 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
                     // We use preventReload: true to handle the UI state manually
                     await syncService.restoreFromCloud((msg) => console.log(msg), true);
 
-                    // 2. MARK AS READY: Enable Auto-Sync hooks
+                    // 3. MARK AS READY: Enable Auto-Sync hooks
                     syncService.isReady = true;
+
+                    // 4. PERSIST SESSION STATE: Handshake complete
+                    sessionStorage.setItem('kontigo_handshake_done', 'true');
 
                     setStatus('saved');
                     setLastSyncedAt(new Date());

@@ -23,6 +23,9 @@ class SyncService {
     public isSyncing = false;
     public isReady = false; // Flag to enable auto-sync only after initial pull
 
+    // REALTIME SUBSCRIPTION
+    private channel: any = null;
+
     // Generic push function for a table
     // tableName: Dexie table name
     // supabaseTableName: Supabase table name (usually snake_case version of Dexie name)
@@ -712,6 +715,56 @@ class SyncService {
     async checkSubscriptionStatus(): Promise<boolean> {
         // BYPASS: Always allow sync for emergency restore scenarios
         return true;
+    }
+
+    // --- REALTIME NEXUS ---
+    /**
+     * Listens for changes in Supabase and updates local Dexie.
+     * Use this for critical shared state like 'restaurant_tables' or 'orders'.
+     */
+    async subscribeToTable(tableName: string, dexieTable: Table, onUpdate?: (payload: any) => void) {
+        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+        if (!restaurantId) return;
+
+        console.log(`📡 [Realtime] Subscribing to ${tableName} for Restaurant ${restaurantId}...`);
+
+        // Create or get the main channel
+        if (!this.channel) {
+            this.channel = supabase.channel('kontigo-realtime-nexus');
+        }
+
+        this.channel
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: tableName,
+                    filter: `restaurant_id=eq.${restaurantId}`
+                },
+                async (payload: any) => {
+                    console.log(`📡 [Realtime] Received ${payload.eventType} on ${tableName}:`, payload.new);
+
+                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                        const camelItem = this.toCamelCase(payload.new);
+
+                        // Specific transforms for local Dexie compatibility
+                        if (tableName === 'orders') {
+                            if ('createdAt' in camelItem && typeof camelItem.createdAt === 'string') camelItem.createdAt = new Date(camelItem.createdAt);
+                            if ('closedAt' in camelItem && typeof camelItem.closedAt === 'string') camelItem.closedAt = new Date(camelItem.closedAt);
+                        }
+
+                        // Atomic Update Local DB (Overwrite with source of truth)
+                        await dexieTable.put(camelItem);
+                        onUpdate?.(camelItem);
+                    } else if (payload.eventType === 'DELETE') {
+                        const id = payload.old.id;
+                        if (id) await dexieTable.delete(id);
+                        onUpdate?.({ id, deleted: true });
+                    }
+                }
+            )
+            .subscribe();
     }
 }
 

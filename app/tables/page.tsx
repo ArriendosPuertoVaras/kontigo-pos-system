@@ -13,6 +13,7 @@ import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import ClockOutModal from '@/components/ClockOutModal';
 import GuestCountModal from '@/components/GuestCountModal'; // NEW Import
+import { syncService } from '@/lib/sync_service';
 
 // --- COMPONENTS ---
 
@@ -27,6 +28,23 @@ export default function TablesPage() {
             setNow(Date.now());
         }, 30000); // Update every 30 seconds to keep times fresh
         return () => clearInterval(interval);
+    }, []);
+
+    // --- REALTIME NEXUS: Listen for Shared State Changes ---
+    useEffect(() => {
+        // Initialize subscriptions
+        const initRealtime = async () => {
+            await syncService.subscribeToTable('restaurant_tables', db.restaurantTables, () => {
+                console.log("♻️ [UI] Refreshing Tables due to Realtime event...");
+                setNow(Date.now()); // Trigger useLiveQuery refresh
+            });
+            await syncService.subscribeToTable('orders', db.orders, () => {
+                console.log("♻️ [UI] Refreshing Orders due to Realtime event...");
+                setNow(Date.now());
+            });
+        };
+
+        initRealtime();
     }, []);
 
     // Fetched Data
