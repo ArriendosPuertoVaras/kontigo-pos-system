@@ -100,7 +100,10 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
                     // 3. MARK AS READY: Enable Auto-Sync hooks
                     syncService.isReady = true;
 
-                    // 4. PERSIST SESSION STATE: Handshake complete
+                    // 4. RETRY REALTIME: Re-subscribe now that we have restaurantId
+                    await syncService.retrySubscriptions();
+
+                    // 5. PERSIST SESSION STATE: Handshake complete
                     sessionStorage.setItem('kontigo_handshake_done', 'true');
 
                     setStatus('saved');

@@ -25,6 +25,8 @@ class SyncService {
 
     // REALTIME SUBSCRIPTION
     private channel: any = null;
+    public channelStatus: 'connecting' | 'connected' | 'error' | 'disconnected' = 'disconnected';
+    private subscriptionCallbacks: Array<{ tableName: string, dexieTable: Table, onUpdate?: (payload: any) => void }> = [];
 
     // Generic push function for a table
     // tableName: Dexie table name
@@ -724,13 +726,34 @@ class SyncService {
      */
     async subscribeToTable(tableName: string, dexieTable: Table, onUpdate?: (payload: any) => void) {
         const restaurantId = localStorage.getItem('kontigo_restaurant_id');
-        if (!restaurantId) return;
 
-        console.log(`📡 [Realtime] Subscribing to ${tableName} for Restaurant ${restaurantId}...`);
+        // Store for later if ID is missing (e.g. session starting)
+        const exists = this.subscriptionCallbacks.find(s => s.tableName === tableName);
+        if (!exists) {
+            this.subscriptionCallbacks.push({ tableName, dexieTable, onUpdate });
+        }
+
+        if (!restaurantId) {
+            console.warn(`📡 [Realtime] Delaying subscription for ${tableName}: No Restaurant ID yet.`);
+            this.channelStatus = 'connecting';
+            return;
+        }
+
+        console.log(`📡 [Realtime] Connecting to ${tableName} for Restaurant ${restaurantId}...`);
 
         // Create or get the main channel
         if (!this.channel) {
-            this.channel = supabase.channel('kontigo-realtime-nexus');
+            this.channel = supabase.channel('kontigo-realtime-nexus', {
+                config: {
+                    presence: { key: restaurantId }
+                }
+            });
+
+            this.channel.subscribe((status: string) => {
+                console.log(`📡 [Realtime] Nexus Channel Status: ${status}`);
+                if (status === 'SUBSCRIBED') this.channelStatus = 'connected';
+                else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') this.channelStatus = 'error';
+            });
         }
 
         this.channel
@@ -743,28 +766,47 @@ class SyncService {
                     filter: `restaurant_id=eq.${restaurantId}`
                 },
                 async (payload: any) => {
-                    console.log(`📡 [Realtime] Received ${payload.eventType} on ${tableName}:`, payload.new);
+                    console.log(`📡 [Realtime] Pulse on ${tableName}:`, payload.eventType);
 
-                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                        const camelItem = this.toCamelCase(payload.new);
+                    try {
+                        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                            const camelItem = this.toCamelCase(payload.new);
 
-                        // Specific transforms for local Dexie compatibility
-                        if (tableName === 'orders') {
-                            if ('createdAt' in camelItem && typeof camelItem.createdAt === 'string') camelItem.createdAt = new Date(camelItem.createdAt);
-                            if ('closedAt' in camelItem && typeof camelItem.closedAt === 'string') camelItem.closedAt = new Date(camelItem.closedAt);
+                            // Specific transforms for local Dexie compatibility
+                            if (tableName === 'orders') {
+                                if ('createdAt' in camelItem && typeof camelItem.createdAt === 'string') camelItem.createdAt = new Date(camelItem.createdAt);
+                                if ('closedAt' in camelItem && typeof camelItem.closedAt === 'string') camelItem.closedAt = new Date(camelItem.closedAt);
+                            }
+
+                            // Atomic Update Local DB (Overwrite with source of truth)
+                            await dexieTable.put(camelItem);
+                            onUpdate?.(camelItem);
+                        } else if (payload.eventType === 'DELETE') {
+                            const id = payload.old.id;
+                            if (id) await dexieTable.delete(id);
+                            onUpdate?.({ id, deleted: true });
                         }
-
-                        // Atomic Update Local DB (Overwrite with source of truth)
-                        await dexieTable.put(camelItem);
-                        onUpdate?.(camelItem);
-                    } else if (payload.eventType === 'DELETE') {
-                        const id = payload.old.id;
-                        if (id) await dexieTable.delete(id);
-                        onUpdate?.({ id, deleted: true });
+                    } catch (err) {
+                        console.error(`📡 [Realtime] Failed to apply update for ${tableName}:`, err);
                     }
                 }
-            )
-            .subscribe();
+            );
+
+        // Re-trigger subscription if we just added a new handler
+        if (this.channel.state === 'closed' || this.channel.state === 'errored') {
+            this.channel.subscribe();
+        }
+    }
+
+    /**
+     * Call this when restaurantId becomes available (e.g. after login/handshake)
+     */
+    async retrySubscriptions() {
+        if (this.subscriptionCallbacks.length === 0) return;
+        console.log(`📡 [Realtime] Retrying ${this.subscriptionCallbacks.length} subscriptions...`);
+        for (const sub of this.subscriptionCallbacks) {
+            await this.subscribeToTable(sub.tableName, sub.dexieTable, sub.onUpdate);
+        }
     }
 }
 
