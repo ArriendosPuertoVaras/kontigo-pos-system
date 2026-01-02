@@ -13,6 +13,7 @@ import PaymentModal from '@/components/PaymentModal';
 import ClockOutModal from '@/components/ClockOutModal';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
+import { toast } from 'sonner';
 
 import { usePermission } from '@/hooks/usePermission';
 import { Lock } from 'lucide-react';
@@ -568,6 +569,37 @@ function POSContent() {
     }
   };
 
+  const handleDeliverSection = async (section: string) => {
+    if (!activeOrder?.id) return;
+
+    try {
+      // 1. Move from ready to delivered
+      const currentReady = (activeOrder.readySections || []).map(s => s.toLowerCase());
+      const currentDelivered = (activeOrder.deliveredSections || []).map(s => s.toLowerCase());
+
+      const sectionLower = section.toLowerCase();
+
+      if (currentReady.includes(sectionLower) && !currentDelivered.includes(sectionLower)) {
+        const updatedDelivered = [...currentDelivered, sectionLower];
+
+        await db.orders.update(activeOrder.id, {
+          deliveredSections: updatedDelivered
+        });
+
+        // 2. Transactional Sync
+        const { syncService } = await import('@/lib/sync_service');
+        toast.promise(syncService.autoSync(db.orders, 'orders'), {
+          loading: 'Actualizando entrega...',
+          success: `Aviso de ${section} apagado`,
+          error: 'Error al sincronizar'
+        });
+      }
+    } catch (err) {
+      console.error("Error delivering section:", err);
+      toast.error("Error al procesar entrega");
+    }
+  };
+
   return (
     <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
 
@@ -743,7 +775,15 @@ function POSContent() {
                           if (section === 'bar') color = "bg-blue-500";
                           else if (section === 'parrilla') color = "bg-orange-500";
                           return (
-                            <div key={idx} className={`w-2.5 h-2.5 rounded-full animate-pulse ${color}`} />
+                            <button
+                              key={idx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeliverSection(section);
+                              }}
+                              className={`w-3.5 h-3.5 rounded-full animate-pulse ${color} hover:scale-125 active:scale-90 transition-all shadow-lg border border-white/20 cursor-pointer`}
+                              title={`Confirmar entrega de ${s} (Click para apagar)`}
+                            />
                           );
                         })}
                     </div>
