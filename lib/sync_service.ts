@@ -812,14 +812,18 @@ class SyncService {
             console.log(`📡 [Realtime] Nexus Channel Status: ${status}`, err || '');
             if (status === 'SUBSCRIBED') {
                 this.channelStatus = 'connected';
+                this.lastError = null;
             } else if (status === 'TIMED_OUT') {
                 this.channelStatus = 'timed_out';
+                this.lastError = "Nexus: Tiempo de espera agotado";
                 console.warn("📡 [Realtime] Nexus Timeout. Reconnecting...");
                 setTimeout(() => this.retrySubscriptions(), 5000);
             } else if (status === 'CLOSED') {
                 this.channelStatus = 'disconnected';
             } else {
                 this.channelStatus = 'error';
+                const errorMsg = err?.message || err || 'Error desconocido';
+                this.lastError = `Nexus: ${status} (${errorMsg})`;
                 console.error(`📡 [Realtime] Nexus Error: ${status}`, err);
             }
         });
