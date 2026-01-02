@@ -24,15 +24,14 @@ export default function TablesPage() {
     const router = useRouter();
 
     // --- STATE: Ticker for Time Updates (Every 30s) ---
-    const [now, setNow] = useState(Date.now());
     const { status: autoSyncStatus } = useAutoSync();
-    const [realtimeConnected, setRealtimeConnected] = useState(false);
+    const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error' | 'timed_out'>('connecting');
 
     // Monitor Realtime Status
     useEffect(() => {
         const interval = setInterval(() => {
-            setRealtimeConnected(syncService.channelStatus === 'connected');
-        }, 2000);
+            setRealtimeStatus(syncService.channelStatus as any);
+        }, 1000);
         return () => clearInterval(interval);
     }, []);
 
@@ -192,8 +191,17 @@ export default function TablesPage() {
                     <div className="flex items-center gap-6 w-full justify-between">
                         <div className="hidden lg:flex gap-3">
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full shadow-[0_0_8px] ${realtimeConnected ? 'bg-blue-500 shadow-blue-500/50' : 'bg-gray-500 animate-pulse'}`}></span>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{realtimeConnected ? 'Nexus Live' : 'Nexus Connecting...'}</span>
+                                <span className={`w-2 h-2 rounded-full shadow-[0_0_8px] 
+                                    ${realtimeStatus === 'connected' ? 'bg-blue-500 shadow-blue-500/50' :
+                                        realtimeStatus === 'error' ? 'bg-red-500 shadow-red-500/50' :
+                                            realtimeStatus === 'timed_out' ? 'bg-orange-500 shadow-orange-500/50' :
+                                                'bg-gray-500 animate-pulse'}`}></span>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                    {realtimeStatus === 'connected' ? 'Nexus Live' :
+                                        realtimeStatus === 'error' ? 'Nexus Error' :
+                                            realtimeStatus === 'timed_out' ? 'Nexus Timeout' :
+                                                'Nexus Connecting...'}
+                                </span>
                             </div>
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
@@ -228,11 +236,15 @@ export default function TablesPage() {
 
                             <button
                                 onClick={async () => {
-                                    toast.loading("Refrescando datos desde la nube...");
+                                    toast.loading("Refrescando datos y reconectando Nexus...");
                                     try {
+                                        // 1. Full Pull truth from cloud
                                         await syncService.restoreFromCloud((msg) => console.log(msg), true);
+                                        // 2. Re-kickstart Realtime Nexus
+                                        await syncService.retrySubscriptions();
+
                                         toast.dismiss();
-                                        toast.success("Mapa de mesas actualizado");
+                                        toast.success("Mapa de mesas actualizado y Nexus reiniciado");
                                         setNow(Date.now());
                                     } catch (e) {
                                         toast.error("Fallo al refrescar");

@@ -23,10 +23,10 @@ class SyncService {
     public isSyncing = false;
     public isReady = false; // Flag to enable auto-sync only after initial pull
 
-    // REALTIME SUBSCRIPTION
     private channel: any = null;
-    public channelStatus: 'connecting' | 'connected' | 'error' | 'disconnected' = 'disconnected';
+    public channelStatus: 'connecting' | 'connected' | 'error' | 'disconnected' | 'timed_out' = 'disconnected';
     private subscriptionCallbacks: Array<{ tableName: string, dexieTable: Table, onUpdate?: (payload: any) => void }> = [];
+    private activeListeners: Set<string> = new Set();
 
     // Generic push function for a table
     // tableName: Dexie table name
@@ -725,7 +725,12 @@ class SyncService {
      * Use this for critical shared state like 'restaurant_tables' or 'orders'.
      */
     async subscribeToTable(tableName: string, dexieTable: Table, onUpdate?: (payload: any) => void) {
-        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+        let restaurantId = localStorage.getItem('kontigo_restaurant_id');
+
+        // HEALER: Remove unexpected quotes if they exist
+        if (restaurantId) {
+            restaurantId = restaurantId.replace(/^["'](.+)["']$/, '$1');
+        }
 
         // Store for later if ID is missing (e.g. session starting)
         const exists = this.subscriptionCallbacks.find(s => s.tableName === tableName);
@@ -741,8 +746,13 @@ class SyncService {
 
         console.log(`📡 [Realtime] Connecting to ${tableName} for Restaurant ${restaurantId}...`);
 
-        // Create or get the main channel
-        if (!this.channel) {
+        if (!this.channel || this.channel.state === 'closed' || this.channel.state === 'errored') {
+            if (this.channel) {
+                console.log("📡 [Realtime] Cleaning up stale channel before reconnecting...");
+                supabase.removeChannel(this.channel);
+                this.activeListeners.clear(); // Reset listener tracking on fresh channel
+            }
+
             this.channel = supabase.channel('kontigo-realtime-nexus', {
                 config: {
                     presence: { key: restaurantId }
@@ -751,10 +761,30 @@ class SyncService {
 
             this.channel.subscribe((status: string) => {
                 console.log(`📡 [Realtime] Nexus Channel Status: ${status}`);
-                if (status === 'SUBSCRIBED') this.channelStatus = 'connected';
-                else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') this.channelStatus = 'error';
+                if (status === 'SUBSCRIBED') {
+                    this.channelStatus = 'connected';
+                } else if (status === 'TIMED_OUT') {
+                    this.channelStatus = 'timed_out';
+                    // Retry once after a delay
+                    setTimeout(() => this.retrySubscriptions(), 5000);
+                } else {
+                    this.channelStatus = 'error';
+                }
             });
         }
+
+        // ADD LISTENER ONLY IF NOT ALREADY ACTIVE
+        const supabaseTableName = tableName === 'restaurantTables' ? 'restaurant_tables' : tableName;
+        const listenerKey = `${supabaseTableName}:ALL`;
+
+        if (this.activeListeners.has(listenerKey)) {
+            console.log(`📡 [Realtime] Listener for ${supabaseTableName} already active. Skipping duplicate.`);
+            return;
+        }
+
+        this.activeListeners.add(listenerKey);
+
+        console.log(`📡 [Realtime] Applying filter for ${supabaseTableName}: restaurant_id=eq.${restaurantId}`);
 
         this.channel
             .on(
@@ -762,7 +792,7 @@ class SyncService {
                 {
                     event: '*',
                     schema: 'public',
-                    table: tableName,
+                    table: supabaseTableName,
                     filter: `restaurant_id=eq.${restaurantId}`
                 },
                 async (payload: any) => {
