@@ -24,6 +24,7 @@ export default function TablesPage() {
     const router = useRouter();
 
     // --- STATE: Ticker for Time Updates (Every 30s) ---
+    const [now, setNow] = useState(Date.now());
     const { status: autoSyncStatus } = useAutoSync();
     const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error' | 'timed_out'>('connecting');
 
