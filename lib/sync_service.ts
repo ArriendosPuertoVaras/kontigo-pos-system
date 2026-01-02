@@ -739,54 +739,32 @@ class SyncService {
         }
 
         if (!restaurantId) {
-            console.warn(`📡 [Realtime] Delaying subscription for ${tableName}: No Restaurant ID yet.`);
+            console.warn(`📡 [Realtime] Delaying connection for ${tableName}: No Restaurant ID yet.`);
             this.channelStatus = 'connecting';
             return;
         }
 
-        console.log(`📡 [Realtime] Connecting to ${tableName} for Restaurant ${restaurantId}...`);
+        const supabaseTableName = tableName === 'restaurantTables' ? 'restaurant_tables' : tableName;
+        const listenerKey = `${supabaseTableName}:ALL`;
+
+        if (this.activeListeners.has(listenerKey)) {
+            console.log(`📡 [Realtime] Listener for ${supabaseTableName} already active.`);
+            return;
+        }
 
         if (!this.channel || this.channel.state === 'closed' || this.channel.state === 'errored') {
             if (this.channel) {
                 console.log("📡 [Realtime] Cleaning up stale channel before reconnecting...");
                 supabase.removeChannel(this.channel);
-                this.activeListeners.clear(); // Reset listener tracking on fresh channel
             }
 
-            this.channel = supabase.channel('kontigo-realtime-nexus', {
-                config: {
-                    presence: { key: restaurantId }
-                }
-            });
-
-            this.channel.subscribe((status: string, err?: any) => {
-                console.log(`📡 [Realtime] Nexus Channel Status: ${status}`, err || '');
-                if (status === 'SUBSCRIBED') {
-                    this.channelStatus = 'connected';
-                } else if (status === 'TIMED_OUT') {
-                    this.channelStatus = 'timed_out';
-                    console.warn("📡 [Realtime] Nexus Timeout. Check network.");
-                    setTimeout(() => this.retrySubscriptions(), 5000);
-                } else if (status === 'CLOSED') {
-                    this.channelStatus = 'disconnected';
-                } else {
-                    this.channelStatus = 'error';
-                    console.error(`📡 [Realtime] Nexus Error: ${status}`, err);
-                }
-            });
-        }
-
-        // ADD LISTENER ONLY IF NOT ALREADY ACTIVE
-        const supabaseTableName = tableName === 'restaurantTables' ? 'restaurant_tables' : tableName;
-        const listenerKey = `${supabaseTableName}:ALL`;
-
-        if (this.activeListeners.has(listenerKey)) {
-            console.log(`📡 [Realtime] Listener for ${supabaseTableName} already active. Skipping duplicate.`);
-            return;
+            console.log(`📡 [Realtime] Creating Nexus Channel for restaurant ${restaurantId}...`);
+            this.channel = supabase.channel('kontigo-realtime-nexus');
+            this.channelStatus = 'connecting';
+            this.activeListeners.clear();
         }
 
         this.activeListeners.add(listenerKey);
-
         console.log(`📡 [Realtime] Applying filter for ${supabaseTableName}: restaurant_id=eq.${restaurantId}`);
 
         this.channel
@@ -825,10 +803,22 @@ class SyncService {
                 }
             );
 
-        // Re-trigger subscription if we just added a new handler
-        if (this.channel.state === 'closed' || this.channel.state === 'errored') {
-            this.channel.subscribe();
-        }
+        // Always attempt to subscribe (it's idempotent if already joined)
+        this.channel.subscribe((status: string, err?: any) => {
+            console.log(`📡 [Realtime] Nexus Channel Status: ${status}`, err || '');
+            if (status === 'SUBSCRIBED') {
+                this.channelStatus = 'connected';
+            } else if (status === 'TIMED_OUT') {
+                this.channelStatus = 'timed_out';
+                console.warn("📡 [Realtime] Nexus Timeout. Reconnecting...");
+                setTimeout(() => this.retrySubscriptions(), 5000);
+            } else if (status === 'CLOSED') {
+                this.channelStatus = 'disconnected';
+            } else {
+                this.channelStatus = 'error';
+                console.error(`📡 [Realtime] Nexus Error: ${status}`, err);
+            }
+        });
     }
 
     /**
