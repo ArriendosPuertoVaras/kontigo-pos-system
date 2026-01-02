@@ -258,6 +258,8 @@ function POSContent() {
       addToTicket(productForModifiers, pendingModifiers);
       setProductForModifiers(null);
       setPendingModifiers([]);
+      // Immediate persistence for UI agility
+      handleSaveOrder(false);
     }
   };
 
@@ -385,6 +387,11 @@ function POSContent() {
         // Link to table
         await db.restaurantTables.update(tableId, { status: 'occupied', currentOrderId: newOrderId as number });
       }
+
+      // NO-DELAY SYNC: Push immediately to prevent loss on refresh
+      const { syncService } = await import('@/lib/sync_service');
+      await syncService.autoSync(db.orders, 'orders');
+      await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
 
       if (redirect) {
         router.push('/tables');

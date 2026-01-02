@@ -128,10 +128,10 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
             clearTimeout(debounceTimerRef.current);
         }
 
-        // Set new timer for 5 seconds (The "Quiet Courier" debounce)
+        // Set new timer for 1 second (High Performance for Restaurants)
         debounceTimerRef.current = setTimeout(() => {
             performSync();
-        }, 5000);
+        }, 1000);
     }, [performSync]);
 
     // Manual Force Sync (for Buttons)

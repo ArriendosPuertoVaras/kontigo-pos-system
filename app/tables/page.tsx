@@ -123,6 +123,11 @@ export default function TablesPage() {
 
             router.push(`/?tableId=${selectedTableForGuestCount.id}`);
 
+            // TRANSACTIONAL SYNC: Ensure cloud has this order NOW
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.autoSync(db.orders, 'orders');
+            await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+
         } catch (e) {
             console.error("Error creating order:", e);
         } finally {
