@@ -759,16 +759,19 @@ class SyncService {
                 }
             });
 
-            this.channel.subscribe((status: string) => {
-                console.log(`📡 [Realtime] Nexus Channel Status: ${status}`);
+            this.channel.subscribe((status: string, err?: any) => {
+                console.log(`📡 [Realtime] Nexus Channel Status: ${status}`, err || '');
                 if (status === 'SUBSCRIBED') {
                     this.channelStatus = 'connected';
                 } else if (status === 'TIMED_OUT') {
                     this.channelStatus = 'timed_out';
-                    // Retry once after a delay
+                    console.warn("📡 [Realtime] Nexus Timeout. Check network.");
                     setTimeout(() => this.retrySubscriptions(), 5000);
+                } else if (status === 'CLOSED') {
+                    this.channelStatus = 'disconnected';
                 } else {
                     this.channelStatus = 'error';
+                    console.error(`📡 [Realtime] Nexus Error: ${status}`, err);
                 }
             });
         }
