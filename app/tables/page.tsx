@@ -197,12 +197,19 @@ export default function TablesPage() {
                                         realtimeStatus === 'error' ? 'bg-red-500 shadow-red-500/50' :
                                             realtimeStatus === 'timed_out' ? 'bg-orange-500 shadow-orange-500/50' :
                                                 'bg-gray-500 animate-pulse'}`}></span>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                    {realtimeStatus === 'connected' ? 'Nexus Live' :
-                                        realtimeStatus === 'error' ? 'Nexus Error' :
-                                            realtimeStatus === 'timed_out' ? 'Nexus Timeout' :
-                                                'Nexus Connecting...'}
-                                </span>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                        {realtimeStatus === 'connected' ? 'Nexus Live' :
+                                            realtimeStatus === 'error' ? 'Nexus Error' :
+                                                realtimeStatus === 'timed_out' ? 'Nexus Timeout' :
+                                                    'Nexus Connecting...'}
+                                    </span>
+                                    {realtimeStatus === 'error' && syncService.lastError && (
+                                        <span className="text-[8px] text-red-400 font-medium leading-none">
+                                            {syncService.lastError}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>

@@ -22,6 +22,7 @@ class SyncService {
 
     public isSyncing = false;
     public isReady = false; // Flag to enable auto-sync only after initial pull
+    public lastError: string | null = null;
 
     private channel: any = null;
     public channelStatus: 'connecting' | 'connected' | 'error' | 'disconnected' | 'timed_out' = 'disconnected';
@@ -744,6 +745,9 @@ class SyncService {
             return;
         }
 
+        // --- NEW: NEXUS HEALTH CHECK (Cloud Auth vs Local context) ---
+        this.checkNexusHealth(restaurantId).catch(console.error);
+
         const supabaseTableName = tableName === 'restaurantTables' ? 'restaurant_tables' : tableName;
         const listenerKey = `${supabaseTableName}:ALL`;
 
@@ -829,6 +833,44 @@ class SyncService {
         console.log(`📡 [Realtime] Retrying ${this.subscriptionCallbacks.length} subscriptions...`);
         for (const sub of this.subscriptionCallbacks) {
             await this.subscribeToTable(sub.tableName, sub.dexieTable, sub.onUpdate);
+        }
+    }
+
+    /**
+     * Diagnostic: Verifies that the user is actually AUTHENTICATED in Supabase
+     * and that their Cloud Profile is linked to the correct restaurant.
+     */
+    async checkNexusHealth(localRestaurantId: string) {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                console.error("🕵️ Nexus Health: No Supabase Session. Realtime will be blocked by RLS.");
+                this.lastError = "No hay sesión activa en Supabase";
+                return;
+            }
+
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('restaurant_id')
+                .eq('id', session.user.id)
+                .single();
+
+            if (error || !profile) {
+                console.error("🕵️ Nexus Health: Could not load cloud profile.", error);
+                this.lastError = "Perfil de nube no encontrado";
+                return;
+            }
+
+            if (profile.restaurant_id !== localRestaurantId) {
+                console.warn(`🕵️ Nexus Health: Mismatch! Local: ${localRestaurantId} | Cloud: ${profile.restaurant_id}`);
+                this.lastError = `Tu cuenta está vinculada a otro restaurante en la nube.`;
+                console.warn("Realtime updates for THIS restaurant will be rejected by Supabase RLS.");
+            } else {
+                console.log("🕵️ Nexus Health: ✅ Cloud session and profile are synced.");
+                this.lastError = null;
+            }
+        } catch (err) {
+            console.error("🕵️ Nexus Health Check failed:", err);
         }
     }
 }
