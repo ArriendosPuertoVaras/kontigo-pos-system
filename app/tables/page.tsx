@@ -200,6 +200,9 @@ export default function TablesPage() {
                                             realtimeStatus === 'error' ? 'bg-red-500 shadow-red-500/50' :
                                                 realtimeStatus === 'timed_out' ? 'bg-orange-500 shadow-orange-500/50' :
                                                     'bg-gray-500 animate-pulse'}`}></span>
+                                    <span className="text-[10px] font-black text-white px-2 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 uppercase tracking-widest leading-none">
+                                        Nexus v3.0
+                                    </span>
                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
                                         {realtimeStatus === 'connected' ? 'Nexus Live' :
                                             realtimeStatus === 'error' ? 'Nexus Error' :
