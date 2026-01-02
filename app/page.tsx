@@ -480,7 +480,10 @@ function POSContent() {
 
       // 2. Release Table (Logic moved here from legacy handlePay)
       if (order.tableId) {
-        await db.restaurantTables.update(order.tableId, { status: 'available', currentOrderId: undefined });
+        await db.restaurantTables.update(order.tableId, {
+          status: 'available',
+          currentOrderId: null as any
+        });
         const { syncService } = await import('@/lib/sync_service');
         await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
       }
@@ -548,7 +551,10 @@ function POSContent() {
       if (activeTable.currentOrderId) {
         await db.orders.delete(activeTable.currentOrderId);
       }
-      await db.restaurantTables.update(activeTable.id!, { status: 'available', currentOrderId: undefined });
+      await db.restaurantTables.update(activeTable.id!, {
+        status: 'available',
+        currentOrderId: null as any
+      });
 
       // FORCE SYNC TO KILL ZOMBIE TABLES
       const { syncService } = await import('@/lib/sync_service');
