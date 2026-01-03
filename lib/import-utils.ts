@@ -26,6 +26,21 @@ const TEMPLATES: Record<ImportType, any[]> = {
     recipes: [
         { Plato: "Lomo a lo Pobre", Insumo: "Lomo Liso", Cantidad: "0.300", Unidad: "kg" },
         { Plato: "Lomo a lo Pobre", Insumo: "Papas", Cantidad: "0.400", Unidad: "kg" }
+    ],
+    master_recipes: [
+        {
+            Plato: "Empanaditas de Prieta",
+            Precio: "12500",
+            Categoría: "Entradas",
+            Ingrediente: "Prieta",
+            Cantidad: "50",
+            Unidad: "gr",
+            Familia: "Carnes",
+            SubFamilia: "Embutidos",
+            Almacenaje: "Refrigerado",
+            "Preparación (Pasos)": "1. Masa: Formar corona... | 2. Relleno: Sofreír...",
+            "Tips del Chef": "No cocines demasiado la manzana..."
+        }
     ]
 };
 
