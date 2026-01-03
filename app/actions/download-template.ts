@@ -3,6 +3,7 @@
 import * as XLSX from 'xlsx';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { ImportType } from '@/lib/types';
 
 // Redefine templates here or import if shared (imports from lib might not work if lib uses client-only stuff, but lib/import-utils seems safe-ish except for the buffer blob part which is browser only)
@@ -30,6 +31,21 @@ const TEMPLATES: Record<ImportType, any[]> = {
     recipes: [
         { Plato: "Lomo a lo Pobre", Insumo: "Lomo Liso", Cantidad: "0.300", Unidad: "kg" },
         { Plato: "Lomo a lo Pobre", Insumo: "Papas", Cantidad: "0.400", Unidad: "kg" }
+    ],
+    master_recipes: [
+        {
+            Plato: "Empanaditas de Prieta",
+            Precio: "12500",
+            Categoría: "Entradas",
+            Ingrediente: "Prieta",
+            Cantidad: "50",
+            Unidad: "gr",
+            Familia: "Carnes",
+            SubFamilia: "Embutidos",
+            Almacenaje: "Refrigerado",
+            "Preparación (Pasos)": "1. Masa: Formar corona... | 2. Relleno: Sofreír...",
+            "Tips del Chef": "No cocines demasiado la manzana..."
+        }
     ]
 };
 
@@ -45,8 +61,9 @@ export async function saveTemplateToDesktop(type: ImportType) {
         // Generate buffer
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-        // Define path
-        const desktopPath = path.join('/Users/ricardoperalta/Desktop', `template_${type}.xlsx`);
+        // Define path - Dynamic resolution of Desktop
+        const homeDir = os.homedir();
+        const desktopPath = path.join(homeDir, 'Desktop', `template_${type}.xlsx`);
 
         // Write file
         await fs.writeFile(desktopPath, buffer);

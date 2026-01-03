@@ -1,4 +1,4 @@
-export type ImportType = 'staff' | 'categories' | 'inventory' | 'products' | 'recipes';
+export type ImportType = 'staff' | 'categories' | 'inventory' | 'products' | 'recipes' | 'master_recipes';
 
 export interface ImportRow {
     [key: string]: string | number | boolean;

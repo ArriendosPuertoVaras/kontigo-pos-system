@@ -15,6 +15,7 @@ const STEPS = [
     { id: 'inventory', label: '2. Inventario', icon: FileText },
     { id: 'products', label: '3. Productos', icon: FileText },
     { id: 'recipes', label: '4. Recetas', icon: FileText },
+    { id: 'master_recipes', label: '🌟 Fichas Maestras (Todo en 1)', icon: RefreshCw },
     { id: 'staff', label: '5. Personal', icon: FileText },
 ];
 
@@ -190,6 +191,110 @@ export default function DataImportPage() {
                     updated++;
                 }
                 count = updated;
+            }
+
+            if (activeTab === 'master_recipes') {
+                setLogs(prev => [...prev, "🧬 Iniciando Importación Maestras..."]);
+
+                // 1. Get current state for matching
+                const existingCategories = await db.categories.toArray();
+                const existingIngredients = await db.ingredients.toArray();
+                const existingProducts = await db.products.toArray();
+
+                // Maps to track created items during this loop
+                const categoryMap = new Map(existingCategories.map(c => [c.name.toLowerCase(), c.id]));
+                const ingredientMap = new Map(existingIngredients.map(i => [i.name.toLowerCase(), i.id]));
+                const productMap = new Map(existingProducts.map(p => [p.name.toLowerCase(), p.id]));
+
+                // Group by Product
+                const productGroups = new Map<string, any>(); // Name -> { rows: [], info: {} }
+
+                for (const row of previewData) {
+                    const prodName = (row['Plato'] || '').trim();
+                    if (!prodName) continue;
+
+                    if (!productGroups.has(prodName)) {
+                        productGroups.set(prodName, {
+                            name: prodName,
+                            price: Number(row['Precio']) || 0,
+                            category: (row['Categoría'] || 'General').trim(),
+                            instructions: (row['Preparación (Pasos)'] || '').split('|').map((s: string) => s.trim()).filter(Boolean),
+                            chefNote: (row['Tips del Chef'] || '').trim(),
+                            rows: []
+                        });
+                    }
+                    productGroups.get(prodName).rows.push(row);
+                }
+
+                // --- PHASE 1: Categories & Ingredients ---
+                for (const row of previewData) {
+                    // CATEGORY
+                    const catName = (row['Categoría'] || 'General').trim();
+                    if (catName && !categoryMap.has(catName.toLowerCase())) {
+                        const newId = await db.categories.add({ name: catName, destination: 'kitchen', order: 99 });
+                        categoryMap.set(catName.toLowerCase(), newId as number);
+                        setLogs(prev => [...prev, `📁 Categoría creada: ${catName}`]);
+                    }
+
+                    // INGREDIENT
+                    const ingName = (row['Ingrediente'] || '').trim();
+                    if (ingName && !ingredientMap.has(ingName.toLowerCase())) {
+                        const newId = await db.ingredients.add({
+                            name: ingName,
+                            unit: (row['Unidad'] || 'un').trim(),
+                            purchaseUnit: (row['Unidad'] || 'un').trim(),
+                            stock: 0,
+                            cost: 0,
+                            family: row['Familia'],
+                            subFamily: row['Sub-Familia'],
+                            storage: row['Almacenaje'],
+                            conversionFactor: 1
+                        });
+                        ingredientMap.set(ingName.toLowerCase(), newId as number);
+                    }
+                }
+
+                // --- PHASE 2: Products & Recipes ---
+                let productsProcessed = 0;
+                for (const [name, group] of productGroups) {
+                    const catId = categoryMap.get(group.category.toLowerCase()) || 1;
+
+                    // Upsert Product
+                    let productId = productMap.get(name.toLowerCase());
+                    const productData = {
+                        name: group.name,
+                        price: group.price,
+                        categoryId: catId,
+                        instructions: group.instructions,
+                        chefNote: group.chefNote,
+                        isAvailable: true
+                    };
+
+                    if (productId) {
+                        await db.products.update(productId, productData);
+                    } else {
+                        productId = await db.products.add(productData) as number;
+                        productMap.set(name.toLowerCase(), productId);
+                    }
+
+                    // Build Recipe
+                    const recipe = group.rows.map((row: any) => {
+                        const iName = (row['Ingrediente'] || '').trim();
+                        const iId = ingredientMap.get(iName.toLowerCase());
+                        if (!iId) return null;
+                        return {
+                            ingredientId: iId,
+                            quantity: Number(row['Cantidad']) || 0,
+                            unit: (row['Unidad'] || 'un').trim()
+                        };
+                    }).filter(Boolean);
+
+                    await db.products.update(productId, { recipe });
+                    productsProcessed++;
+                }
+
+                count = productsProcessed;
+                setLogs(prev => [...prev, `✅ Procesadas ${productGroups.size} Fichas Técnicas.`]);
             }
 
             setLogs(prev => [...prev, `✅ ÉXITO: Se importaron ${count} registros correctamente.`]);
