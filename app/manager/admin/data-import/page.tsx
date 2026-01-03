@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { db } from '@/lib/db';
 import { ArrowLeft, Download, Upload, CheckCircle, AlertTriangle, FileText, Loader2, Save, Cloud, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { parseExcel } from '@/lib/import-utils';
-import { saveTemplateToDesktop } from '@/app/actions/download-template';
+import { parseExcel, downloadTemplate } from '@/lib/import-utils';
 import { ImportType } from '@/lib/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { syncService } from '@/lib/sync_service';
@@ -390,14 +389,14 @@ export default function DataImportPage() {
                                 Descarga el formato correcto para importar <strong>{activeTab.toUpperCase()}</strong>.
                             </p>
                             <button
-                                onClick={async () => {
-                                    setLogs(prev => [...prev, "⏳ Generando plantilla..."]);
-                                    const res = await saveTemplateToDesktop(activeTab);
-                                    if (res.success) {
-                                        setLogs(prev => [...prev, `✅ ${res.message}`]);
-                                        setLogs(prev => [...prev, "👉 Ahora arrastra ese archivo en el paso 2 (Subir Archivo)."]);
-                                    } else {
-                                        setLogs(prev => [...prev, `❌ ${res.message}`]);
+                                onClick={() => {
+                                    setLogs(prev => [...prev, "⏳ Generando planilla en el navegador..."]);
+                                    try {
+                                        downloadTemplate(activeTab);
+                                        setLogs(prev => [...prev, `✅ Plantilla generada con éxito.`]);
+                                        setLogs(prev => [...prev, "👉 Revisa tu carpeta de 'Descargas' y arrastra el archivo al paso 2."]);
+                                    } catch (e: any) {
+                                        setLogs(prev => [...prev, `❌ Error al generar: ${e.message}`]);
                                     }
                                 }}
                                 className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors"
