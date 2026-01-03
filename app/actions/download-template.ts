@@ -61,14 +61,32 @@ export async function saveTemplateToDesktop(type: ImportType) {
         // Generate buffer
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-        // Define path - Dynamic resolution of Desktop
+        // Define path - Intelligent Resolution
         const homeDir = os.homedir();
-        const desktopPath = path.join(homeDir, 'Desktop', `template_${type}.xlsx`);
+        const desktopPath = path.join(homeDir, 'Desktop');
+        const downloadsPath = path.join(homeDir, 'Downloads');
 
-        // Write file
-        await fs.writeFile(desktopPath, buffer);
+        let finalPath = '';
 
-        return { success: true, message: `Archivo guardado en: ${desktopPath}` };
+        // 1. Try Desktop
+        try {
+            await fs.mkdir(desktopPath, { recursive: true });
+            finalPath = path.join(desktopPath, `template_${type}.xlsx`);
+        } catch (e) {
+            // 2. Try Downloads
+            try {
+                await fs.mkdir(downloadsPath, { recursive: true });
+                finalPath = path.join(downloadsPath, `template_${type}.xlsx`);
+            } catch (e2) {
+                // 3. Fallback to Home
+                finalPath = path.join(homeDir, `template_${type}.xlsx`);
+            }
+        }
+
+        // Write file to the best possible location found
+        await fs.writeFile(finalPath, buffer);
+
+        return { success: true, message: `Archivo guardado en: ${finalPath}` };
     } catch (error: any) {
         console.error("Error saving template:", error);
         return { success: false, message: `Error al guardar: ${error.message}` };
