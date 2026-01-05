@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Account, JournalEntry } from '@/lib/db';
 import { KontigoFinance } from '@/lib/accounting';
-import { ArrowLeft, RefreshCw, Layers, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Layers, TrendingUp, TrendingDown, DollarSign, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
@@ -27,6 +27,15 @@ export default function AccountingDashboard() {
         setInitializing(true);
         await KontigoFinance.initialize();
         setInitializing(false);
+    };
+
+    const handleDeleteEntry = async (id: number) => {
+        if (!confirm('¿Estás seguro de eliminar este asiento contable? Se revertirán los saldos de las cuentas afectadas.')) return;
+        try {
+            await KontigoFinance.reverseEntryBalances(id);
+        } catch (error: any) {
+            alert(`Error al eliminar: ${error.message}`);
+        }
     };
 
     if (!accounts) return <div className="p-10 text-white">Cargando Nexus...</div>;
@@ -183,8 +192,17 @@ export default function AccountingDashboard() {
                                                                 Ref: {entry.referenceId || 'Manual'} • {new Date(entry.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                                             </p>
                                                         </div>
-                                                        <div className={`shrink-0 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${entry.status === 'posted' ? 'bg-green-900/40 text-green-400 border border-green-500/20' : 'bg-gray-700 text-gray-300'}`}>
-                                                            {entry.status === 'posted' ? 'Publicado' : 'Borrador'}
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${entry.status === 'posted' ? 'bg-green-900/40 text-green-400 border border-green-500/20' : 'bg-gray-700 text-gray-300'}`}>
+                                                                {entry.status === 'posted' ? 'Publicado' : 'Borrador'}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleDeleteEntry(entry.id!)}
+                                                                className="p-1 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded transition-colors group"
+                                                                title="Eliminar Asiento"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
                                                         </div>
                                                     </div>
 

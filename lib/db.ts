@@ -130,6 +130,7 @@ export interface WasteLog {
     date: Date;
     note?: string;
     restaurantId?: string;
+    deletedAt?: Date | null;
 }
 
 export interface Customer {
@@ -185,6 +186,7 @@ export interface Order {
     readySections?: string[]; // Tracking independent KDS station readiness
     deliveredSections?: string[]; // Tracking independent delivery per station
     restaurantId?: string;
+    deletedAt?: Date | null;
 }
 
 export interface JobTitle {

@@ -100,8 +100,8 @@ export class KontigoFinance {
      * Recover sales that occurred before Nexus was initialized.
      */
     static async syncMissingSales() {
-        const orders = await db.orders.toArray();
-        const entries = await db.journalEntries.toArray();
+        const orders = await db.orders.filter(o => !o.deletedAt).toArray();
+        const entries = await db.journalEntries.filter(e => !e.deletedAt).toArray();
         // Create a set of already registered IDs to avoid duplicates (though less relevant in nuclear reset)
         const registeredRefIds = new Set(entries.filter(e => e.referenceId).map(e => e.referenceId!));
 
@@ -199,6 +199,41 @@ export class KontigoFinance {
 
             console.log(`🦁 Nexus: Entry Posted (ID: ${newEntryId}). ${entry.description}`);
             return newEntryId;
+        });
+    }
+
+    /**
+     * REVERSES a Journal Entry's impact on balances.
+     * Use this during logical deletion.
+     */
+    static async reverseEntryBalances(entryId: number) {
+        return await db.transaction('rw', db.accounts, db.journalEntries, async () => {
+            const entry = await db.journalEntries.get(entryId);
+            if (!entry || entry.deletedAt) return;
+
+            console.log(`🦁 Nexus: Reversing Balances for Entry ID: ${entryId} (${entry.description})...`);
+
+            for (const move of entry.movements) {
+                const account = await db.accounts.get(move.accountId);
+                if (!account) continue;
+
+                // REVERSAL Logic: 
+                // ASSET/EXPENSE: Debit decreases Bal, Credit increases Bal
+                // LIABILITY/EQUITY/INCOME: Credit decreases Bal, Debit increases Bal
+                let change = 0;
+                if (['ASSET', 'EXPENSE'].includes(account.type)) {
+                    change = move.type === 'DEBIT' ? -move.amount : move.amount;
+                } else {
+                    change = move.type === 'CREDIT' ? -move.amount : move.amount;
+                }
+
+                await db.accounts.update(account.id!, {
+                    balance: (account.balance || 0) + change
+                });
+            }
+
+            // Mark as deleted
+            await db.journalEntries.update(entryId, { deletedAt: new Date() });
         });
     }
 
@@ -489,7 +524,10 @@ export class KontigoFinance {
      * SYNC: Recover purchases that are not in the journal.
      */
     static async syncMissingPurchases() {
-        const purchases = await db.purchaseOrders.where('status').equals('Received').toArray();
+        const purchases = await db.purchaseOrders
+            .where('status').equals('Received')
+            .filter(po => !po.deletedAt)
+            .toArray();
         const entries = await db.journalEntries.toArray();
         const registeredIds = new Set(entries.filter(e => e.referenceId && e.referenceId.startsWith('PURCHASE-')).map(e => e.referenceId!.replace('PURCHASE-', '')));
 
@@ -523,7 +561,7 @@ export class KontigoFinance {
     static async syncMissingWaste() {
         // Similar issue involves matching. 
         // For regeneration, we just blindly re-add.
-        const logs = await db.wasteLogs.toArray();
+        const logs = await db.wasteLogs.filter(w => !w.deletedAt).toArray();
         let recovered = 0;
 
         for (const log of logs) {
