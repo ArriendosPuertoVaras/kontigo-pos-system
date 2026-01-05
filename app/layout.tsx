@@ -4,6 +4,13 @@ import { Toaster } from "sonner";
 import { AutoSyncProvider } from "@/components/providers/AutoSyncProvider";
 import GlobalModals from "@/components/GlobalModals";
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   title: "KONTIGO - POS",
   description: "Offline-first Restaurant POS System",
@@ -17,7 +24,6 @@ export const metadata: Metadata = {
     apple: "/pwa-icon.jpg",
     icon: "/pwa-icon.jpg",
   },
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0", // Critical for touch POS
 };
 
 export default function RootLayout({

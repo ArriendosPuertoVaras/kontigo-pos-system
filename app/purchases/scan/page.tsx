@@ -21,7 +21,6 @@ export default function ScanPage() {
     const [rawText, setRawText] = useState("");
     const [isDuplicate, setIsDuplicate] = useState(false);
     const [duplicateId, setDuplicateId] = useState<number | null>(null);
-    const suppliers = db.suppliers.toArray(); // Keep this simple, or use useLiveQuery if needed.
     // Actually better to use useLiveQuery for reactive list
     const [existingSuppliers, setExistingSuppliers] = useState<any[]>([]);
 
