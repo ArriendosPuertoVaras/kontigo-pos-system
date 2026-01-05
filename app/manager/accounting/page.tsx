@@ -179,15 +179,17 @@ export default function AccountingDashboard() {
                                         <div className="divide-y divide-white/5">
                                             {journalEntries.map(entry => (
                                                 <div key={entry.id} className="p-3 hover:bg-white/5 transition-colors text-xs">
-                                                    <div className="flex justify-between items-start mb-1.5">
-                                                        <div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-[9px] font-mono text-toast-orange bg-orange-500/10 px-1 py-0.5 rounded">#{entry.id}</span>
-                                                                <span className="font-bold text-white text-xs">{entry.description}</span>
+                                                    <div className="flex justify-between items-start gap-3 mb-2">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-1.5 mb-0.5">
+                                                                <span className="text-[9px] font-mono text-toast-orange bg-orange-500/10 px-1.5 py-0.5 rounded shrink-0">#{entry.id}</span>
+                                                                <span className="font-bold text-white text-xs truncate">{entry.description}</span>
                                                             </div>
-                                                            <p className="text-[9px] text-gray-500 mt-0.5 ml-0.5">Ref: {entry.referenceId || 'Manual'} • {new Date(entry.date).toLocaleString()}</p>
+                                                            <p className="text-[9px] text-gray-500 ml-0.5 truncate leading-tight">
+                                                                Ref: {entry.referenceId || 'Manual'} • {new Date(entry.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                                            </p>
                                                         </div>
-                                                        <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${entry.status === 'posted' ? 'bg-green-900/40 text-green-400' : 'bg-gray-700 text-gray-300'}`}>
+                                                        <div className={`shrink-0 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${entry.status === 'posted' ? 'bg-green-900/40 text-green-400 border border-green-500/20' : 'bg-gray-700 text-gray-300'}`}>
                                                             {entry.status === 'posted' ? 'Publicado' : 'Borrador'}
                                                         </div>
                                                     </div>

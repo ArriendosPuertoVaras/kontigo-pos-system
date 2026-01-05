@@ -293,29 +293,29 @@ export default function RecipeAnalyzerPage() {
                     <div className="mt-8 pb-32"> {/* Added ample padding for scrolling */}
                         <h3 className="text-gray-500 uppercase tracking-widest text-xs font-bold mb-4">Detalle del Producto</h3>
                         <div className="bg-[#1e1e1e] border border-white/5 rounded-lg overflow-hidden divide-y divide-white/5">
-                            <div className="flex items-center text-xs text-gray-500 font-bold bg-white/5 px-6 py-3 uppercase tracking-wider">
+                            <div className="flex items-center text-xs text-gray-500 font-bold bg-white/5 px-4 sm:px-6 py-3 uppercase tracking-wider">
                                 <div className="flex-1">Producto</div>
-                                <div className="w-32 text-right">Costo Receta</div>
-                                <div className="w-32 text-right">Venta Neto</div>
-                                <div className="w-32 text-right">Venta c/IVA</div>
+                                <div className="w-20 sm:w-32 text-right">Costo</div>
+                                <div className="w-20 sm:w-32 text-right hidden xs:block">Neto</div>
+                                <div className="w-24 sm:w-32 text-right">Carta (IVA)</div>
                             </div>
-                            <div className="flex items-center px-6 py-4 hover:bg-white/5 transition-colors">
-                                <div className="flex-1">
+                            <div className="flex items-center px-4 sm:px-6 py-4 hover:bg-white/5 transition-colors gap-2">
+                                <div className="flex-1 min-w-0">
                                     <button
                                         onClick={() => setIsBuilderOpen(true)}
-                                        className="font-bold text-white hover:text-toast-orange transition-colors flex items-center gap-2 group text-left"
+                                        className="font-bold text-white hover:text-toast-orange transition-colors flex items-center gap-2 group text-left w-full"
                                     >
-                                        {products?.find(p => p.id === selectedProductId)?.name}
-                                        <ChefHat className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <span className="truncate">{products?.find(p => p.id === selectedProductId)?.name}</span>
+                                        <ChefHat className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 </div>
-                                <div className="w-32 text-right font-mono text-gray-300">
+                                <div className="w-20 sm:w-32 text-right font-mono text-gray-300 shrink-0">
                                     {formatPrice(analysis.financials.total_cost)}
                                 </div>
-                                <div className="w-32 text-right font-mono text-gray-300">
+                                <div className="w-20 sm:w-32 text-right font-mono text-gray-300 shrink-0 hidden xs:block">
                                     {formatPrice(analysis.selling_price_net || 0)}
                                 </div>
-                                <div className="w-32 text-right font-mono text-toast-orange font-bold">
+                                <div className="w-24 sm:w-32 text-right font-mono text-toast-orange font-bold shrink-0">
                                     {formatPrice((analysis.selling_price_net || 0) * 1.19)}
                                 </div>
                             </div>

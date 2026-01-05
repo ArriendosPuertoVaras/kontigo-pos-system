@@ -266,48 +266,58 @@ export default function PurchasesPage() {
                                 <div className="mt-4 space-y-4">
                                     <h2 className="font-bold text-xl text-gray-400 uppercase text-xs tracking-wider mb-6">Historial de Órdenes</h2>
                                     {orders?.map((order: any) => (
-                                        <div key={order.id} className="bg-white/5 p-4 rounded-lg flex justify-between items-center group hover:bg-white/10 transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white 
+                                        <div key={order.id} className="bg-white/5 p-4 rounded-lg flex flex-col md:flex-row md:justify-between md:items-center gap-4 group hover:bg-white/10 transition-colors">
+                                            <div className="flex items-start sm:items-center gap-4 flex-1 min-w-0">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shrink-0 mt-1 sm:mt-0
                                                     ${order.status === 'Received' ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'}`}>
                                                     {order.status === 'Received' ? <Check className="w-5 h-5" /> : <Package className="w-5 h-5" />}
                                                 </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="font-bold text-toast-orange text-lg">{getSupplierName(order.supplierId)}</p>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1">
+                                                        <p className="font-bold text-toast-orange text-lg leading-tight">{getSupplierName(order.supplierId)}</p>
                                                         {order.paymentStatus === 'Pending' && order.dueDate && (
                                                             (() => {
                                                                 const isOverdue = new Date(order.dueDate) < new Date();
                                                                 const isSoon = !isOverdue && (new Date(order.dueDate).getTime() - new Date().getTime()) < (3 * 24 * 60 * 60 * 1000); // 3 days
-                                                                if (isOverdue) return <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded border border-red-500/30 flex items-center gap-1 animate-pulse"><AlertTriangle className="w-3 h-3" /> VENCIDA</span>;
-                                                                if (isSoon) return <span className="bg-yellow-500/20 text-yellow-500 text-[10px] font-bold px-2 py-0.5 rounded border border-yellow-500/30 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> POR VENCER</span>;
+                                                                if (isOverdue) return <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded border border-red-500/30 flex items-center gap-1 animate-pulse shrink-0"><AlertTriangle className="w-3 h-3" /> VENCIDA</span>;
+                                                                if (isSoon) return <span className="bg-yellow-500/20 text-yellow-500 text-[10px] font-bold px-2 py-0.5 rounded border border-yellow-500/30 flex items-center gap-1 shrink-0"><AlertTriangle className="w-3 h-3" /> POR VENCER</span>;
                                                                 return null;
                                                             })()
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-gray-400">
-                                                        {format(order.date, "d MMM, HH:mm", { locale: es })} • {
-                                                            order.items.length > 3
-                                                                ? `${order.items.length} productos / ítems`
-                                                                : order.items.map((i: any) => `${i.quantity} ${i.purchaseUnit || 'un'} ${getIngredientName(i.ingredientId)}`).join(', ')
-                                                        } • ${order.totalCost.toLocaleString()}
-                                                        {order.paymentStatus === 'Pending' && order.dueDate && ` • Vence: ${format(new Date(order.dueDate), "d MMM", { locale: es })}`}
+                                                    <p className="text-xs text-gray-400 leading-relaxed">
+                                                        <span className="font-medium text-gray-300">{format(order.date, "d MMM, HH:mm", { locale: es })}</span>
+                                                        <span className="mx-1.5 opacity-30">•</span>
+                                                        <span className="text-gray-300 font-semibold">${order.totalCost.toLocaleString()}</span>
+                                                        <span className="mx-1.5 opacity-30">•</span>
+                                                        {order.items.length > 3
+                                                            ? `${order.items.length} productos`
+                                                            : order.items.map((i: any) => `${i.quantity}${i.purchaseUnit || 'un'} ${getIngredientName(i.ingredientId)}`).join(', ')
+                                                        }
+                                                        {order.paymentStatus === 'Pending' && order.dueDate && (
+                                                            <>
+                                                                <span className="mx-1.5 opacity-30">•</span>
+                                                                <span className="text-toast-orange/80">Vence: {format(new Date(order.dueDate), "d MMM", { locale: es })}</span>
+                                                            </>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            {order.status === 'Pending' ? (
-                                                <button
-                                                    onClick={() => handleReceiveOrder(order)}
-                                                    className="bg-toast-green hover:bg-green-600 text-white px-4 py-2 rounded font-bold text-sm shadow-lg flex items-center gap-2 animate-pulse"
-                                                >
-                                                    <Check className="w-4 h-4" /> Recibir
-                                                </button>
-                                            ) : (
-                                                <span className="text-xs font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
-                                                    RECIBIDO
-                                                </span>
-                                            )}
+                                            <div className="flex shrink-0 ml-14 md:ml-0">
+                                                {order.status === 'Pending' ? (
+                                                    <button
+                                                        onClick={() => handleReceiveOrder(order)}
+                                                        className="bg-toast-green hover:bg-green-600 text-white px-4 py-2 rounded font-bold text-sm shadow-lg flex items-center gap-2 animate-pulse whitespace-nowrap"
+                                                    >
+                                                        <Check className="w-4 h-4" /> Recibir
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-green-500 bg-green-500/10 px-3 py-1.5 rounded-lg border border-green-500/20 uppercase tracking-widest whitespace-nowrap">
+                                                        RECIBIDO
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -329,17 +339,17 @@ export default function PurchasesPage() {
                                     <h2 className="font-bold text-xl text-gray-400 uppercase text-xs tracking-wider mb-6">Historial de Pérdidas</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                         {wasteLogs?.map((log: any) => (
-                                            <div key={log.id} className="bg-red-500/5 border border-red-500/10 p-4 rounded-xl flex justify-between items-start">
-                                                <div>
-                                                    <p className="font-bold text-white text-lg">{getIngredientName(log.ingredientId)}</p>
+                                            <div key={log.id} className="bg-red-500/5 border border-red-500/10 p-4 rounded-xl flex justify-between items-start gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-white text-lg truncate">{getIngredientName(log.ingredientId)}</p>
                                                     <p className="text-red-400 font-bold text-sm bg-red-500/10 inline-block px-2 py-0.5 rounded mt-1">
                                                         -{log.quantity} en stock
                                                     </p>
-                                                    <p className="text-gray-500 text-xs mt-2 italic">"{log.note || 'Sin nota'}"</p>
+                                                    <p className="text-gray-500 text-xs mt-2 italic truncate">"{log.note || 'Sin nota'}"</p>
                                                 </div>
-                                                <div className="text-right">
+                                                <div className="text-right shrink-0">
                                                     <span className="text-xs font-bold text-gray-400 block mb-1">{format(log.date, "d MMM", { locale: es })}</span>
-                                                    <span className="text-xs text-red-500 border border-red-500/30 px-2 py-1 rounded bg-red-500/10 uppercase font-bold">
+                                                    <span className="text-[10px] text-red-500 border border-red-500/30 px-2 py-1 rounded bg-red-500/10 uppercase font-black tracking-tighter">
                                                         {log.reason === 'Mistake' ? 'Error' : log.reason}
                                                     </span>
                                                 </div>

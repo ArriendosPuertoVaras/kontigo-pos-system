@@ -384,11 +384,14 @@ export default function ManagerPage() {
                                         <p className="text-[10px] text-gray-500 text-center py-4">Stock en niveles óptimos</p>
                                     ) : (
                                         lowStockIngredients?.map(ing => (
-                                            <div key={ing.id} className="flex justify-between items-center p-3 bg-red-500/5 border border-red-500/10 rounded-xl group hover:bg-red-500/10 transition-all">
-                                                <span className="text-[11px] font-bold text-gray-300 group-hover:text-white transition-colors">{ing.name}</span>
-                                                <div className="text-right">
-                                                    <span className="text-[10px] font-black text-red-400 block tracking-tight uppercase">{ing.stock} {ing.unit}</span>
-                                                    <span className="text-[8px] text-red-500/60 font-medium">Bajo el mínimo</span>
+                                            <div key={ing.id} className="flex justify-between items-center gap-3 p-3 bg-red-500/5 border border-red-500/10 rounded-xl group hover:bg-red-500/10 transition-all">
+                                                <div className="min-w-0">
+                                                    <span className="text-[11px] font-bold text-gray-300 group-hover:text-white transition-colors block truncate">{ing.name}</span>
+                                                    <span className="text-[8px] text-red-500/60 font-medium uppercase tracking-tighter">Stock Crítico</span>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <span className="text-[10px] font-black text-red-500 block tracking-tight uppercase whitespace-nowrap">{ing.stock} {ing.unit}</span>
+                                                    <span className="text-[8px] text-gray-500 font-medium">mín: {ing.minStock || 5}</span>
                                                 </div>
                                             </div>
                                         ))

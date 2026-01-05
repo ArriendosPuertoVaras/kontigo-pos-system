@@ -95,13 +95,13 @@ export default function SuppliersPage() {
                                 </div>
 
                                 <div className="relative z-10">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
+                                    <div className="flex justify-between items-start gap-3 mb-4">
+                                        <div className="min-w-0">
                                             <span className="text-xs font-bold text-toast-orange bg-toast-orange/10 px-2 py-1 rounded uppercase tracking-wider mb-2 inline-block">
                                                 {supplier.category}
                                             </span>
-                                            <h3 className="text-xl font-bold text-white">{supplier.name}</h3>
-                                            {supplier.rut && <p className="text-[10px] font-mono text-gray-500 mt-0.5">{supplier.rut}</p>}
+                                            <h3 className="text-xl font-bold text-white truncate">{supplier.name}</h3>
+                                            {supplier.rut && <p className="text-[10px] font-mono text-gray-500 mt-0.5 truncate">{supplier.rut}</p>}
                                         </div>
                                     </div>
 
