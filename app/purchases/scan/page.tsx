@@ -21,6 +21,9 @@ export default function ScanPage() {
     const [rawText, setRawText] = useState("");
     const [isDuplicate, setIsDuplicate] = useState(false);
     const [duplicateId, setDuplicateId] = useState<number | null>(null);
+    const suppliers = db.suppliers.toArray(); // Keep this simple, or use useLiveQuery if needed.
+    // Actually better to use useLiveQuery for reactive list
+    const [existingSuppliers, setExistingSuppliers] = useState<any[]>([]);
 
     const handleSave = async () => {
         if (!result || !result.supplierName || !result.total) {
@@ -32,6 +35,7 @@ export default function ScanPage() {
         try {
             await db.transaction('rw', db.suppliers, db.purchaseOrders, db.journalEntries, db.accounts, async () => {
                 // 1. Find or Create Supplier
+                // If it was manually selected or matched exactly
                 let supplier = await db.suppliers.where('name').equalsIgnoreCase(result.supplierName!.trim()).first();
 
                 if (!supplier) {
@@ -142,6 +146,10 @@ export default function ScanPage() {
         setIsScanning(true);
         setIsDuplicate(false);
         try {
+            // Load suppliers to help with matching
+            const allSupps = await db.suppliers.toArray();
+            setExistingSuppliers(allSupps);
+
             const text = await scanInvoiceImage(image);
             setRawText(text);
             const data = parseInvoiceText(text);
@@ -236,17 +244,34 @@ export default function ScanPage() {
                             <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-toast-orange/20 space-y-3">
                                 <div>
                                     <p className="text-[10px] md:text-xs uppercase font-bold text-toast-orange mb-1">Empresa / Proveedor</p>
-                                    <div className="relative group">
-                                        <input
-                                            type="text"
-                                            value={result.supplierName || ''}
-                                            onChange={(e) => setResult({ ...result, supplierName: e.target.value })}
-                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-toast-orange outline-none transition-all"
-                                            placeholder="Nombre de la empresa..."
-                                        />
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 opacity-50 group-focus-within:opacity-0 pointer-events-none">
-                                            <Store className="w-4 h-4" />
+                                    <div className="flex gap-2">
+                                        <div className="relative group flex-1">
+                                            <input
+                                                type="text"
+                                                value={result.supplierName || ''}
+                                                onChange={(e) => setResult({ ...result, supplierName: e.target.value })}
+                                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-toast-orange outline-none transition-all"
+                                                placeholder="Nombre de la empresa..."
+                                            />
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 opacity-50 group-focus-within:opacity-0 pointer-events-none">
+                                                <Store className="w-4 h-4" />
+                                            </div>
                                         </div>
+                                        {existingSuppliers.length > 0 && (
+                                            <select
+                                                className="bg-black/40 border border-white/10 rounded-lg px-2 text-xs text-gray-400 outline-none focus:border-toast-orange max-w-[120px]"
+                                                onChange={(e) => {
+                                                    const s = existingSuppliers.find(x => x.id === Number(e.target.value));
+                                                    if (s) setResult({ ...result, supplierName: s.name, rut: s.rut || result.rut });
+                                                }}
+                                                value=""
+                                            >
+                                                <option value="" disabled>Coincidir...</option>
+                                                {existingSuppliers.map(s => (
+                                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
                                     </div>
                                 </div>
                                 <div>
@@ -310,7 +335,15 @@ export default function ScanPage() {
                                 </div>
                                 <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-white/5">
                                     <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">Fecha Emisión</p>
-                                    <p className="text-lg md:text-xl font-bold text-white">{result.date ? result.date.toLocaleDateString() : '?'}</p>
+                                    <input
+                                        type="date"
+                                        value={result.date ? result.date.toISOString().split('T')[0] : ''}
+                                        onChange={(e) => {
+                                            const newDate = e.target.value ? new Date(e.target.value + 'T12:00:00') : undefined;
+                                            setResult({ ...result, date: newDate });
+                                        }}
+                                        className="w-full bg-transparent font-bold text-white outline-none focus:text-toast-orange text-sm md:text-base"
+                                    />
                                 </div>
                                 <div className={`p-3 md:p-4 rounded-lg border transition-all ${((result.neto || 0) + (result.iva || 0) === (result.total || 0) && (result.total || 0) > 0) ? 'border-toast-green/40 bg-toast-green/10' : 'border-toast-orange/20 bg-toast-orange/5'}`}>
                                     <div className="flex justify-between items-start">

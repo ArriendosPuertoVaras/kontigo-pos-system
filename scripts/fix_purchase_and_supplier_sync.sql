@@ -9,6 +9,10 @@ ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS due_date TIMESTAMP WITH TIME ZONE;
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS folio TEXT;
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS customer_number TEXT;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+
+-- 3. Logical Deletion for Suppliers
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
 
 -- 3. Ensure RLS allows these columns (usually automatic, but good to check)
 -- No specific RLS changes needed for standard columns.

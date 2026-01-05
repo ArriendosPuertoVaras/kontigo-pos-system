@@ -119,6 +119,7 @@ export interface PurchaseOrder {
     customerNumber?: string; // Client account number
     items: PurchaseOrderItem[];
     restaurantId?: string;
+    deletedAt?: Date | null;
 }
 
 export interface WasteLog {

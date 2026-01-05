@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, PurchaseOrder, PurchaseOrderItem } from '@/lib/db';
-import { UtensilsCrossed, ArrowLeft, ShoppingCart, Plus, Check, Package, Loader2, Search, X, Trash2, Settings, Store, Sparkles, AlertTriangle } from 'lucide-react';
+import { db, PurchaseOrder, PurchaseOrderItem, Supplier } from '@/lib/db';
+import { UtensilsCrossed, ArrowLeft, ShoppingCart, Plus, Check, Package, Loader2, Search, X, Trash2, Settings, Store, Sparkles, AlertTriangle, Edit } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -56,7 +56,7 @@ export default function PurchasesPage() {
     // Queries
     const suppliers = useLiveQuery(() => db.suppliers.toArray());
     const ingredients = useLiveQuery(() => db.ingredients.toArray());
-    const orders = useLiveQuery(() => db.purchaseOrders.reverse().toArray());
+    const orders = useLiveQuery(() => db.purchaseOrders.filter(o => !o.deletedAt).reverse().toArray());
     const wasteLogs = useLiveQuery(() => db.wasteLogs.reverse().toArray());
 
     // Local State: Navigation
@@ -72,6 +72,7 @@ export default function PurchasesPage() {
     // Local State: Waste & Editing
     const [isWasteModalOpen, setIsWasteModalOpen] = useState(false);
     const [editingIngredient, setEditingIngredient] = useState<any | null>(null);
+    const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
 
     // Derived State
     const categories = Array.from(new Set(ingredients?.map((i) => i.category).filter(Boolean) as string[]));
@@ -162,7 +163,7 @@ export default function PurchasesPage() {
     const handleDeleteOrder = async (orderId: number) => {
         if (!confirm("¿Seguro que quieres eliminar este registro de compra? Esto no revertirá el stock si ya fue recibido, pero sí afectará los reportes contables futuros.")) return;
 
-        await db.purchaseOrders.delete(orderId);
+        await db.purchaseOrders.update(orderId, { deletedAt: new Date() });
         toast.info("Registro de compra eliminado.");
         syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
     };
@@ -346,6 +347,14 @@ export default function PurchasesPage() {
                                                 )}
 
                                                 <button
+                                                    onClick={() => setEditingOrder(order)}
+                                                    className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                                                    title="Editar Registro"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+
+                                                <button
                                                     onClick={() => order.id && handleDeleteOrder(order.id)}
                                                     className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
                                                     title="Eliminar Registro"
@@ -477,6 +486,25 @@ export default function PurchasesPage() {
                     <EditIngredientModal
                         ingredient={editingIngredient}
                         onClose={() => setEditingIngredient(null)}
+                    />
+                )
+            }
+
+            {/* --- MODAL: EDIT PURCHASE ORDER --- */}
+            {
+                editingOrder && (
+                    <EditPurchaseModal
+                        order={editingOrder}
+                        suppliers={suppliers || []}
+                        onClose={() => setEditingOrder(null)}
+                        onSave={async (updatedData) => {
+                            if (editingOrder.id) {
+                                await db.purchaseOrders.update(editingOrder.id, updatedData);
+                                toast.success("Registro de compra actualizado");
+                                syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
+                            }
+                            setEditingOrder(null);
+                        }}
                     />
                 )
             }
@@ -630,4 +658,113 @@ function EditIngredientModal({ ingredient, onClose }: { ingredient: any, onClose
             </div>
         </div>
     )
+}
+
+function EditPurchaseModal({ order, suppliers, onClose, onSave }: { order: PurchaseOrder, suppliers: Supplier[], onClose: () => void, onSave: (data: Partial<PurchaseOrder>) => void }) {
+    const [supplierId, setSupplierId] = useState(order.supplierId);
+    const [date, setDate] = useState(format(new Date(order.date), "yyyy-MM-dd"));
+    const [totalCost, setTotalCost] = useState(order.totalCost);
+    const [folio, setFolio] = useState(order.folio || "");
+    const [paymentStatus, setPaymentStatus] = useState(order.paymentStatus || "Pending");
+    const [dueDate, setDueDate] = useState(order.dueDate ? format(new Date(order.dueDate), "yyyy-MM-dd") : "");
+
+    return (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-toast-charcoal border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+                <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Edit className="text-toast-orange w-5 h-5" /> Editar Compra
+                    </h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs text-gray-400 uppercase font-bold">Proveedor</label>
+                        <select
+                            value={supplierId}
+                            onChange={e => setSupplierId(Number(e.target.value))}
+                            className="w-full bg-black/30 border border-white/10 rounded p-2 text-white mt-1 text-sm outline-none focus:border-toast-orange"
+                        >
+                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold">Fecha</label>
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={e => setDate(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 rounded p-2 text-white mt-1 text-sm outline-none focus:border-toast-orange"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold">Monto Total</label>
+                            <input
+                                type="number"
+                                value={totalCost}
+                                onChange={e => setTotalCost(Number(e.target.value))}
+                                className="w-full bg-black/30 border border-white/10 rounded p-2 text-white mt-1 text-sm outline-none focus:border-toast-orange"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold">Folio / Documento</label>
+                            <input
+                                type="text"
+                                value={folio}
+                                onChange={e => setFolio(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 rounded p-2 text-white mt-1 text-sm outline-none focus:border-toast-orange"
+                                placeholder="Ej: 123456"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-400 uppercase font-bold">Estado Pago</label>
+                            <select
+                                value={paymentStatus}
+                                onChange={e => setPaymentStatus(e.target.value as any)}
+                                className="w-full bg-black/30 border border-white/10 rounded p-2 text-white mt-1 text-sm outline-none focus:border-toast-orange"
+                            >
+                                <option value="Pending">Por Pagar</option>
+                                <option value="Paid">Pagado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-gray-400 uppercase font-bold">Vencimiento</label>
+                        <input
+                            type="date"
+                            value={dueDate}
+                            onChange={e => setDueDate(e.target.value)}
+                            className="w-full bg-black/30 border border-white/10 rounded p-2 text-white mt-1 text-sm outline-none focus:border-toast-orange"
+                        />
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                        <button onClick={onClose} className="flex-1 text-gray-400 hover:text-white text-sm font-bold">Cancelar</button>
+                        <button
+                            onClick={() => onSave({
+                                supplierId,
+                                date: new Date(date + "T12:00:00"),
+                                totalCost,
+                                folio,
+                                paymentStatus: paymentStatus as any,
+                                dueDate: dueDate ? new Date(dueDate + "T12:00:00") : undefined
+                            })}
+                            className="flex-1 bg-toast-orange hover:brightness-110 text-white font-bold py-2 rounded shadow-lg text-sm"
+                        >
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
