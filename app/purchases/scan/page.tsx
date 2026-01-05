@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { db } from '@/lib/db';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Camera, Loader2, Sparkles, AlertTriangle, FileText, Check, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Camera, Loader2, Sparkles, AlertTriangle, FileText, Check, ShoppingCart, Store } from 'lucide-react';
 import { scanInvoiceImage } from '@/lib/ai/scanner';
 import { parseInvoiceText, ExtractedData } from '@/lib/ai/parser';
 import Header from '@/components/Header';
@@ -171,32 +171,75 @@ export default function ScanPage() {
                     {result && (
                         <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Supplier Section */}
-                            <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-toast-orange/20">
-                                <p className="text-[10px] md:text-xs uppercase font-bold text-toast-orange mb-2">Proveedor Detectado</p>
-                                <div className="relative group">
-                                    <input
-                                        type="text"
-                                        value={result.supplierName || ''}
-                                        onChange={(e) => setResult({ ...result, supplierName: e.target.value })}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-toast-orange outline-none transition-all"
-                                        placeholder="Nombre del proveedor..."
-                                    />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 opacity-50 group-focus-within:opacity-0 pointer-events-none">
-                                        <FileText className="w-4 h-4" />
+                            <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-toast-orange/20 space-y-3">
+                                <div>
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-toast-orange mb-1">Empresa / Proveedor</p>
+                                    <div className="relative group">
+                                        <input
+                                            type="text"
+                                            value={result.supplierName || ''}
+                                            onChange={(e) => setResult({ ...result, supplierName: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-toast-orange outline-none transition-all"
+                                            placeholder="Nombre de la empresa..."
+                                        />
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 opacity-50 group-focus-within:opacity-0 pointer-events-none">
+                                            <Store className="w-4 h-4" />
+                                        </div>
                                     </div>
                                 </div>
-                                <p className="text-[9px] text-gray-500 mt-2 italic">Se creará automáticamente si no existe.</p>
+                                <div>
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">RUT Empresa</p>
+                                    <div className="relative group">
+                                        <input
+                                            type="text"
+                                            value={result.rut || ''}
+                                            onChange={(e) => setResult({ ...result, rut: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-toast-orange outline-none transition-all"
+                                            placeholder="xx.xxx.xxx-x"
+                                        />
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 opacity-50 pointer-events-none">
+                                            <FileText className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-gray-500 italic">Se creará automáticamente si no existe.</p>
                             </div>
 
-                            {/* Summary */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                                <div className="bg-white/5 p-3 md:p-4 rounded-lg">
-                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400">Fecha</p>
+                            {/* Detailed Summary */}
+                            <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-white/5">
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">Monto Neto</p>
+                                    <input
+                                        type="number"
+                                        value={result.neto || 0}
+                                        onChange={(e) => setResult({ ...result, neto: parseInt(e.target.value) })}
+                                        className="w-full bg-transparent text-lg md:text-xl font-bold text-white outline-none focus:text-toast-orange"
+                                    />
+                                </div>
+                                <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-white/5">
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">IVA (19%)</p>
+                                    <input
+                                        type="number"
+                                        value={result.iva || 0}
+                                        onChange={(e) => setResult({ ...result, iva: parseInt(e.target.value) })}
+                                        className="w-full bg-transparent text-lg md:text-xl font-bold text-white outline-none focus:text-toast-orange"
+                                    />
+                                </div>
+                                <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-white/5">
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">Fecha Emisión</p>
                                     <p className="text-lg md:text-xl font-bold text-white">{result.date ? result.date.toLocaleDateString() : '?'}</p>
                                 </div>
-                                <div className="bg-white/5 p-3 md:p-4 rounded-lg">
-                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400">Total Detectado</p>
-                                    <p className="text-lg md:text-xl font-bold text-green-400">{result.total ? `$${result.total}` : '?'}</p>
+                                <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-toast-green/20 bg-toast-green/5">
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-toast-green mb-1">TOTAL FINAL</p>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-toast-green font-bold">$</span>
+                                        <input
+                                            type="number"
+                                            value={result.total || 0}
+                                            onChange={(e) => setResult({ ...result, total: parseInt(e.target.value) })}
+                                            className="w-full bg-transparent text-lg md:text-xl font-bold text-white outline-none focus:text-toast-green"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
