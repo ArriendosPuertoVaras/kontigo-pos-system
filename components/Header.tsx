@@ -171,10 +171,8 @@ export default function Header({ title, children, backHref }: HeaderProps) {
             </div>
 
             {children && (
-                <div className="w-full md:w-auto md:flex-1 order-3 md:order-2 flex justify-center mt-2 md:mt-0 relative pointer-events-none">
-                    <div className="w-full md:w-auto flex justify-center pointer-events-auto">
-                        {children}
-                    </div>
+                <div className="w-full md:w-auto md:flex-1 order-3 md:order-2 flex justify-center mt-2 md:mt-0 relative">
+                    {children}
                 </div>
             )}
 

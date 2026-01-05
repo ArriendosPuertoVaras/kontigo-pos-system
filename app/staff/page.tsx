@@ -125,24 +125,25 @@ export default function StaffPage() {
     return (
         <div className="min-h-screen bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white pb-20">
             {/* Header */}
-            <Header title="Control de Personal" backHref="/">
-                <div className="hidden md:flex flex-wrap gap-3 w-full justify-start">
-                    <Link href="/staff/employees" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        Colaboradores
-                    </Link>
-                    <Link href="/staff/planner" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        Ver Horarios
-                    </Link>
-                    <button
-                        onClick={() => setIsClockInOpen(true)}
-                        className="bg-toast-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-orange-500/20 flex items-center gap-2">
-                        <UserPlus className="w-4 h-4" />
-                        Registrar Entrada
-                    </button>
-                </div>
-            </Header>
+            <Header title="Control de Personal" backHref="/" />
+
+            {/* DESKTOP NAV - Moved out of Header children to avoid invisible wrapper issues */}
+            <div className="hidden md:flex flex-wrap gap-3 p-6 pb-0 max-w-7xl mx-auto">
+                <Link href="/staff/employees" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Colaboradores
+                </Link>
+                <Link href="/staff/planner" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Ver Horarios
+                </Link>
+                <button
+                    onClick={() => setIsClockInOpen(true)}
+                    className="bg-toast-orange hover:brightness-110 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-orange-500/20 flex items-center gap-2 ml-auto">
+                    <UserPlus className="w-4 h-4" />
+                    Registrar Entrada
+                </button>
+            </div>
 
             {/* MOBILE QUICK NAV */}
             <div className="grid grid-cols-2 gap-2 p-4 pb-0 md:hidden relative z-30">

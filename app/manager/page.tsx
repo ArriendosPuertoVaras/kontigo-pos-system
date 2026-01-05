@@ -173,19 +173,20 @@ export default function ManagerPage() {
             <Sidebar />
             <main className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-[1600px] mx-auto w-full">
-                    <Header title="Panel Gerencial">
-                        <div className="hidden md:flex gap-3">
-                            <Link href="/staff" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
-                                <Users className="w-4 h-4 text-orange-400" /> RRHH
-                            </Link>
-                            <Link href="/manager/recipe-analyzer" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
-                                <TrendingUp className="w-4 h-4 text-green-400" /> COSTOS
-                            </Link>
-                            <Link href="/manager/accounting" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
-                                <DollarSign className="w-4 h-4 text-blue-400" /> FINANZAS
-                            </Link>
-                        </div>
-                    </Header>
+                    <Header title="Panel Gerencial" />
+
+                    {/* DESKTOP NAV - Moved out of Header children to avoid invisible wrapper issues */}
+                    <div className="hidden md:flex gap-3 mb-6">
+                        <Link href="/staff" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                            <Users className="w-4 h-4 text-orange-400" /> RRHH
+                        </Link>
+                        <Link href="/manager/recipe-analyzer" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                            <TrendingUp className="w-4 h-4 text-green-400" /> COSTOS
+                        </Link>
+                        <Link href="/manager/accounting" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                            <DollarSign className="w-4 h-4 text-blue-400" /> FINANZAS
+                        </Link>
+                    </div>
 
                     {/* MOBILE QUICK NAV */}
                     <div className="grid grid-cols-3 gap-2 mt-4 md:hidden relative z-30">
