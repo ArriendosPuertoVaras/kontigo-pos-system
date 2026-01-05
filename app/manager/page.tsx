@@ -174,186 +174,273 @@ export default function ManagerPage() {
             <main className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-[1600px] mx-auto w-full">
                     <Header title="Panel Gerencial">
-                        <div className="flex gap-2">
-                            <Link href="/staff" className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a2a2a] hover:bg-[#333] border border-white/10 rounded-lg text-xs font-bold transition">
-                                <Users className="w-3.5 h-3.5" /> RRHH
+                        <div className="flex gap-3">
+                            <Link href="/staff" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                                <Users className="w-4 h-4 text-orange-400" /> RRHH
                             </Link>
-                            <Link href="/manager/recipe-analyzer" className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a2a2a] hover:bg-[#333] border border-white/10 rounded-lg text-xs font-bold transition">
-                                <TrendingUp className="w-3.5 h-3.5" /> COSTOS
+                            <Link href="/manager/recipe-analyzer" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                                <TrendingUp className="w-4 h-4 text-green-400" /> COSTOS
                             </Link>
-                            <Link href="/manager/accounting" className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a2a2a] hover:bg-[#333] border border-white/10 rounded-lg text-xs font-bold transition">
-                                <DollarSign className="w-3.5 h-3.5" /> FINANZAS
+                            <Link href="/manager/accounting" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                                <DollarSign className="w-4 h-4 text-blue-400" /> FINANZAS
                             </Link>
                         </div>
                     </Header>
 
-                    {/* DATE NAVIGATION & ACTIONS (Compact) */}
-                    <div className="flex items-center justify-between mb-4 mt-2">
-                        <div className="flex items-center gap-3">
+                    {/* DATE NAVIGATION & ACTIONS */}
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-6 mt-4 gap-4">
+                        <div className="flex items-center gap-4">
                             {/* VIEW MODE TOGGLE */}
-                            <div className="bg-black/20 p-0.5 rounded-lg flex text-[10px] font-bold border border-white/5">
+                            <div className="bg-black/40 p-1 rounded-xl flex text-[11px] font-bold border border-white/10 backdrop-blur-sm">
                                 {(['day', 'week', 'month'] as const).map(m => (
                                     <button
                                         key={m}
                                         onClick={() => setViewMode(m)}
-                                        className={`px-3 py-1 rounded transition-all capitalize ${viewMode === m ? 'bg-toast-charcoal text-white shadow' : 'text-gray-500 hover:text-gray-300'}`}
+                                        className={`px-4 py-1.5 rounded-lg transition-all capitalize ${viewMode === m ? 'bg-gradient-to-r from-toast-orange to-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
                                     >
                                         {m === 'day' ? 'Día' : m === 'week' ? 'Semana' : 'Mes'}
                                     </button>
                                 ))}
                             </div>
 
-                            <div className="flex items-center bg-[#2a2a2a] rounded-lg p-1 border border-white/5">
-                                <button onClick={() => moveDate('prev')} className="p-1 hover:bg-white/10 rounded transition"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                                <span className="px-3 py-1 text-xs font-bold text-gray-300 flex items-center gap-1.5 capitalize min-w-[120px] justify-center">
-                                    <Calendar className="w-3.5 h-3.5 text-toast-orange" />
+                            <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 backdrop-blur-md">
+                                <button onClick={() => moveDate('prev')} className="p-1.5 hover:bg-white/10 rounded-lg transition"><ChevronLeft className="w-4 h-4 text-gray-400" /></button>
+                                <span className="px-4 py-1 text-sm font-black text-white flex items-center gap-2 capitalize min-w-[160px] justify-center tracking-tight">
+                                    <Calendar className="w-4 h-4 text-toast-orange" />
                                     {formatDateLabel()}
                                 </span>
-                                <button onClick={() => moveDate('next')} className="p-1 hover:bg-white/10 rounded transition"><ChevronRight className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => moveDate('next')} className="p-1.5 hover:bg-white/10 rounded-lg transition"><ChevronRight className="w-4 h-4 text-gray-400" /></button>
                             </div>
+
                             {isSameDay(selectedDate, new Date()) && (
-                                <span className="text-[9px] font-bold text-toast-orange bg-toast-orange/10 px-2 py-0.5 rounded border border-toast-orange/20 animate-pulse">
-                                    EN VIVO
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-toast-orange opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-toast-orange"></span>
+                                    </span>
+                                    <span className="text-[10px] font-black text-toast-orange tracking-tighter uppercase">EN VIVO</span>
+                                </div>
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a2a2a] hover:bg-[#333] border border-white/10 rounded-lg text-xs font-bold transition">
-                                <MessageSquare className="w-3.5 h-3.5" /> Chat Equipo
+                        <div className="flex items-center gap-3">
+                            <button className="flex items-center gap-2 px-4 py-2 bg-toast-orange/10 hover:bg-toast-orange/20 border border-toast-orange/20 rounded-xl text-xs font-bold transition-all text-toast-orange">
+                                <MessageSquare className="w-4 h-4" /> Chat Nexus
                             </button>
                         </div>
                     </div>
 
-                    {/* KPI CARDS (Compact) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                    {/* KPI CARDS (WOW DESIGN) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                         {/* TOTAL SALES */}
-                        <div className="bg-[#1e3a29] border border-[#2d5c40] p-4 rounded-xl relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-lg">
-                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <DollarSign className="w-10 h-10 text-green-400" />
+                        <div className="bg-gradient-to-br from-green-600/20 to-emerald-900/10 border border-green-500/20 p-5 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-all shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+                            <div className="absolute -top-4 -right-4 bg-green-500/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-green-500/20 transition-all"></div>
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-[11px] font-black text-green-400/80 uppercase tracking-[0.2em]">Ventas Totales</p>
+                                <DollarSign className="w-5 h-5 text-green-400" />
                             </div>
-                            <p className="text-[10px] font-bold text-green-400 uppercase tracking-widest mb-1">Venta Total</p>
-                            <h3 className="text-xl font-black text-white">{formatMoney(totalSales)}</h3>
+                            <h3 className="text-3xl font-black text-white tracking-tighter">{formatMoney(totalSales)}</h3>
+                            <div className="mt-2 flex items-center gap-1">
+                                <TrendingUp className="w-3 h-3 text-green-400" />
+                                <span className="text-[10px] text-green-400/60 font-medium">+12% vs anterior</span>
+                            </div>
                         </div>
 
                         {/* TICKET PROMEDIO */}
-                        <div className="bg-[#1e2330] border border-[#2d364f] p-4 rounded-xl relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-lg">
-                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <TrendingUp className="w-10 h-10 text-blue-400" />
+                        <div className="bg-gradient-to-br from-blue-600/20 to-indigo-900/10 border border-blue-500/20 p-5 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-all shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+                            <div className="absolute -top-4 -right-4 bg-blue-500/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-[11px] font-black text-blue-400/80 uppercase tracking-[0.2em]">Ticket Prom.</p>
+                                <BarChart3 className="w-5 h-5 text-blue-400" />
                             </div>
-                            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Ticket Prom.</p>
-                            <h3 className="text-xl font-black text-white">{formatMoney(avgTicket)}</h3>
+                            <h3 className="text-3xl font-black text-white tracking-tighter">{formatMoney(avgTicket)}</h3>
+                            <div className="mt-2 flex items-center gap-1">
+                                <span className="text-[10px] text-blue-400/60 font-medium">Basado en {ticketCount} tickets</span>
+                            </div>
                         </div>
 
                         {/* PERSONAL ACTIVO */}
-                        <div className="bg-[#3a251e] border border-[#5c3a2d] p-4 rounded-xl relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-lg">
-                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <Users className="w-10 h-10 text-orange-400" />
+                        <div className="bg-gradient-to-br from-orange-600/20 to-yellow-900/10 border border-orange-500/20 p-5 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-all shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+                            <div className="absolute -top-4 -right-4 bg-orange-500/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-all"></div>
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-[11px] font-black text-orange-400/80 uppercase tracking-[0.2em]">Equipo en Turno</p>
+                                <Users className="w-5 h-5 text-orange-400" />
                             </div>
-                            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1">Personal</p>
-                            <h3 className="text-xl font-black text-white">{activeStaffCount}</h3>
+                            <h3 className="text-3xl font-black text-white tracking-tighter">{activeStaffCount}</h3>
+                            <div className="mt-2 flex items-center gap-1">
+                                <span className="text-[10px] text-orange-400/60 font-medium">Laboratorio / Servicio</span>
+                            </div>
                         </div>
 
                         {/* STOCK ALERTS */}
-                        <div className="bg-[#3a1e1e] border border-[#5c2d2d] p-4 rounded-xl relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-lg">
-                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <AlertTriangle className="w-10 h-10 text-red-500" />
+                        <div className="bg-gradient-to-br from-red-600/20 to-rose-900/10 border border-red-500/20 p-5 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-all shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+                            <div className="absolute -top-4 -right-4 bg-red-500/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-red-500/20 transition-all"></div>
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-[11px] font-black text-red-400/80 uppercase tracking-[0.2em]">Críticos de Stock</p>
+                                <AlertTriangle className="w-5 h-5 text-red-500" />
                             </div>
-                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Alertas Stock</p>
-                            <h3 className="text-xl font-black text-white">{lowStockIngredients?.length || 0}</h3>
+                            <h3 className="text-3xl font-black text-white tracking-tighter">{lowStockIngredients?.length || 0}</h3>
+                            <div className="mt-2 flex items-center gap-1">
+                                <span className="text-[10px] text-red-400/60 font-medium">Requieren reposición urgente</span>
+                            </div>
                         </div>
                     </div>
 
-                    {/* CHARTS & LISTS GRID (Compact) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* CHARTS & LISTS GRID */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                         {/* SALES CHART */}
-                        <div className="lg:col-span-2 bg-[#2a2a2a] border border-white/5 rounded-xl p-4 shadow-xl flex flex-col">
-                            <h3 className="text-xs font-bold text-white mb-4 uppercase tracking-wider">{chartTitle}</h3>
-                            <div className="flex-1 w-full min-h-[250px] flex items-end">
+                        <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md flex flex-col">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="text-sm font-black text-white uppercase tracking-widest">{chartTitle}</h3>
+                                <div className="flex gap-2">
+                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-md border border-white/10">
+                                        <div className="w-2 h-2 rounded-full bg-toast-orange"></div>
+                                        <span className="text-[10px] text-gray-400 font-bold">Ventas</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex-1 w-full min-h-[300px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={visibleChartData}>
+                                        <defs>
+                                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#f97316" stopOpacity={1} />
+                                                <stop offset="100%" stopColor="#ea580c" stopOpacity={0.8} />
+                                            </linearGradient>
+                                        </defs>
                                         <XAxis
                                             dataKey="hour"
                                             stroke="#666"
-                                            fontSize={10}
+                                            fontSize={11}
                                             tickLine={false}
                                             axisLine={false}
+                                            dy={10}
                                         />
                                         <Tooltip
-                                            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px', fontSize: '10px' }}
-                                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                            contentStyle={{
+                                                backgroundColor: 'rgba(26,26,26,0.9)',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                borderRadius: '12px',
+                                                fontSize: '11px',
+                                                backdropFilter: 'blur(8px)',
+                                                boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                                            }}
+                                            cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                                         />
-                                        <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
+                                        <Bar dataKey="total" fill="url(#barGradient)" radius={[6, 6, 0, 0]} barSize={24} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
 
                         {/* RIGHT COLUMN: STAFF & ALERTS */}
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             {/* ACTIVE STAFF */}
-                            <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-4 shadow-xl">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Equipo Activo</h3>
-                                    <span className="text-[10px] font-bold text-orange-400">{activeShifts?.length || 0}</span>
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md">
+                                <div className="flex justify-between items-center mb-5">
+                                    <h3 className="text-xs font-black text-white uppercase tracking-widest">Equipo en Piso</h3>
+                                    <div className="px-2 py-0.5 bg-toast-orange/20 text-toast-orange rounded text-[10px] font-black uppercase">
+                                        {activeShifts?.length || 0}
+                                    </div>
                                 </div>
-                                <div className="space-y-3 max-h-40 overflow-y-auto">
+                                <div className="space-y-4 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                                     {!activeShifts || activeShifts.length === 0 ? (
-                                        <p className="text-[10px] text-gray-500 text-center py-2">Sin personal activo</p>
+                                        <div className="flex flex-col items-center justify-center py-6 opacity-40">
+                                            <Users className="w-8 h-8 mb-2" />
+                                            <p className="text-[10px] font-bold">Sin personal en turno</p>
+                                        </div>
                                     ) : (
-                                        activeShifts.map(shift => {
-                                            return (
-                                                <div key={shift.id} className="flex items-center gap-3">
-                                                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-bold">
-                                                        S{shift.staffId}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-white">Staff #{shift.staffId}</p>
-                                                        <p className="text-[9px] text-green-400 flex items-center gap-1">
-                                                            {new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - Ahora
+                                        activeShifts.map(shift => (
+                                            <div key={shift.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors border border-transparent hover:border-white/5">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-toast-orange to-orange-700 flex items-center justify-center text-[10px] font-black text-white ring-2 ring-white/10">
+                                                    S{shift.staffId}
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-white">Staff #{shift.staffId}</p>
+                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                                        <p className="text-[9px] text-green-400 font-bold uppercase tracking-tight">
+                                                            {new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ONLINE
                                                         </p>
                                                     </div>
                                                 </div>
-                                            )
-                                        })
+                                            </div>
+                                        ))
                                     )}
                                 </div>
                             </div>
 
                             {/* ALERTS */}
-                            <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-4 shadow-xl">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Stock Bajo</h3>
-                                    <span className="text-[10px] font-bold text-red-400">{lowStockIngredients?.length || 0}</span>
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md">
+                                <div className="flex justify-between items-center mb-5">
+                                    <h3 className="text-xs font-black text-white uppercase tracking-widest">Reposición Requerida</h3>
+                                    <div className="px-2 py-0.5 bg-red-500/20 text-red-500 rounded text-[10px] font-black uppercase">
+                                        {lowStockIngredients?.length || 0}
+                                    </div>
                                 </div>
-                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                    {lowStockIngredients?.map(ing => (
-                                        <div key={ing.id} className="flex justify-between items-center p-1.5 bg-red-500/5 border border-red-500/10 rounded-lg">
-                                            <span className="text-[10px] text-gray-300">{ing.name}</span>
-                                            <span className="text-[9px] font-bold text-red-400">{ing.stock} {ing.unit}</span>
-                                        </div>
-                                    ))}
+                                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {lowStockIngredients?.length === 0 ? (
+                                        <p className="text-[10px] text-gray-500 text-center py-4">Stock en niveles óptimos</p>
+                                    ) : (
+                                        lowStockIngredients?.map(ing => (
+                                            <div key={ing.id} className="flex justify-between items-center p-3 bg-red-500/5 border border-red-500/10 rounded-xl group hover:bg-red-500/10 transition-all">
+                                                <span className="text-[11px] font-bold text-gray-300 group-hover:text-white transition-colors">{ing.name}</span>
+                                                <div className="text-right">
+                                                    <span className="text-[10px] font-black text-red-400 block tracking-tight uppercase">{ing.stock} {ing.unit}</span>
+                                                    <span className="text-[8px] text-red-500/60 font-medium">Bajo el mínimo</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </div>
                         </div>
                     </div>
+                    {/* BOTTOM: POPULAR ITEMS & RECENT ACTIVITY */}
+                    <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md">
+                            <h3 className="text-xs font-black text-white mb-5 uppercase tracking-widest">Productos Top</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                {[1, 2, 3, 4, 5, 6].map((_, i) => (
+                                    <div key={i} className="bg-black/20 p-3 rounded-xl border border-white/5 group hover:bg-white/5 transition-all cursor-pointer">
+                                        <div className="h-12 bg-gradient-to-br from-white/5 to-white/0 rounded-lg mb-3"></div>
+                                        <div className="h-2.5 w-3/4 bg-white/10 rounded-full mb-2"></div>
+                                        <div className="h-2 w-1/2 bg-white/5 rounded-full"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
 
-                    {/* BOTTOM: POPULAR ITEMS (Compact) */}
-                    <div className="mt-4 bg-[#2a2a2a] border border-white/5 rounded-xl p-4 shadow-xl">
-                        <h3 className="text-xs font-bold text-white mb-3 uppercase tracking-wider">Productos Top (Simulado)</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                            {[1, 2, 3, 4, 5, 6].map((_, i) => (
-                                <div key={i} className="bg-black/20 p-2 rounded-lg border border-white/5">
-                                    <div className="h-10 bg-white/5 rounded mb-2"></div>
-                                    <div className="h-2 w-3/4 bg-white/10 rounded mb-1"></div>
-                                    <div className="h-1.5 w-1/2 bg-white/10 rounded"></div>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-6 opacity-5">
+                                <MessageSquare className="w-24 h-24" />
+                            </div>
+                            <h3 className="text-xs font-black text-white mb-5 uppercase tracking-widest">Actividad de Nexus</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-start gap-3 p-3 bg-toast-orange/5 border border-toast-orange/10 rounded-xl">
+                                    <div className="w-8 h-8 rounded-full bg-toast-orange/20 flex items-center justify-center text-toast-orange group">
+                                        <DollarSign className="w-4 h-4 animate-bounce" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-white">Escáner V7 Activo</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">La validación contable está activada y protegida.</p>
+                                    </div>
                                 </div>
-                            ))}
+                                <div className="flex items-start gap-3 p-3 bg-blue-500/5 border border-blue-500/10 rounded-xl">
+                                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                        <TrendingUp className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-white">Sincronización Cloud</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">Respaldos físicos en Supabase completados.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </main>
-        </div>
+                </div >
+            </main >
+        </div >
     );
 }
