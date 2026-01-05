@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, PurchaseOrder, PurchaseOrderItem } from '@/lib/db';
-import { UtensilsCrossed, ArrowLeft, ShoppingCart, Plus, Check, Package, Loader2, Search, X, Trash2, Settings, Store, Sparkles } from 'lucide-react';
+import { UtensilsCrossed, ArrowLeft, ShoppingCart, Plus, Check, Package, Loader2, Search, X, Trash2, Settings, Store, Sparkles, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -300,9 +300,21 @@ export default function PurchasesPage() {
                                                     {order.status === 'Received' ? <Check className="w-5 h-5" /> : <Package className="w-5 h-5" />}
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-toast-orange text-lg">{getSupplierName(order.supplierId)}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-toast-orange text-lg">{getSupplierName(order.supplierId)}</p>
+                                                        {order.paymentStatus === 'Pending' && order.dueDate && (
+                                                            (() => {
+                                                                const isOverdue = new Date(order.dueDate) < new Date();
+                                                                const isSoon = !isOverdue && (new Date(order.dueDate).getTime() - new Date().getTime()) < (3 * 24 * 60 * 60 * 1000); // 3 days
+                                                                if (isOverdue) return <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded border border-red-500/30 flex items-center gap-1 animate-pulse"><AlertTriangle className="w-3 h-3" /> VENCIDA</span>;
+                                                                if (isSoon) return <span className="bg-yellow-500/20 text-yellow-500 text-[10px] font-bold px-2 py-0.5 rounded border border-yellow-500/30 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> POR VENCER</span>;
+                                                                return null;
+                                                            })()
+                                                        )}
+                                                    </div>
                                                     <p className="text-xs text-gray-400">
                                                         {format(order.date, "d MMM, HH:mm", { locale: es })} • {order.items.map((i: any) => `${i.quantity} ${i.purchaseUnit || 'un'} ${getIngredientName(i.ingredientId)}`).join(', ')} • ${order.totalCost.toLocaleString()}
+                                                        {order.paymentStatus === 'Pending' && order.dueDate && ` • Vence: ${format(new Date(order.dueDate), "d MMM", { locale: es })}`}
                                                     </p>
                                                 </div>
                                             </div>

@@ -1,5 +1,6 @@
 export interface ExtractedData {
     date?: Date;
+    dueDate?: Date;
     total?: number;
     supplierName?: string;
     items: { name: string; price?: number }[];
@@ -38,7 +39,13 @@ export function parseInvoiceText(text: string): ExtractedData {
                 const day = parseInt(dateMatch[1]);
                 const month = parseInt(dateMatch[2]) - 1;
                 const year = dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3]);
-                data.date = new Date(year, month, day);
+                const detectedDate = new Date(year, month, day);
+
+                if (!data.date) {
+                    data.date = detectedDate;
+                } else if (!data.dueDate && (data.date as any) < detectedDate) {
+                    data.dueDate = detectedDate;
+                }
             }
         }
 

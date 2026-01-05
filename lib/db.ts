@@ -112,6 +112,7 @@ export interface PurchaseOrder {
     date: Date;
     status: 'Pending' | 'Ordered' | 'Received';
     paymentStatus?: 'Paid' | 'Pending';
+    dueDate?: Date;
     totalCost: number;
     items: PurchaseOrderItem[];
     restaurantId?: string;

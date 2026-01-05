@@ -50,6 +50,7 @@ export default function ScanPage() {
                 await db.purchaseOrders.add({
                     supplierId: supplier!.id!,
                     date: result.date || new Date(),
+                    dueDate: result.dueDate,
                     status: 'Received',
                     paymentStatus: paymentStatus,
                     totalCost: result.total!,
@@ -218,6 +219,24 @@ export default function ScanPage() {
                                         Por Pagar
                                     </button>
                                 </div>
+
+                                {paymentStatus === 'Pending' && (
+                                    <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <label className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1 block">Fecha de Vencimiento</label>
+                                        <input
+                                            type="date"
+                                            value={result.dueDate ? result.dueDate.toISOString().split('T')[0] : ''}
+                                            onChange={(e) => {
+                                                const newDate = e.target.value ? new Date(e.target.value) : undefined;
+                                                setResult({ ...result, dueDate: newDate });
+                                            }}
+                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-toast-orange outline-none transition-all"
+                                        />
+                                        <p className="text-[9px] text-yellow-500/70 mt-1 italic flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3" /> Se generará una alerta si no se paga antes de esta fecha.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Items */}
