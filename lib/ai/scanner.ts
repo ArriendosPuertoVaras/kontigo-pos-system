@@ -4,7 +4,7 @@ export async function scanInvoiceImage(imageFile: File): Promise<string> {
     try {
         const { data: { text } } = await Tesseract.recognize(
             imageFile,
-            'eng', // Using English mostly for numbers/keywords, 'spa' is better but larger download
+            'spa+eng', // Supporting both for Spanish keywords and standard numbers
             { logger: m => console.log(m) }
         );
         return text;

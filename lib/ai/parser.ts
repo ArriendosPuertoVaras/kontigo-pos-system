@@ -11,8 +11,28 @@ export interface ExtractedData {
     items: { name: string; price?: number }[];
 }
 
+/**
+ * Clean OCR noise and common misreads
+ */
+function preprocessOCR(text: string): string {
+    return text
+        .split('\n')
+        .map(line => {
+            // Remove isolated characters (noise) like "a s @ #"
+            let cleaned = line.replace(/(^|\s)[^a-zA-Z0-9](\s|$)/g, ' ').trim();
+            // Remove non-printable/weird symbols
+            cleaned = cleaned.replace(/[^\w\s\$\.\,\-\:\/]/g, '');
+            return cleaned;
+        })
+        .filter(line => line.length > 2) // Ignore very short noise lines
+        .join('\n');
+}
+
 export function parseInvoiceText(text: string): ExtractedData {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const rawLines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const sanitizedText = preprocessOCR(text);
+    const lines = sanitizedText.split('\n').map(l => l.trim()).filter(Boolean);
+
     const data: ExtractedData = { items: [] };
 
     // Regex Utils
@@ -20,87 +40,88 @@ export function parseInvoiceText(text: string): ExtractedData {
     const rutRegex = /(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]|\d{7,8}-[\dkK])/;
     const amountRegex = /(?:[\$]|(?:\s|^))(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/;
 
-    // Heuristic for cleaning price (removes dots if they are thousands separators)
     const cleanAmount = (str: string) => {
         const num = str.replace(/[^\d]/g, '');
         return parseInt(num) || 0;
     };
 
-    // 1. Detect RUT (Heuristic: First one found is usually the supplier's RUT)
-    for (const line of lines) {
+    // 1. Detect RUT (Filter out obvious noise)
+    for (const line of rawLines) {
         const match = line.match(rutRegex);
-        if (match && !data.rut) {
-            data.rut = match[0];
-            break;
+        if (match) {
+            const val = match[0].replace(/\./g, '');
+            // Simple sanity: RUTs in Chile usually don't start with too many zeros unless placeholder
+            if (!val.startsWith('000') && !data.rut) {
+                data.rut = match[0];
+            }
         }
     }
 
-    // 2. Identify Total, IVA, Neto (Chilean pattern)
-    let maxFoundAmount = 0;
+    // 2. Identify Amounts with advanced heuristic
+    let detectedTotal = 0;
+    let detectedNeto = 0;
+    let detectedIva = 0;
+    let maxAmount = 0;
 
     for (const line of lines) {
         const upper = line.toUpperCase();
-
-        // Match potential amounts in this line
         const amounts = line.match(/(\d{1,3}(?:\.\d{3})+|\d{4,})/g) || [];
-        const numericalAmounts = amounts.map(item => cleanAmount(item));
+        const numericals = amounts.map(a => cleanAmount(a));
 
-        if (numericalAmounts.length > 0) {
-            const lineMax = Math.max(...numericalAmounts);
-            if (lineMax > maxFoundAmount) maxFoundAmount = lineMax;
+        if (numericals.length > 0) {
+            const m = Math.max(...numericals);
+            if (m > maxAmount) maxAmount = m;
         }
 
-        // Keywords for Total
-        if (upper.includes('TOTAL') || upper.includes('A PAGAR') || upper.includes('SALDO') || upper.includes('MONTO FINAL')) {
-            const matches = line.match(amountRegex);
-            if (matches) {
-                const val = cleanAmount(matches[1]);
-                if (val > 100) data.total = val;
+        const matches = line.match(amountRegex);
+        const val = matches ? cleanAmount(matches[1]) : 0;
+
+        if (val > 0) {
+            if (upper.includes('TOTAL') || upper.includes('A PAGAR') || upper.includes('PAGADO') || upper.includes('FINAL')) {
+                if (val > detectedTotal) detectedTotal = val;
+            }
+            if (upper.includes('NETO') || upper.includes('SUBTOTAL') || upper.includes('AFECTO') || upper.includes('MONTO NETO')) {
+                if (val > detectedNeto) detectedNeto = val;
+            }
+            if (upper.includes('IVA') || upper.includes('I.V.A')) {
+                if (val > detectedIva) detectedIva = val;
             }
         }
 
-        if (upper.includes('IVA') || upper.includes('I.V.A')) {
-            const matches = line.match(amountRegex);
-            if (matches) data.iva = cleanAmount(matches[1]);
-        }
-
-        if (upper.includes('NETO') || upper.includes('SUBTOTAL') || upper.includes('AFECTO')) {
-            const matches = line.match(amountRegex);
-            if (matches) data.neto = cleanAmount(matches[1]);
-        }
-
-        // 2b. Folio and Customer Number
+        // Folio & Customer
         if (upper.includes('FOLIO') || upper.includes('BOLETA N') || upper.includes('FACTURA N')) {
-            const folioMatch = line.match(/(\d{4,})/);
-            if (folioMatch && !data.folio) data.folio = folioMatch[1];
+            const f = line.match(/(\d{4,})/);
+            if (f && !data.folio) data.folio = f[1];
         }
-
-        if (upper.includes('CLIENTE') || upper.includes('NRO CTA') || upper.includes('N° CTA')) {
-            const clientMatch = line.match(/(\d{6,})/);
-            if (clientMatch && !data.customerNumber) data.customerNumber = clientMatch[1];
+        if (upper.includes('CLIENTE') || upper.includes('CTA') || upper.includes('NRO CTA')) {
+            const c = line.match(/(\d{5,})/);
+            if (c && !data.customerNumber) data.customerNumber = c[1];
         }
     }
 
-    // Mathematical Validation (Nexus Core Heuristic)
-    // If Neto + IVA exists, it's more reliable than a random "TOTAL" keyword match
-    if (data.neto && data.iva) {
-        const calculatedTotal = data.neto + data.iva;
-        if (!data.total || Math.abs(data.total - calculatedTotal) > 10) {
-            console.log(`[Parser] ⚖️ Correcting Total: detected ${data.total} -> calculated ${calculatedTotal}`);
-            data.total = calculatedTotal;
+    // 3. Mathematical Healing (The "Professional" Layer)
+    // We prioritize patterns that make mathematical sense
+    if (detectedNeto > 0 && detectedIva > 0) {
+        const sum = detectedNeto + detectedIva;
+        if (detectedTotal === 0 || Math.abs(detectedTotal - sum) > 5) {
+            detectedTotal = sum;
         }
-    } else if (data.total && !data.neto && !data.iva) {
-        // Reverse calculate if only total found (assuming 19% IVA)
-        data.neto = Math.round(data.total / 1.19);
-        data.iva = data.total - data.neto;
+    } else if (detectedTotal > 0) {
+        // If we only have Total, try to split it
+        if (detectedNeto === 0) detectedNeto = Math.round(detectedTotal / 1.19);
+        if (detectedIva === 0) detectedIva = detectedTotal - detectedNeto;
+    } else if (maxAmount > 0) {
+        // Fallback to largest number found
+        detectedTotal = maxAmount;
+        detectedNeto = Math.round(detectedTotal / 1.19);
+        detectedIva = detectedTotal - detectedNeto;
     }
 
-    // Fallback for Total if not found via keyword but we see a large number
-    if (!data.total && maxFoundAmount > 0) {
-        data.total = maxFoundAmount;
-    }
+    data.total = detectedTotal;
+    data.neto = detectedNeto;
+    data.iva = detectedIva;
 
-    // 3. Dates
+    // 4. Dates
     for (const line of lines) {
         const dateMatch = line.match(dateRegex);
         if (dateMatch) {
@@ -108,40 +129,39 @@ export function parseInvoiceText(text: string): ExtractedData {
             const month = parseInt(dateMatch[2]) - 1;
             const yearStr = dateMatch[3];
             const year = yearStr.length === 2 ? 2000 + parseInt(yearStr) : parseInt(yearStr);
-            const detectedDate = new Date(year, month, day);
-
-            if (!data.date) {
-                data.date = detectedDate;
-            } else if (!data.dueDate && (data.date as any) < detectedDate) {
-                data.dueDate = detectedDate;
+            if (day > 0 && day <= 31 && month >= 0 && month < 12) {
+                const d = new Date(year, month, day);
+                if (!data.date) data.date = d;
             }
         }
     }
 
-    // 4. Supplier Name (Aggressive improvement)
-    const garbageKeywords = /FACTURA|BOLETA|ELECTRONICA|RUT|GIRO|DIRECCION|TELEFONO|EMISION|VENCIMIENTO|TOTAL|NETO|IVA|BOLETA|GUIA|RUT|CONTADO|PAGO|CHILE|S\.A|LTDA|ALAMEDA|HIGGINS|AVENIDA|PASAJE|CALLE|N°|NUMERO|LOCAL|PISO|CIUDAD|COMUNA|REGION/i;
+    // 5. Supplier Name (High Quality Heuristic)
+    const blackList = /FACTURA|BOLETA|ELECTRONICA|RUT|GIRO|DIRECCION|EMISION|VENCIMIENTO|TOTAL|NETO|IVA|CONTADO|PAGO|CHILE|ALAMEDA|AVENIDA|PISO|CIUDAD|COMUNA|REGION|CLIENTE|DETALLE/i;
 
-    const possibleSuppliers = lines.slice(0, 15).filter(l =>
-        l.length > 5 &&
-        l.length < 50 &&
-        !dateRegex.test(l) &&
-        !rutRegex.test(l) &&
-        !/\d{3,}/.test(l) && // Exclude lines with numbers (likely addresses or noise)
-        (l.toUpperCase().includes(' S.A') || l.toUpperCase().includes(' LTDA') || l.toUpperCase().includes(' SPA') || !garbageKeywords.test(l))
-    );
+    // Look at first 8 lines specifically, after cleaning
+    const potentialLines = sanitizedText.split('\n')
+        .slice(0, 8)
+        .filter(l => l.length > 4 && !blackList.test(l) && !dateRegex.test(l) && !rutRegex.test(l));
 
-    if (possibleSuppliers.length > 0) {
-        data.supplierName = possibleSuppliers[0];
+    if (potentialLines.length > 0) {
+        // Prefer lines containing business suffixes
+        const business = potentialLines.find(l => /S\.A|LTDA|SPA|LIMITADA| SOCIEDAD/i.test(l));
+        data.supplierName = business || potentialLines[0];
+    } else {
+        // Extreme fallback: first line of raw text that isn't empty nor obviously noise
+        data.supplierName = rawLines.find(l => l.length > 5 && !blackList.test(l)) || "Proveedor Desconocido";
     }
 
-    // 5. Items (Keep simple for now but avoid keywords)
+    // 6. Items
     lines.forEach(line => {
-        const isGarbage = /TOTAL|IVA|NETO|FECHA|RUT|FOLIO/i.test(line);
-        if (!isGarbage && line.length > 10) {
-            const matches = line.match(amountRegex);
-            const amt = matches ? cleanAmount(matches[1]) : 0;
-            if (amt > 0 && data.total && amt < data.total) { // Basic sanity check
-                data.items.push({ name: line.replace(matches ? matches[0] : '', '').trim() });
+        if (line.length > 10 && !blackList.test(line)) {
+            const m = line.match(amountRegex);
+            if (m) {
+                const amt = cleanAmount(m[1]);
+                if (amt > 0 && amt < (data.total || 9999999)) {
+                    data.items.push({ name: line.replace(m[0], '').trim(), price: amt });
+                }
             }
         }
     });
