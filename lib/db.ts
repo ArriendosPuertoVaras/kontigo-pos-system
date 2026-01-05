@@ -90,6 +90,7 @@ export interface Category {
 export interface Supplier {
     id?: number;
     name: string;
+    rut?: string; // Chilean identifier
     contactName: string;
     email: string;
     phone: string;

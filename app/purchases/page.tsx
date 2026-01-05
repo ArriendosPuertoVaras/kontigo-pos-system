@@ -313,7 +313,11 @@ export default function PurchasesPage() {
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-gray-400">
-                                                        {format(order.date, "d MMM, HH:mm", { locale: es })} • {order.items.map((i: any) => `${i.quantity} ${i.purchaseUnit || 'un'} ${getIngredientName(i.ingredientId)}`).join(', ')} • ${order.totalCost.toLocaleString()}
+                                                        {format(order.date, "d MMM, HH:mm", { locale: es })} • {
+                                                            order.items.length > 3
+                                                                ? `${order.items.length} productos / ítems`
+                                                                : order.items.map((i: any) => `${i.quantity} ${i.purchaseUnit || 'un'} ${getIngredientName(i.ingredientId)}`).join(', ')
+                                                        } • ${order.totalCost.toLocaleString()}
                                                         {order.paymentStatus === 'Pending' && order.dueDate && ` • Vence: ${format(new Date(order.dueDate), "d MMM", { locale: es })}`}
                                                     </p>
                                                 </div>

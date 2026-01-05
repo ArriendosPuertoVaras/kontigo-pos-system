@@ -35,6 +35,7 @@ export default function ScanPage() {
                 if (!supplier) {
                     const newId = await db.suppliers.add({
                         name: result.supplierName!.trim(),
+                        rut: result.rut, // Persist RUT
                         category: 'General',
                         contactName: '',
                         email: '',
@@ -43,6 +44,10 @@ export default function ScanPage() {
                     });
                     supplier = await db.suppliers.get(newId as number);
                     toast.info(`Nuevo proveedor creado: ${result.supplierName}`);
+                    syncService.autoSync(db.suppliers, 'suppliers').catch(console.error);
+                } else if (!supplier.rut && result.rut) {
+                    // Update RUT if missing in existing supplier
+                    await db.suppliers.update(supplier.id!, { rut: result.rut });
                     syncService.autoSync(db.suppliers, 'suppliers').catch(console.error);
                 }
 

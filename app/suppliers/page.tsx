@@ -114,6 +114,7 @@ export default function SuppliersPage() {
                                                 {supplier.category}
                                             </span>
                                             <h3 className="text-xl font-bold text-white">{supplier.name}</h3>
+                                            {supplier.rut && <p className="text-[10px] font-mono text-gray-500 mt-0.5">{supplier.rut}</p>}
                                         </div>
                                     </div>
 
