@@ -114,78 +114,57 @@ export default function Header({ title, children, backHref }: HeaderProps) {
     return (
         <header className="relative h-auto min-h-[5rem] border-b border-white/5 flex flex-wrap items-center justify-between px-4 md:px-8 py-3 bg-toast-charcoal shadow-sm z-10 shrink-0 gap-4">
             {/* LEFT: Page Title & Global Nav */}
-            <div className="flex items-center justify-between w-full md:w-auto gap-4 shrink-0">
-                <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between w-full md:w-auto gap-2 md:gap-4 shrink-0">
+                <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
                     {/* HAMBURGER (Mobile Only) */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('toggle-sidebar'))}
-                        className="md:hidden p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg"
+                        className="md:hidden p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg shrink-0"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                         {backHref && (
-                            <Link href={backHref} className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded-full transition-colors mr-1">
-                                <ArrowLeft className="w-5 h-5" />
+                            <Link href={backHref} className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded-full transition-colors shrink-0">
+                                <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                             </Link>
                         )}
-                        <h1 className="text-lg md:text-xl font-bold tracking-tight text-white/90 truncate flex items-center gap-2">
+                        <h1 className="text-sm md:text-xl font-bold tracking-tight text-white/90 truncate flex items-center gap-2">
                             {title}
-                            <span className="px-2 py-0.5 rounded bg-toast-orange text-[10px] text-white font-bold tracking-wider">v2.0 SECURE</span>
+                            <span className="hidden xs:inline-block px-1.5 py-0.5 rounded bg-toast-orange text-[8px] md:text-[10px] text-white font-bold tracking-wider">v2.0</span>
                         </h1>
                         {status === 'offline' ? (
-                            <span className="flex items-center gap-1.5 bg-red-500/10 text-red-500 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-red-500/20 hidden sm:flex animate-pulse">
+                            <span className="flex items-center gap-1.5 bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full text-[8px] md:text-[10px] font-bold border border-red-500/20 hidden sm:flex animate-pulse">
                                 <WiFiOff className="w-3 h-3" /> OFFLINE
                             </span>
                         ) : (
-                            <span className="flex items-center gap-1.5 bg-toast-green/10 text-toast-green px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-toast-green/20 hidden sm:flex cursor-pointer hover:bg-toast-green/20 transition-colors" title="Conectado a la Nube">
+                            <span className="flex items-center gap-1.5 bg-toast-green/10 text-toast-green px-2 py-0.5 rounded-full text-[8px] md:text-[10px] font-bold border border-toast-green/20 hidden sm:flex cursor-pointer hover:bg-toast-green/20 transition-colors" title="Conectado a la Nube">
                                 <Wifi className="w-3 h-3" /> ONLINE
                             </span>
                         )}
                     </div>
                 </div>
 
-                {/* Mobile Time/User (Compact) */}
-                <div className="md:hidden flex items-center gap-2">
-                    {/* Mobile Sync Button */}
+                {/* Mobile Time/User/Sync (Compact) */}
+                <div className="md:hidden flex items-center gap-1.5 shrink-0">
                     <button
                         onClick={handleSync}
                         disabled={syncStatus === 'syncing'}
-                        className={`p-2 rounded-full transition-all border
+                        className={`p-1.5 rounded-full transition-all border
                         ${syncStatus === 'idle' ? 'bg-white/5 border-white/10 text-gray-400' : ''}
                         ${syncStatus === 'syncing' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 animate-pulse' : ''}
                         ${syncStatus === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : ''}
                         ${syncStatus === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : ''}
                         `}
                     >
-                        {syncStatus === 'idle' && <CloudUpload className="w-4 h-4" />}
-                        {syncStatus === 'syncing' && <RefreshCw className="w-4 h-4 animate-spin" />}
-                        {syncStatus === 'success' && <Check className="w-4 h-4" />}
-                        {syncStatus === 'error' && <AlertCircle className="w-4 h-4" />}
+                        {syncStatus === 'idle' && <CloudUpload className="w-3.5 h-3.5" />}
+                        {syncStatus === 'syncing' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        {syncStatus === 'success' && <Check className="w-3.5 h-3.5" />}
+                        {syncStatus === 'error' && <AlertCircle className="w-3.5 h-3.5" />}
                     </button>
 
-                    {/* Mobile Restore Button */}
-                    <button
-                        onClick={async () => {
-                            if (!confirm("⚠️ RESTAURAR DATOS\n\n¿Reemplazar datos locales con la Nube?")) return;
-                            setSyncStatus('syncing');
-                            try {
-                                const { syncService } = await import('@/lib/sync_service');
-                                await syncService.restoreFromCloud();
-                                alert("✅ Restaurado");
-                            } catch (e: any) {
-                                alert("Error: " + e.message);
-                                setSyncStatus('error');
-                                setTimeout(() => setSyncStatus('idle'), 3000);
-                            }
-                        }}
-                        className="p-2 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                    </button>
-
-                    <div className="w-8 h-8 bg-toast-charcoal-light ring-1 ring-white/10 rounded-full flex items-center justify-center font-bold text-xs text-white">
+                    <div className="w-7 h-7 bg-toast-charcoal-light ring-1 ring-white/10 rounded-full flex items-center justify-center font-bold text-[10px] text-white">
                         {staffName.charAt(0)}
                     </div>
                 </div>

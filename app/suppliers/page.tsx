@@ -18,7 +18,7 @@ export default function SuppliersPage() {
 
     if (hasAccess === false) {
         return (
-            <div className="flex h-screen w-full bg-[#1e1e1e]">
+            <div className="flex flex-col md:flex-row h-screen w-full bg-[#1e1e1e]">
                 <Sidebar />
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-white">
                     <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
@@ -61,21 +61,8 @@ export default function SuppliersPage() {
     };
 
     return (
-        <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
-            {/* SIDEBAR (Mini Version for Navigation context) */}
-            <aside className="w-[90px] bg-toast-charcoal-dark flex flex-col items-center py-6 border-r border-white/5 z-20 shadow-xl">
-                <div className="mb-10 scale-110">
-                    <div className="w-12 h-12 bg-gradient-to-br from-toast-orange to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                        <UtensilsCrossed className="text-white w-7 h-7" />
-                    </div>
-                </div>
-                <nav className="flex flex-col gap-2 w-full px-2">
-                    <Link href="/" className="flex flex-col items-center justify-center w-full py-3 rounded-xl transition-all duration-200 group text-gray-400 hover:text-white hover:bg-white/5">
-                        <ArrowLeft className="w-5 h-5 mb-1" />
-                        <span className="text-[9px] font-bold uppercase">Volver</span>
-                    </Link>
-                </nav>
-            </aside>
+        <div className="flex flex-col md:flex-row h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative overflow-hidden">
+            <Sidebar />
 
             {/* MAIN CONTENT */}
             <main className="flex-1 flex flex-col h-full bg-[#2a2a2a] overflow-hidden">

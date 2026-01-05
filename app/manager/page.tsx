@@ -66,7 +66,7 @@ export default function ManagerPage() {
 
     if (hasAccess === false) {
         return (
-            <div className="flex h-screen w-full bg-[#1a1a1a] text-white font-sans selection:bg-toast-orange selection:text-white relative">
+            <div className="flex flex-col md:flex-row h-screen w-full bg-[#1a1a1a] text-white font-sans selection:bg-toast-orange selection:text-white relative overflow-hidden">
                 <Sidebar />
                 <div className="flex-1 flex items-center justify-center bg-[#1a1a1a] text-white">
                     <div className="flex flex-col items-center gap-4 p-8 bg-white/5 rounded-2xl border border-white/10 max-w-sm text-center">
@@ -169,7 +169,7 @@ export default function ManagerPage() {
     const formatMoney = (val: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
 
     return (
-        <div className="flex h-screen w-full bg-[#1a1a1a] text-white font-sans selection:bg-toast-orange selection:text-white relative">
+        <div className="flex flex-col md:flex-row h-screen w-full bg-[#1a1a1a] text-white font-sans selection:bg-toast-orange selection:text-white relative overflow-hidden">
             <Sidebar />
             <main className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-[1600px] mx-auto w-full">

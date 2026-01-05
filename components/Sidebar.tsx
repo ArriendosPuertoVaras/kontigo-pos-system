@@ -96,7 +96,7 @@ export default function Sidebar() {
 
             <aside id="sidebar-container" className={`
                 w-[80px] bg-toast-charcoal-dark flex flex-col items-center py-4 border-r border-white/5 shadow-xl flex-shrink-0 h-full
-                fixed md:relative top-0 left-0 bottom-0 z-30 transition-transform duration-300
+                fixed md:sticky top-0 left-0 bottom-0 z-50 transition-transform duration-300
                 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
             `}>
                 {/* LOGO */}

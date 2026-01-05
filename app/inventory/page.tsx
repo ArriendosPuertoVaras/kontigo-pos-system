@@ -56,7 +56,7 @@ export default function InventoryPage() {
 
     if (hasAccess === false) {
         return (
-            <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
+            <div className="flex flex-col md:flex-row h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
                 <Sidebar />
                 <div className="flex-1 flex items-center justify-center bg-toast-charcoal text-white">
                     <div className="flex flex-col items-center gap-4 p-8 bg-white/5 rounded-2xl border border-white/10 max-w-sm text-center">
@@ -154,24 +154,8 @@ export default function InventoryPage() {
     }
 
     return (
-        <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
-            {/* SIDEBAR */}
-            <aside className="w-[90px] bg-toast-charcoal-dark flex flex-col items-center py-6 border-r border-white/5 z-20 shadow-xl">
-                <div className="mb-10 scale-110">
-                    <div className="w-12 h-12 bg-gradient-to-br from-toast-orange to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                        <Package className="text-white w-7 h-7" />
-                    </div>
-                </div>
-                <nav className="flex flex-col gap-2 w-full px-2">
-                    <NavItem icon={<ArrowLeft />} label="Volver" onClick={() => router.push('/tables')} />
-                    <div className="h-px w-full bg-white/10 my-2"></div>
-                    <NavItem
-                        icon={<ChefHat />}
-                        label="Cocina"
-                        onClick={() => router.push('/inventory/preparations')}
-                    />
-                </nav>
-            </aside>
+        <div className="flex flex-col md:flex-row h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative overflow-hidden">
+            <Sidebar />
 
             {/* CONTENT */}
             <main className="flex-1 flex flex-col h-full bg-[#2a2a2a] overflow-hidden">
