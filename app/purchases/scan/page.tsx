@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { db } from '@/lib/db';
+import { db, PurchaseOrder } from '@/lib/db';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Camera, Loader2, Sparkles, AlertTriangle, FileText, Check, ShoppingCart, Store } from 'lucide-react';
@@ -52,20 +52,22 @@ export default function ScanPage() {
                 }
 
                 // 2. Create Purchase Order (Implicitly Received)
-                await db.purchaseOrders.add({
+                const orderId = await db.purchaseOrders.add({
                     supplierId: supplier!.id!,
                     date: result.date || new Date(),
-                    dueDate: result.dueDate,
                     status: 'Received',
                     paymentStatus: paymentStatus,
-                    totalCost: result.total!,
-                    items: result.items.map(it => ({
+                    dueDate: paymentStatus === 'Pending' ? result.dueDate : undefined,
+                    totalCost: result.total || 0,
+                    folio: result.folio,
+                    customerNumber: result.customerNumber,
+                    items: result.items.map(item => ({
                         ingredientId: 0, // Generic/AI Item placeholder
                         quantity: 1,
-                        unitCost: it.price || 0,
+                        unitCost: item.price || 0,
                         purchaseUnit: 'un'
                     }))
-                });
+                } as PurchaseOrder);
 
                 // 3. Record in Accounting
                 await KontigoFinance.recordPurchase(supplier!.name, result.total!, false, paymentStatus === 'Paid'); // false = expense, not asset by default for rapid scan
@@ -213,6 +215,27 @@ export default function ScanPage() {
                             {/* Detailed Summary */}
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-white/5">
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">Folio / Boleta</p>
+                                    <input
+                                        type="text"
+                                        value={result.folio || ''}
+                                        onChange={(e) => setResult({ ...result, folio: e.target.value })}
+                                        className="w-full bg-transparent text-lg md:text-xl font-bold text-white outline-none focus:text-toast-orange"
+                                        placeholder="N° 000"
+                                    />
+                                </div>
+                                <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-white/5">
+                                    <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">N° Cliente</p>
+                                    <input
+                                        type="text"
+                                        value={result.customerNumber || ''}
+                                        onChange={(e) => setResult({ ...result, customerNumber: e.target.value })}
+                                        className="w-full bg-transparent text-lg md:text-xl font-bold text-white outline-none focus:text-toast-orange"
+                                        placeholder="Ctas..."
+                                    />
+                                </div>
+
+                                <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-white/5">
                                     <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">Monto Neto</p>
                                     <input
                                         type="number"
@@ -234,17 +257,25 @@ export default function ScanPage() {
                                     <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-1">Fecha Emisión</p>
                                     <p className="text-lg md:text-xl font-bold text-white">{result.date ? result.date.toLocaleDateString() : '?'}</p>
                                 </div>
-                                <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-toast-green/20 bg-toast-green/5">
-                                    <p className="text-[10px] md:text-xs uppercase font-bold text-toast-green mb-1">TOTAL FINAL</p>
+                                <div className={`p-3 md:p-4 rounded-lg border transition-all ${((result.neto || 0) + (result.iva || 0) === (result.total || 0) && (result.total || 0) > 0) ? 'border-toast-green/40 bg-toast-green/10' : 'border-toast-orange/20 bg-toast-orange/5'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <p className={`text-[10px] md:text-xs uppercase font-bold mb-1 ${((result.neto || 0) + (result.iva || 0) === (result.total || 0) && (result.total || 0) > 0) ? 'text-toast-green' : 'text-toast-orange'}`}>TOTAL FINAL</p>
+                                        {((result.neto || 0) + (result.iva || 0) === (result.total || 0) && (result.total || 0) > 0) && (
+                                            <Check className="w-3 h-3 text-toast-green" />
+                                        )}
+                                    </div>
                                     <div className="flex items-center gap-1">
-                                        <span className="text-toast-green font-bold">$</span>
+                                        <span className={`${((result.neto || 0) + (result.iva || 0) === (result.total || 0) && (result.total || 0) > 0) ? 'text-toast-green' : 'text-toast-orange'} font-bold`}>$</span>
                                         <input
                                             type="number"
                                             value={result.total || 0}
                                             onChange={(e) => setResult({ ...result, total: parseInt(e.target.value) })}
-                                            className="w-full bg-transparent text-lg md:text-xl font-bold text-white outline-none focus:text-toast-green"
+                                            className="w-full bg-transparent text-lg md:text-xl font-bold text-white outline-none"
                                         />
                                     </div>
+                                    {((result.neto || 0) + (result.iva || 0) !== (result.total || 0)) && (result.total || 0) > 0 && (
+                                        <p className="text-[9px] text-toast-orange/80 mt-1 italic leading-none">⚠️ No coincide con Neto + IVA</p>
+                                    )}
                                 </div>
                             </div>
 

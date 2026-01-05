@@ -6,6 +6,8 @@ export interface ExtractedData {
     neto?: number;
     rut?: string;
     supplierName?: string;
+    folio?: string;
+    customerNumber?: string;
     items: { name: string; price?: number }[];
 }
 
@@ -49,7 +51,7 @@ export function parseInvoiceText(text: string): ExtractedData {
         }
 
         // Keywords for Total
-        if (upper.includes('TOTAL') || upper.includes('AMOUNT') || upper.includes('A PAGAR') || upper.includes('SALDO')) {
+        if (upper.includes('TOTAL') || upper.includes('A PAGAR') || upper.includes('SALDO') || upper.includes('MONTO FINAL')) {
             const matches = line.match(amountRegex);
             if (matches) {
                 const val = cleanAmount(matches[1]);
@@ -62,10 +64,35 @@ export function parseInvoiceText(text: string): ExtractedData {
             if (matches) data.iva = cleanAmount(matches[1]);
         }
 
-        if (upper.includes('NETO') || upper.includes('SUBTOTAL')) {
+        if (upper.includes('NETO') || upper.includes('SUBTOTAL') || upper.includes('AFECTO')) {
             const matches = line.match(amountRegex);
             if (matches) data.neto = cleanAmount(matches[1]);
         }
+
+        // 2b. Folio and Customer Number
+        if (upper.includes('FOLIO') || upper.includes('BOLETA N') || upper.includes('FACTURA N')) {
+            const folioMatch = line.match(/(\d{4,})/);
+            if (folioMatch && !data.folio) data.folio = folioMatch[1];
+        }
+
+        if (upper.includes('CLIENTE') || upper.includes('NRO CTA') || upper.includes('N° CTA')) {
+            const clientMatch = line.match(/(\d{6,})/);
+            if (clientMatch && !data.customerNumber) data.customerNumber = clientMatch[1];
+        }
+    }
+
+    // Mathematical Validation (Nexus Core Heuristic)
+    // If Neto + IVA exists, it's more reliable than a random "TOTAL" keyword match
+    if (data.neto && data.iva) {
+        const calculatedTotal = data.neto + data.iva;
+        if (!data.total || Math.abs(data.total - calculatedTotal) > 10) {
+            console.log(`[Parser] ⚖️ Correcting Total: detected ${data.total} -> calculated ${calculatedTotal}`);
+            data.total = calculatedTotal;
+        }
+    } else if (data.total && !data.neto && !data.iva) {
+        // Reverse calculate if only total found (assuming 19% IVA)
+        data.neto = Math.round(data.total / 1.19);
+        data.iva = data.total - data.neto;
     }
 
     // Fallback for Total if not found via keyword but we see a large number
@@ -92,14 +119,15 @@ export function parseInvoiceText(text: string): ExtractedData {
     }
 
     // 4. Supplier Name (Aggressive improvement)
-    const garbageKeywords = /FACTURA|BOLETA|ELECTRONICA|RUT|GIRO|DIRECCION|TELEFONO|EMISION|VENCIMIENTO|TOTAL|NETO|IVA|BOLETA|GUIA|RUT|CONTADO|PAGO|CHILE|S\.A|LTDA/i;
+    const garbageKeywords = /FACTURA|BOLETA|ELECTRONICA|RUT|GIRO|DIRECCION|TELEFONO|EMISION|VENCIMIENTO|TOTAL|NETO|IVA|BOLETA|GUIA|RUT|CONTADO|PAGO|CHILE|S\.A|LTDA|ALAMEDA|HIGGINS|AVENIDA|PASAJE|CALLE|N°|NUMERO|LOCAL|PISO|CIUDAD|COMUNA|REGION/i;
 
-    const possibleSuppliers = lines.slice(0, 10).filter(l =>
+    const possibleSuppliers = lines.slice(0, 15).filter(l =>
         l.length > 5 &&
+        l.length < 50 &&
         !dateRegex.test(l) &&
         !rutRegex.test(l) &&
-        !/\d{10,}/.test(l) &&
-        (l.includes(' S.A') || l.includes(' LTDA') || l.includes(' SPA') || !garbageKeywords.test(l))
+        !/\d{3,}/.test(l) && // Exclude lines with numbers (likely addresses or noise)
+        (l.toUpperCase().includes(' S.A') || l.toUpperCase().includes(' LTDA') || l.toUpperCase().includes(' SPA') || !garbageKeywords.test(l))
     );
 
     if (possibleSuppliers.length > 0) {

@@ -115,6 +115,8 @@ export interface PurchaseOrder {
     paymentStatus?: 'Paid' | 'Pending';
     dueDate?: Date;
     totalCost: number;
+    folio?: string; // Invoice/Ticket number
+    customerNumber?: string; // Client account number
     items: PurchaseOrderItem[];
     restaurantId?: string;
 }

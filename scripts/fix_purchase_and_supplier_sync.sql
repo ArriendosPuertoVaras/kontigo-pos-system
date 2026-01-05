@@ -7,6 +7,8 @@ ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS rut TEXT;
 -- 2. Add Payment Status and Due Date to Purchase Orders
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'Paid';
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS due_date TIMESTAMP WITH TIME ZONE;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS folio TEXT;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS customer_number TEXT;
 
 -- 3. Ensure RLS allows these columns (usually automatic, but good to check)
 -- No specific RLS changes needed for standard columns.
