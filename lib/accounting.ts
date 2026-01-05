@@ -208,19 +208,20 @@ export class KontigoFinance {
      * CASE 2: THE PURCHASE (Factura)
      * Records an invoice. Simple version: Assumes it goes to Inventory vs Bank.
      */
-    static async recordPurchase(supplierName: string, totalAmount: number, isAsset: boolean = true): Promise<number | void> {
+    static async recordPurchase(supplierName: string, totalAmount: number, isAsset: boolean = true, isPaid: boolean = true): Promise<number | void> {
         // Find Accounts
         const inventoryAcc = await this.getAccount('1.2.01'); // Inventario
         const expenseAcc = await this.getAccount('6.1.03'); // Servicios (Fallback)
         const bankAcc = await this.getAccount('1.1.02');      // Banco
+        const payableAcc = await this.getAccount('2.2.01');   // Proveedores por Pagar
         const ivaCreditAcc = await this.getAccount('1.3.01'); // IVA Crédito
 
-        if (!inventoryAcc || !expenseAcc || !bankAcc || !ivaCreditAcc) {
+        if (!inventoryAcc || !expenseAcc || !bankAcc || !ivaCreditAcc || !payableAcc) {
             console.warn("🦁 Nexus: Accounts missing during purchase. Auto-initializing...");
             await this.initialize();
 
             // Retry
-            return this.recordPurchase(supplierName, totalAmount, isAsset);
+            return this.recordPurchase(supplierName, totalAmount, isAsset, isPaid);
         }
 
         const netAmount = Math.round(totalAmount / 1.19);
@@ -240,7 +241,7 @@ export class KontigoFinance {
             },
             // CREDIT (How we paid)
             {
-                accountId: bankAcc.id!,
+                accountId: isPaid ? bankAcc.id! : payableAcc.id!,
                 type: 'CREDIT',
                 amount: totalAmount
             }

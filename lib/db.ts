@@ -111,6 +111,7 @@ export interface PurchaseOrder {
     supplierId: number;
     date: Date;
     status: 'Pending' | 'Ordered' | 'Received';
+    paymentStatus?: 'Paid' | 'Pending';
     totalCost: number;
     items: PurchaseOrderItem[];
     restaurantId?: string;

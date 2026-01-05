@@ -16,6 +16,7 @@ export default function ScanPage() {
     const [preview, setPreview] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Pending'>('Paid');
     const [result, setResult] = useState<ExtractedData | null>(null);
     const [rawText, setRawText] = useState("");
 
@@ -50,6 +51,7 @@ export default function ScanPage() {
                     supplierId: supplier!.id!,
                     date: result.date || new Date(),
                     status: 'Received',
+                    paymentStatus: paymentStatus,
                     totalCost: result.total!,
                     items: result.items.map(it => ({
                         ingredientId: 0, // Generic/AI Item placeholder
@@ -60,7 +62,7 @@ export default function ScanPage() {
                 });
 
                 // 3. Record in Accounting
-                await KontigoFinance.recordPurchase(supplier!.name, result.total!, false); // false = expense, not asset by default for rapid scan
+                await KontigoFinance.recordPurchase(supplier!.name, result.total!, false, paymentStatus === 'Paid'); // false = expense, not asset by default for rapid scan
 
                 // 4. Syc
                 syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
@@ -194,6 +196,27 @@ export default function ScanPage() {
                                 <div className="bg-white/5 p-3 md:p-4 rounded-lg">
                                     <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400">Total Detectado</p>
                                     <p className="text-lg md:text-xl font-bold text-green-400">{result.total ? `$${result.total}` : '?'}</p>
+                                </div>
+                            </div>
+
+                            {/* Payment Status Selector */}
+                            <div className="bg-white/5 p-3 md:p-4 rounded-lg">
+                                <p className="text-[10px] md:text-xs uppercase font-bold text-gray-400 mb-3">Estado del Pago</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setPaymentStatus('Paid')}
+                                        className={`py-2 px-4 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all border ${paymentStatus === 'Paid' ? 'bg-green-500/20 text-green-500 border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-black/20 text-gray-500 border-white/5 hover:border-white/10'}`}
+                                    >
+                                        <Check className={`w-4 h-4 ${paymentStatus === 'Paid' ? 'opacity-100' : 'opacity-0'}`} />
+                                        Pagado
+                                    </button>
+                                    <button
+                                        onClick={() => setPaymentStatus('Pending')}
+                                        className={`py-2 px-4 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all border ${paymentStatus === 'Pending' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-black/20 text-gray-500 border-white/5 hover:border-white/10'}`}
+                                    >
+                                        <AlertTriangle className={`w-4 h-4 ${paymentStatus === 'Pending' ? 'opacity-100' : 'opacity-0'}`} />
+                                        Por Pagar
+                                    </button>
                                 </div>
                             </div>
 
