@@ -128,14 +128,28 @@ export function parseInvoiceText(text: string): ExtractedData {
         data.supplierName = name;
     }
 
-    // 5. DATES
+    // 5. DATES (Issue vs Due Date Support)
     const dateRegex = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
-    for (const line of lines) {
+    const extractedDates: { date: Date, line: string }[] = [];
+
+    for (const line of rawLines) {
         const match = line.match(dateRegex);
         if (match) {
             const d = new Date(parseInt(match[3].length === 2 ? '20' + match[3] : match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
-            if (!isNaN(d.getTime()) && !data.date) data.date = d;
+            if (!isNaN(d.getTime())) {
+                extractedDates.push({ date: d, line: line.toUpperCase() });
+            }
         }
+    }
+
+    if (extractedDates.length > 0) {
+        // Find Emission Date (Fecha de Emisión)
+        const issueDate = extractedDates.find(ed => ed.line.includes('EMISION') || (ed.line.includes('FECHA') && !ed.line.includes('VENCE')));
+        data.date = issueDate ? issueDate.date : extractedDates[0].date;
+
+        // Find Due Date (Fecha de Vencimiento)
+        const dueDate = extractedDates.find(ed => ed.line.includes('VENCE') || ed.line.includes('VENCIMIENTO') || ed.line.includes('LIMITE'));
+        if (dueDate) data.dueDate = dueDate.date;
     }
 
     // FINAL FALLBACK: If harmony failed but we have candidates, use best guess

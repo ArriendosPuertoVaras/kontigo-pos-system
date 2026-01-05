@@ -19,6 +19,8 @@ export default function ScanPage() {
     const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Pending'>('Paid');
     const [result, setResult] = useState<ExtractedData | null>(null);
     const [rawText, setRawText] = useState("");
+    const [isDuplicate, setIsDuplicate] = useState(false);
+    const [duplicateId, setDuplicateId] = useState<number | null>(null);
 
     const handleSave = async () => {
         if (!result || !result.supplierName || !result.total) {
@@ -97,14 +99,54 @@ export default function ScanPage() {
         }
     };
 
+    const checkDuplicate = async (data: ExtractedData) => {
+        if (!data.folio && !data.total) return;
+
+        // 1. Check by Folio (Strongest signal)
+        if (data.folio) {
+            const byFolio = await db.purchaseOrders.where('folio').equals(data.folio).first();
+            if (byFolio) {
+                setIsDuplicate(true);
+                setDuplicateId(byFolio.id!);
+                return;
+            }
+        }
+
+        // 2. Check by Supplier + Total + Date (Fuzzy signal)
+        if (data.supplierName && data.total && data.date) {
+            const supplier = await db.suppliers.where('name').equalsIgnoreCase(data.supplierName.trim()).first();
+            if (supplier) {
+                const sameDayRange = {
+                    start: new Date(data.date.setHours(0, 0, 0, 0)),
+                    end: new Date(data.date.setHours(23, 59, 59, 999))
+                };
+                const byFuzzy = await db.purchaseOrders
+                    .where('date')
+                    .between(sameDayRange.start, sameDayRange.end, true, true)
+                    .filter(o => o.supplierId === supplier.id && o.totalCost === data.total)
+                    .first();
+
+                if (byFuzzy) {
+                    setIsDuplicate(true);
+                    setDuplicateId(byFuzzy.id!);
+                    return;
+                }
+            }
+        }
+        setIsDuplicate(false);
+        setDuplicateId(null);
+    };
+
     const handleScan = async () => {
         if (!image) return;
         setIsScanning(true);
+        setIsDuplicate(false);
         try {
             const text = await scanInvoiceImage(image);
             setRawText(text);
             const data = parseInvoiceText(text);
             setResult(data);
+            await checkDuplicate(data);
         } catch (error) {
             alert("Error al escanear imagen.");
         }
@@ -177,6 +219,19 @@ export default function ScanPage() {
 
                     {result && (
                         <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {/* Duplicate Warning */}
+                            {isDuplicate && (
+                                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 animate-pulse">
+                                    <div className="bg-red-500/20 p-2 rounded-full">
+                                        <AlertTriangle className="text-red-500 w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-red-500 uppercase tracking-tighter">¡Documento Duplicado!</p>
+                                        <p className="text-[10px] text-gray-400">Ya existe un ingreso con este folio o monto/fecha/proveedor.</p>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Supplier Section */}
                             <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-toast-orange/20 space-y-3">
                                 <div>

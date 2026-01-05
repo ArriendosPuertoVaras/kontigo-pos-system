@@ -135,21 +135,19 @@ export default function PurchasesPage() {
 
     const handleReceiveOrder = async (order: PurchaseOrder) => {
         if (order.status !== 'Pending') return;
-        await db.transaction('rw', db.ingredients, db.purchaseOrders, async () => {
+        await db.transaction('rw', db.ingredients, db.purchaseOrders, db.journalEntries, db.accounts, async () => {
             for (const item of order.items) {
                 const ingredient = await db.ingredients.get(item.ingredientId);
                 if (ingredient) {
-                    if (ingredient) {
-                        const conversion = getConversionMultiplier(item.purchaseUnit || 'un', ingredient);
-                        const netIncrease = item.quantity * conversion * (ingredient.yieldPercent || 1);
-                        await db.ingredients.update(item.ingredientId, { stock: ingredient.stock + netIncrease });
-                    }
+                    const conversion = getConversionMultiplier(item.purchaseUnit || 'un', ingredient);
+                    const netIncrease = item.quantity * conversion * (ingredient.yieldPercent || 1);
+                    await db.ingredients.update(item.ingredientId, { stock: ingredient.stock + netIncrease });
                 }
             }
             if (order.id) {
                 await db.purchaseOrders.update(order.id, { status: 'Received' });
                 // AUTO-SYNC: Record Expense
-                await KontigoFinance.recordPurchase(order.supplierId.toString(), order.totalCost, true);
+                await KontigoFinance.recordPurchase(order.supplierId.toString(), order.totalCost, true, (order.paymentStatus === 'Paid'));
 
                 // AUTO-SYNC
                 syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
@@ -159,6 +157,22 @@ export default function PurchasesPage() {
                 toast.success("Pedido recibido e inventario actualizado");
             }
         });
+    };
+
+    const handleDeleteOrder = async (orderId: number) => {
+        if (!confirm("¿Seguro que quieres eliminar este registro de compra? Esto no revertirá el stock si ya fue recibido, pero sí afectará los reportes contables futuros.")) return;
+
+        await db.purchaseOrders.delete(orderId);
+        toast.info("Registro de compra eliminado.");
+        syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
+    };
+
+    const handleTogglePaymentStatus = async (order: PurchaseOrder) => {
+        if (!order.id) return;
+        const newStatus = order.paymentStatus === 'Paid' ? 'Pending' : 'Paid';
+        await db.purchaseOrders.update(order.id, { paymentStatus: newStatus });
+        toast.success(newStatus === 'Paid' ? "Marcado como PAGADO" : "Marcado como PENDIENTE");
+        syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
     };
 
     const addToCart = (ingredient: any, qty: number, unit: string, supplierId: number) => {
@@ -304,7 +318,20 @@ export default function PurchasesPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="flex shrink-0 ml-14 md:ml-0">
+                                            <div className="flex items-center gap-2 shrink-0 ml-14 md:ml-0">
+                                                {/* Payment Action */}
+                                                <button
+                                                    onClick={() => handleTogglePaymentStatus(order)}
+                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all
+                                                        ${order.paymentStatus === 'Paid'
+                                                            ? 'bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20'
+                                                            : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20'}`}
+                                                >
+                                                    {order.paymentStatus === 'Paid' ? 'PAGADO' : 'POR PAGAR'}
+                                                </button>
+
+                                                <div className="h-6 w-px bg-white/10 mx-1"></div>
+
                                                 {order.status === 'Pending' ? (
                                                     <button
                                                         onClick={() => handleReceiveOrder(order)}
@@ -313,10 +340,18 @@ export default function PurchasesPage() {
                                                         <Check className="w-4 h-4" /> Recibir
                                                     </button>
                                                 ) : (
-                                                    <span className="text-[10px] font-black text-green-500 bg-green-500/10 px-3 py-1.5 rounded-lg border border-green-500/20 uppercase tracking-widest whitespace-nowrap">
+                                                    <span className="text-[10px] font-black text-white/40 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 uppercase tracking-widest whitespace-nowrap">
                                                         RECIBIDO
                                                     </span>
                                                 )}
+
+                                                <button
+                                                    onClick={() => order.id && handleDeleteOrder(order.id)}
+                                                    className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                    title="Eliminar Registro"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
