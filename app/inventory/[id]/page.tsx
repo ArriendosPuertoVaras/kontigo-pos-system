@@ -56,10 +56,8 @@ export default function IngredientDetailPage() {
         if (confirm("¿Estás seguro de eliminar este ingrediente?")) {
             try {
                 if (id) {
-                    await db.ingredients.delete(id);
-                    // Sync deletion immediately
                     const { syncService } = await import('@/lib/sync_service');
-                    await syncService.pushAll();
+                    await syncService.syncDelete(db.ingredients, 'ingredients', id);
                     router.push('/inventory');
                 }
             } catch (error) {

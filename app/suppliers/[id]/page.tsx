@@ -43,9 +43,8 @@ export default function SupplierDetailPage() {
     const handleDelete = async () => {
         if (confirm("¿Estás seguro de eliminar este proveedor?")) {
             if (id) {
-                await db.suppliers.delete(id);
                 const { syncService } = await import('@/lib/sync_service');
-                await syncService.pushAll();
+                await syncService.syncDelete(db.suppliers, 'suppliers', id);
                 router.push('/suppliers');
             }
         }

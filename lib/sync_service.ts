@@ -714,6 +714,39 @@ class SyncService {
         }
     }
 
+    /**
+     * SYNC DELETE: Physically deletes from local Dexie AND cloud Supabase.
+     */
+    async syncDelete(table: Table, supabaseName: string, id: number | string) {
+        const restaurantId = localStorage.getItem('kontigo_restaurant_id');
+
+        console.log(`[SyncDelete] 🔥 Deleting ID ${id} from ${table.name} and ${supabaseName}...`);
+
+        try {
+            // 1. Delete from Dexie
+            await table.delete(id);
+
+            // 2. Delete from Supabase if online
+            if (navigator.onLine && restaurantId) {
+                const { error } = await supabase
+                    .from(supabaseName)
+                    .delete()
+                    .eq('id', id)
+                    .eq('restaurant_id', restaurantId);
+
+                if (error) {
+                    console.error(`[SyncDelete] ❌ Cloud delete failed for ${supabaseName}:`, error);
+                    // We don't throw here to avoid blocking UI, as local is already gone.
+                } else {
+                    console.log(`[SyncDelete] ✅ Cloud delete success for ${supabaseName}.`);
+                }
+            }
+        } catch (err) {
+            console.error(`[SyncDelete] 💥 Fatal error:`, err);
+            throw err;
+        }
+    }
+
     // --- GATEKEEPER ---
     async checkSubscriptionStatus(): Promise<boolean> {
         // BYPASS: Always allow sync for emergency restore scenarios
