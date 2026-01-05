@@ -34,23 +34,26 @@ export function parseInvoiceText(text: string): ExtractedData {
 
     const data: ExtractedData = { items: [] };
 
-    // Regex Utils
+    // Regex Utils - ELASTIC RUT (v5)
+    // Matches: 12.345.678-9, 12345678-9, 12 345 678 - 9, etc.
+    const rutRegex = /(\d{1,2}[\.\s]?\d{3}[\.\s]?\d{3}[\s\-]*[\dkK])/;
     const dateRegex = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
-    const rutRegex = /(\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]|\d{7,8}-[\dkK])/;
-    const amountRegex = /(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/; // Improved price capture
+    const amountRegex = /(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/;
 
     const cleanAmount = (str: string) => {
         const num = str.replace(/[^\d]/g, '');
         return parseInt(num) || 0;
     };
 
-    // 1. Detect RUT (Filter out placeholders)
+    // 1. Detect RUT (Filter out placeholders and suspicious noise)
     for (const line of rawLines) {
         const match = line.match(rutRegex);
         if (match) {
-            const val = match[0].replace(/\./g, '');
-            if (!val.startsWith('000') && !data.rut) {
-                data.rut = match[0];
+            let val = match[0].replace(/[\.\s\-]/g, '');
+            // Sanity: RUTs in Chile are 7-9 digits + 1 verificador. 
+            // Also ignore obvious noise like "000000"
+            if (val.length >= 8 && !val.startsWith('000') && !data.rut) {
+                data.rut = match[0].trim();
             }
         }
     }
@@ -63,8 +66,6 @@ export function parseInvoiceText(text: string): ExtractedData {
 
     for (const line of lines) {
         const upper = line.toUpperCase();
-
-        // Match numbers that look like prices
         const amounts = line.match(/(\d{1,3}(?:\.\d{3})+|\d{4,})/g) || [];
         const numericals = amounts.map(a => cleanAmount(a));
 
@@ -77,12 +78,10 @@ export function parseInvoiceText(text: string): ExtractedData {
         const val = matches ? cleanAmount(matches[0]) : 0;
 
         if (val > 0) {
-            // Prioritize specific keywords for Utility Bills / Invoices
-            if (upper.includes('TOTAL') || upper.includes('A PAGAR') || upper.includes('VALOR TOTAL') || upper.includes('MONTO TOTAL')) {
+            if (upper.includes('TOTAL') || upper.includes('A PAGAR') || upper.includes('VALOR TOTAL') || upper.includes('PAGADO')) {
                 if (val > detectedTotal) detectedTotal = val;
             }
             if (upper.includes('NETO') || upper.includes('AFECTO') || upper.includes('SUBTOTAL')) {
-                // In Chilean bills, "NETO" is usually smaller than Total
                 if (detectedTotal === 0 || val < detectedTotal) {
                     if (val > detectedNeto) detectedNeto = val;
                 }
@@ -92,40 +91,38 @@ export function parseInvoiceText(text: string): ExtractedData {
             }
         }
 
-        // --- SPECIFIC SERVICE FIELDS (Suralis, Saesa, etc.) ---
-        // Folio Detection V4: Match Boleta/Factura N followed by numbers
-        if (upper.includes('N°') || upper.includes('NUMERO') || upper.includes('FOLIO') || upper.includes('BOLETA') || upper.includes('FACTURA')) {
-            const folioMatch = line.match(/(?:N|FOLIO|BOLETA|FACTURA)[^\d]*(\d{4,})/i);
-            if (folioMatch && !data.folio) {
-                // Ignore dates misread as folios
-                if (!dateRegex.test(line)) data.folio = folioMatch[1];
+        // --- ENHANCED SERVICE FIELDS V5 ---
+
+        // CUSTOMER NUMBER (Priority for Service Bills)
+        if (upper.includes('SERVICIO') || upper.includes('CTA') || upper.includes('CUENTA') || upper.includes('CLIENTE')) {
+            const clientMatch = line.match(/(?:SERVICIO|CTA|CUENTA|CLIENTE)[^\d]*(\d{5,})/i);
+            if (clientMatch && !data.customerNumber) {
+                data.customerNumber = clientMatch[1];
             }
         }
 
-        // Customer Number Detection V4: Specific keywords for utility accounts
-        if (upper.includes('SERVICIO') || upper.includes('CLIENTE') || upper.includes('CUENTA') || upper.includes('CTA')) {
-            const clientMatch = line.match(/(?:SERVICIO|CLIENTE|CUENTA|CTA)[^\d]*(\d{5,})/i);
-            if (clientMatch && !data.customerNumber) data.customerNumber = clientMatch[1];
+        // FOLIO / BOLETA (Priority for explicit document tags)
+        if (upper.includes('N°') || upper.includes('NUMERO') || upper.includes('FOLIO') || upper.includes('BOLETA') || upper.includes('FACTURA')) {
+            const folioMatch = line.match(/(?:BOLETA|FACTURA|DETALLE|N°)[^\d]*(\d{4,})/i);
+            if (folioMatch) {
+                const found = folioMatch[1];
+                // HEURISTIC: If we already found a customer number and this matches it, 
+                // look for a DIFFERENT number for the folio. 
+                // Usually Boleta numbers are 7-10 digits in Chile.
+                if (!data.folio && found !== data.customerNumber) {
+                    if (!dateRegex.test(line)) data.folio = found;
+                }
+            }
         }
     }
 
-    // 3. Mathematical Healing (The "Contextual 19%" Layer)
-    // Rule: if IVA != Neto * 0.19, one of them is wrong.
+    // 3. Mathematical Healing
     const expectedIvaFromNeto = Math.round(detectedNeto * 0.19);
-    const expectedNetoFromIva = Math.round(detectedIva / 0.19);
-
     const isIvaValid = detectedNeto > 0 && Math.abs(detectedIva - expectedIvaFromNeto) < 50;
 
     if (isIvaValid) {
-        // Both match, solid extraction
         detectedTotal = detectedNeto + detectedIva;
     } else if (detectedTotal > 0) {
-        // Use Total as anchor (most reliable in bills)
-        detectedNeto = Math.round(detectedTotal / 1.19);
-        detectedIva = detectedTotal - detectedNeto;
-    } else if (maxAmount > 0) {
-        // Use Max as anchor
-        detectedTotal = maxAmount;
         detectedNeto = Math.round(detectedTotal / 1.19);
         detectedIva = detectedTotal - detectedNeto;
     }
@@ -149,34 +146,20 @@ export function parseInvoiceText(text: string): ExtractedData {
         }
     }
 
-    // 5. Supplier Name (Sanitized for Suralis style)
+    // 5. Supplier Name (Advanced Cleaner V5)
     const blackList = /FACTURA|BOLETA|ELECTRONICA|RUT|GIRO|DIRECCION|EMISION|VENCIMIENTO|TOTAL|NETO|IVA|CHILE|ALAMEDA|AVENIDA|CLIENTE|DETALLE/i;
-
     const potentialLines = sanitizedText.split('\n')
-        .slice(0, 10) // Wider look for utility bills
+        .slice(0, 10)
         .filter(l => l.length > 4 && !blackList.test(l) && !dateRegex.test(l) && !rutRegex.test(l));
 
     if (potentialLines.length > 0) {
-        let name = potentialLines.find(l => /S\.A|LTDA|SPA|LIMITADA|AQUACHILE|SURALIS|SAESA/i.test(l)) || potentialLines[0];
-        // Clean OCR noise like "e " or "a " at start
-        name = name.replace(/^[eaEA]\s+/, '').trim();
+        let name = potentialLines.find(l => /S\.A|LTDA|SPA|LIMITADA|SURALIS|SAESA|AGUAS/i.test(l)) || potentialLines[0];
+        // Clean multi-character noise prefixes (O, E, A, S, etc. followed by space)
+        name = name.replace(/^[a-zA-Z]\s+/, '').trim();
         data.supplierName = name;
     } else {
-        data.supplierName = rawLines.find(l => l.length > 5 && !blackList.test(l)) || "Proveedor Desconocido";
+        data.supplierName = "Proveedor Desconocido";
     }
-
-    // 6. Items
-    lines.forEach(line => {
-        if (line.length > 10 && !blackList.test(line)) {
-            const m = line.match(amountRegex);
-            if (m) {
-                const amt = cleanAmount(m[0]);
-                if (amt > 0 && amt < (data.total || 9999999)) {
-                    data.items.push({ name: line.replace(m[0], '').trim(), price: amt });
-                }
-            }
-        }
-    });
 
     return data;
 }
