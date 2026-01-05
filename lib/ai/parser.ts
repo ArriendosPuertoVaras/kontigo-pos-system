@@ -1,6 +1,7 @@
 export interface ExtractedData {
     date?: Date;
     total?: number;
+    supplierName?: string;
     items: { name: string; price?: number }[];
 }
 
@@ -11,6 +12,19 @@ export function parseInvoiceText(text: string): ExtractedData {
     // Regex Utils
     const dateRegex = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
     const priceRegex = /\$?\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/;
+    const rutRegex = /\d{1,2}\.\d{3}\.\d{3}-[\dkK]/; // Chilean RUT pattern
+
+    // 0. Detect Supplier (Heuristic: Often the first non-empty line that isn't a date/number)
+    const possibleSupplierLines = lines.slice(0, 5).map(l => l.trim()).filter(l =>
+        l.length > 3 &&
+        !dateRegex.test(l) &&
+        !priceRegex.test(l) &&
+        !/FACTURA|BOLETA|GUIA|RUT|GIRO|VENTA/i.test(l)
+    );
+
+    if (possibleSupplierLines.length > 0) {
+        data.supplierName = possibleSupplierLines[0];
+    }
 
     for (const line of lines) {
         const cleanLine = line.trim();

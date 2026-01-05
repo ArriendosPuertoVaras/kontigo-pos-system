@@ -1,17 +1,81 @@
 'use client';
 import { useState } from 'react';
-import { ArrowLeft, Camera, Loader2, Sparkles, AlertTriangle, FileText, Check } from 'lucide-react';
-import Link from 'next/link';
+import { db } from '@/lib/db';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Camera, Loader2, Sparkles, AlertTriangle, FileText, Check, ShoppingCart } from 'lucide-react';
 import { scanInvoiceImage } from '@/lib/ai/scanner';
 import { parseInvoiceText, ExtractedData } from '@/lib/ai/parser';
 import Header from '@/components/Header';
+import { KontigoFinance } from '@/lib/accounting';
+import { syncService } from '@/lib/sync_service';
 
 export default function ScanPage() {
+    const router = useRouter();
     const [image, setImage] = useState<File | null>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [result, setResult] = useState<ExtractedData | null>(null);
     const [rawText, setRawText] = useState("");
+
+    const handleSave = async () => {
+        if (!result || !result.supplierName || !result.total) {
+            toast.error("Faltan datos críticos para guardar.");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await db.transaction('rw', db.suppliers, db.purchaseOrders, db.journalEntries, db.accounts, async () => {
+                // 1. Find or Create Supplier
+                let supplier = await db.suppliers.where('name').equalsIgnoreCase(result.supplierName!.trim()).first();
+
+                if (!supplier) {
+                    const newId = await db.suppliers.add({
+                        name: result.supplierName!.trim(),
+                        category: 'General',
+                        contactName: '',
+                        email: '',
+                        phone: '',
+                        leadTimeDays: 1
+                    });
+                    supplier = await db.suppliers.get(newId as number);
+                    toast.info(`Nuevo proveedor creado: ${result.supplierName}`);
+                    syncService.autoSync(db.suppliers, 'suppliers').catch(console.error);
+                }
+
+                // 2. Create Purchase Order (Implicitly Received)
+                await db.purchaseOrders.add({
+                    supplierId: supplier!.id!,
+                    date: result.date || new Date(),
+                    status: 'Received',
+                    totalCost: result.total!,
+                    items: result.items.map(it => ({
+                        ingredientId: 0, // Generic/AI Item placeholder
+                        quantity: 1,
+                        unitCost: it.price || 0,
+                        purchaseUnit: 'un'
+                    }))
+                });
+
+                // 3. Record in Accounting
+                await KontigoFinance.recordPurchase(supplier!.name, result.total!, false); // false = expense, not asset by default for rapid scan
+
+                // 4. Syc
+                syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
+                syncService.autoSync(db.journalEntries, 'journal_entries').catch(console.error);
+            });
+
+            toast.success("Gasto registrado y proveedor guardado.");
+            router.push('/purchases');
+        } catch (error) {
+            console.error(error);
+            toast.error("Error al guardar el registro.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -103,6 +167,24 @@ export default function ScanPage() {
 
                     {result && (
                         <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {/* Supplier Section */}
+                            <div className="bg-white/5 p-3 md:p-4 rounded-lg border border-toast-orange/20">
+                                <p className="text-[10px] md:text-xs uppercase font-bold text-toast-orange mb-2">Proveedor Detectado</p>
+                                <div className="relative group">
+                                    <input
+                                        type="text"
+                                        value={result.supplierName || ''}
+                                        onChange={(e) => setResult({ ...result, supplierName: e.target.value })}
+                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-toast-orange outline-none transition-all"
+                                        placeholder="Nombre del proveedor..."
+                                    />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 opacity-50 group-focus-within:opacity-0 pointer-events-none">
+                                        <FileText className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-gray-500 mt-2 italic">Se creará automáticamente si no existe.</p>
+                            </div>
+
                             {/* Summary */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                                 <div className="bg-white/5 p-3 md:p-4 rounded-lg">
@@ -133,6 +215,19 @@ export default function ScanPage() {
                                     </ul>
                                 )}
                             </div>
+
+                            {/* Action Button */}
+                            <button
+                                onClick={handleSave}
+                                disabled={isSaving || !result.supplierName || !result.total}
+                                className="w-full bg-toast-green hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 text-lg transition-all"
+                            >
+                                {isSaving ? (
+                                    <><Loader2 className="animate-spin" /> Guardando...</>
+                                ) : (
+                                    <><Check className="w-6 h-6" /> Guardar Registro</>
+                                )}
+                            </button>
 
                             {/* Raw Text Toggle (Debug) */}
                             <details className="text-[9px] md:text-xs text-gray-500">
