@@ -174,7 +174,7 @@ export default function ManagerPage() {
             <main className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-[1600px] mx-auto w-full">
                     <Header title="Panel Gerencial">
-                        <div className="flex gap-3">
+                        <div className="hidden md:flex gap-3">
                             <Link href="/staff" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
                                 <Users className="w-4 h-4 text-orange-400" /> RRHH
                             </Link>
@@ -187,33 +187,46 @@ export default function ManagerPage() {
                         </div>
                     </Header>
 
+                    {/* MOBILE QUICK NAV */}
+                    <div className="grid grid-cols-3 gap-2 mt-4 md:hidden">
+                        <Link href="/staff" className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg backdrop-blur-md">
+                            <Users className="w-5 h-5 text-orange-400" /> RRHH
+                        </Link>
+                        <Link href="/manager/recipe-analyzer" className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg backdrop-blur-md">
+                            <TrendingUp className="w-5 h-5 text-green-400" /> COSTOS
+                        </Link>
+                        <Link href="/manager/accounting" className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg backdrop-blur-md">
+                            <DollarSign className="w-5 h-5 text-blue-400" /> FINANZAS
+                        </Link>
+                    </div>
+
                     {/* DATE NAVIGATION & ACTIONS */}
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-6 mt-4 gap-4">
-                        <div className="flex items-center gap-4">
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-8 mt-6 gap-4">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
                             {/* VIEW MODE TOGGLE */}
-                            <div className="bg-black/40 p-1 rounded-xl flex text-[11px] font-bold border border-white/10 backdrop-blur-sm">
+                            <div className="bg-black/40 p-1 rounded-xl flex text-[11px] font-bold border border-white/10 backdrop-blur-sm w-full sm:w-auto">
                                 {(['day', 'week', 'month'] as const).map(m => (
                                     <button
                                         key={m}
                                         onClick={() => setViewMode(m)}
-                                        className={`px-4 py-1.5 rounded-lg transition-all capitalize ${viewMode === m ? 'bg-gradient-to-r from-toast-orange to-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                                        className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg transition-all capitalize ${viewMode === m ? 'bg-gradient-to-r from-toast-orange to-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
                                     >
                                         {m === 'day' ? 'Día' : m === 'week' ? 'Semana' : 'Mes'}
                                     </button>
                                 ))}
                             </div>
 
-                            <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 backdrop-blur-md">
-                                <button onClick={() => moveDate('prev')} className="p-1.5 hover:bg-white/10 rounded-lg transition"><ChevronLeft className="w-4 h-4 text-gray-400" /></button>
-                                <span className="px-4 py-1 text-sm font-black text-white flex items-center gap-2 capitalize min-w-[160px] justify-center tracking-tight">
-                                    <Calendar className="w-4 h-4 text-toast-orange" />
+                            <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 backdrop-blur-md w-full sm:w-auto justify-between sm:justify-center">
+                                <button onClick={() => moveDate('prev')} className="p-1.5 hover:bg-white/10 rounded-lg transition shrink-0"><ChevronLeft className="w-4 h-4 text-gray-400" /></button>
+                                <span className="px-2 py-1 text-sm font-black text-white flex items-center gap-2 capitalize min-w-[140px] justify-center tracking-tight truncate">
+                                    <Calendar className="w-3.5 h-3.5 text-toast-orange shrink-0" />
                                     {formatDateLabel()}
                                 </span>
-                                <button onClick={() => moveDate('next')} className="p-1.5 hover:bg-white/10 rounded-lg transition"><ChevronRight className="w-4 h-4 text-gray-400" /></button>
+                                <button onClick={() => moveDate('next')} className="p-1.5 hover:bg-white/10 rounded-lg transition shrink-0"><ChevronRight className="w-4 h-4 text-gray-400" /></button>
                             </div>
 
                             {isSameDay(selectedDate, new Date()) && (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 self-center sm:self-auto">
                                     <span className="relative flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-toast-orange opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-toast-orange"></span>
@@ -223,8 +236,8 @@ export default function ManagerPage() {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-3">
-                            <button className="flex items-center gap-2 px-4 py-2 bg-toast-orange/10 hover:bg-toast-orange/20 border border-toast-orange/20 rounded-xl text-xs font-bold transition-all text-toast-orange">
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-toast-orange/10 hover:bg-toast-orange/20 border border-toast-orange/20 rounded-xl text-xs font-bold transition-all text-toast-orange shadow-lg">
                                 <MessageSquare className="w-4 h-4" /> Chat Nexus
                             </button>
                         </div>

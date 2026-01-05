@@ -126,8 +126,7 @@ export default function StaffPage() {
         <div className="min-h-screen bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white pb-20">
             {/* Header */}
             <Header title="Control de Personal" backHref="/">
-
-                <div className="flex flex-wrap gap-3 w-full justify-center md:justify-start">
+                <div className="hidden md:flex flex-wrap gap-3 w-full justify-start">
                     <Link href="/staff/employees" className="bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
                         <Users className="w-4 h-4" />
                         Colaboradores
@@ -144,6 +143,24 @@ export default function StaffPage() {
                     </button>
                 </div>
             </Header>
+
+            {/* MOBILE QUICK NAV */}
+            <div className="grid grid-cols-2 gap-2 p-4 pb-0 md:hidden">
+                <Link href="/staff/employees" className="flex flex-col items-center justify-center gap-2 p-4 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg backdrop-blur-md text-center">
+                    <Users className="w-6 h-6 text-orange-400" />
+                    Colaboradores
+                </Link>
+                <Link href="/staff/planner" className="flex flex-col items-center justify-center gap-2 p-4 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg backdrop-blur-md text-center">
+                    <Clock className="w-6 h-6 text-blue-400" />
+                    Ver Horarios
+                </Link>
+                <button
+                    onClick={() => setIsClockInOpen(true)}
+                    className="col-span-2 flex items-center justify-center gap-2 p-4 bg-toast-orange text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 active:scale-95 transition-all">
+                    <UserPlus className="w-5 h-5" />
+                    Registrar Entrada
+                </button>
+            </div>
 
             <main className="p-6 max-w-7xl mx-auto space-y-8">
 

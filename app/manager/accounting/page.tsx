@@ -6,6 +6,7 @@ import { KontigoFinance } from '@/lib/accounting';
 import { ArrowLeft, RefreshCw, Layers, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import Header from '@/components/Header';
 
 export default function AccountingDashboard() {
     const accounts = useLiveQuery(() => db.accounts.toArray());
@@ -48,22 +49,10 @@ export default function AccountingDashboard() {
             <Sidebar />
 
             <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <div className="flex-1 overflow-y-auto p-5 sm:p-8">
+                <Header title="Finanzas & Contabilidad" backHref="/manager" />
+
+                <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
                     <div className="max-w-7xl mx-auto">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <Link href="/manager" className="p-1.5 bg-white/5 rounded-full hover:bg-white/10 transition">
-                                    <ArrowLeft className="w-5 h-5" />
-                                </Link>
-                                <div>
-                                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                                        <Layers className="text-toast-orange w-6 h-6" />
-                                        Kontigo Finance
-                                    </h1>
-                                    <p className="text-gray-400 text-xs">Libro Contable y Plan de Cuentas en Tiempo Real</p>
-                                </div>
-                            </div>
-                        </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20">
 
