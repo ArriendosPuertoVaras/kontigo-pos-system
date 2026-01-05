@@ -145,7 +145,7 @@ export default function StaffPage() {
             </Header>
 
             {/* MOBILE QUICK NAV */}
-            <div className="grid grid-cols-2 gap-2 p-4 pb-0 md:hidden">
+            <div className="grid grid-cols-2 gap-2 p-4 pb-0 md:hidden relative z-30">
                 <Link href="/staff/employees" className="flex flex-col items-center justify-center gap-2 p-4 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg backdrop-blur-md text-center">
                     <Users className="w-6 h-6 text-orange-400" />
                     Colaboradores

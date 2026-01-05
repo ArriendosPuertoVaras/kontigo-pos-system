@@ -188,7 +188,7 @@ export default function ManagerPage() {
                     </Header>
 
                     {/* MOBILE QUICK NAV */}
-                    <div className="grid grid-cols-3 gap-2 mt-4 md:hidden">
+                    <div className="grid grid-cols-3 gap-2 mt-4 md:hidden relative z-30">
                         <Link href="/staff" className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 shadow-lg backdrop-blur-md">
                             <Users className="w-5 h-5 text-orange-400" /> RRHH
                         </Link>
