@@ -177,13 +177,13 @@ export default function ManagerPage() {
 
                     {/* DESKTOP NAV - Moved out of Header children to avoid invisible wrapper issues */}
                     <div className="hidden md:flex gap-3 mb-6">
-                        <Link href="/staff" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                        <Link href="/staff" className="flex items-center gap-2 px-4 py-2 bg-white/5 md:hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all md:hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
                             <Users className="w-4 h-4 text-orange-400" /> RRHH
                         </Link>
-                        <Link href="/manager/recipe-analyzer" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                        <Link href="/manager/recipe-analyzer" className="flex items-center gap-2 px-4 py-2 bg-white/5 md:hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all md:hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
                             <TrendingUp className="w-4 h-4 text-green-400" /> COSTOS
                         </Link>
-                        <Link href="/manager/accounting" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
+                        <Link href="/manager/accounting" className="flex items-center gap-2 px-4 py-2 bg-white/5 md:hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all md:hover:scale-105 active:scale-95 shadow-lg backdrop-blur-md">
                             <DollarSign className="w-4 h-4 text-blue-400" /> FINANZAS
                         </Link>
                     </div>
@@ -210,7 +210,7 @@ export default function ManagerPage() {
                                     <button
                                         key={m}
                                         onClick={() => setViewMode(m)}
-                                        className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg transition-all capitalize ${viewMode === m ? 'bg-gradient-to-r from-toast-orange to-orange-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                                        className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg transition-all capitalize ${viewMode === m ? 'bg-gradient-to-r from-toast-orange to-orange-600 text-white shadow-lg' : 'text-gray-500 md:hover:text-gray-300'}`}
                                     >
                                         {m === 'day' ? 'Día' : m === 'week' ? 'Semana' : 'Mes'}
                                     </button>
@@ -218,12 +218,12 @@ export default function ManagerPage() {
                             </div>
 
                             <div className="flex items-center bg-white/5 rounded-xl p-1 border border-white/10 backdrop-blur-md w-full sm:w-auto justify-between sm:justify-center">
-                                <button onClick={() => moveDate('prev')} className="p-1.5 hover:bg-white/10 rounded-lg transition shrink-0"><ChevronLeft className="w-4 h-4 text-gray-400" /></button>
+                                <button onClick={() => moveDate('prev')} className="p-1.5 md:hover:bg-white/10 rounded-lg transition shrink-0"><ChevronLeft className="w-4 h-4 text-gray-400" /></button>
                                 <span className="px-2 py-1 text-sm font-black text-white flex items-center gap-2 capitalize min-w-[140px] justify-center tracking-tight truncate">
                                     <Calendar className="w-3.5 h-3.5 text-toast-orange shrink-0" />
                                     {formatDateLabel()}
                                 </span>
-                                <button onClick={() => moveDate('next')} className="p-1.5 hover:bg-white/10 rounded-lg transition shrink-0"><ChevronRight className="w-4 h-4 text-gray-400" /></button>
+                                <button onClick={() => moveDate('next')} className="p-1.5 md:hover:bg-white/10 rounded-lg transition shrink-0"><ChevronRight className="w-4 h-4 text-gray-400" /></button>
                             </div>
 
                             {isSameDay(selectedDate, new Date()) && (
@@ -238,7 +238,7 @@ export default function ManagerPage() {
                         </div>
 
                         <div className="flex items-center gap-3 w-full md:w-auto">
-                            <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-toast-orange/10 hover:bg-toast-orange/20 border border-toast-orange/20 rounded-xl text-xs font-bold transition-all text-toast-orange shadow-lg">
+                            <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-toast-orange/10 md:hover:bg-toast-orange/20 border border-toast-orange/20 rounded-xl text-xs font-bold transition-all text-toast-orange shadow-lg">
                                 <MessageSquare className="w-4 h-4" /> Chat Nexus
                             </button>
                         </div>

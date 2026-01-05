@@ -208,7 +208,7 @@ export class KontigoFinance {
      * CASE 2: THE PURCHASE (Factura)
      * Records an invoice. Simple version: Assumes it goes to Inventory vs Bank.
      */
-    static async recordPurchase(supplierName: string, totalAmount: number, isAsset: boolean = true, isPaid: boolean = true): Promise<number | void> {
+    static async recordPurchase(supplierName: string, totalAmount: number, isAsset: boolean = true, isPaid: boolean = true, orderId?: number): Promise<number | void> {
         // Find Accounts
         const inventoryAcc = await this.getAccount('1.2.01'); // Inventario
         const expenseAcc = await this.getAccount('6.1.03'); // Servicios (Fallback)
@@ -221,7 +221,7 @@ export class KontigoFinance {
             await this.initialize();
 
             // Retry
-            return this.recordPurchase(supplierName, totalAmount, isAsset, isPaid);
+            return this.recordPurchase(supplierName, totalAmount, isAsset, isPaid, orderId);
         }
 
         const netAmount = Math.round(totalAmount / 1.19);
@@ -247,10 +247,10 @@ export class KontigoFinance {
             }
         ];
 
-        await this.postEntry({
+        return await this.postEntry({
             date: new Date(),
             description: `Compra a ${supplierName}`,
-            referenceId: `PURCHASE-${Date.now()}`,
+            referenceId: orderId ? `PURCHASE-${orderId}` : `PURCHASE-${Date.now()}`,
             movements
         });
     }
@@ -510,7 +510,7 @@ export class KontigoFinance {
 
             // For now, let's assume this is only called during Regeneration.
             if (po.totalCost > 0) {
-                await this.recordPurchase(`Proveedor #${po.supplierId}`, po.totalCost, true);
+                await this.recordPurchase(`Proveedor #${po.supplierId}`, po.totalCost, true, po.paymentStatus === 'Paid', po.id);
                 recovered++;
             }
         }

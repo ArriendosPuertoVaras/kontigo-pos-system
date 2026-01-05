@@ -119,14 +119,14 @@ export default function Header({ title, children, backHref }: HeaderProps) {
                     {/* HAMBURGER (Mobile Only) */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('toggle-sidebar'))}
-                        className="md:hidden p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg shrink-0"
+                        className="md:hidden p-2 text-white/70 active:text-white active:bg-white/10 rounded-lg shrink-0"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
                     </button>
 
                     <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                         {backHref && (
-                            <Link href={backHref} className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded-full transition-colors shrink-0">
+                            <Link href={backHref} className="text-gray-400 md:hover:text-white p-1 md:hover:bg-white/10 rounded-full transition-colors shrink-0">
                                 <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                             </Link>
                         )}
@@ -236,7 +236,7 @@ export default function Header({ title, children, backHref }: HeaderProps) {
                             setTimeout(() => setSyncStatus('idle'), 3000);
                         }
                     }}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 hover:text-white text-gray-400 transition-all text-xs font-bold"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 md:hover:bg-white/10 md:hover:text-white text-gray-400 transition-all text-xs font-bold"
                     title="Restaurar desde la Nube"
                 >
                     <RefreshCw className="w-4 h-4" />
@@ -248,17 +248,17 @@ export default function Header({ title, children, backHref }: HeaderProps) {
                 </div>
                 <div
                     onClick={() => setShowProfileModal(true)}
-                    className="flex items-center gap-3 pl-3 border-l border-white/10 cursor-pointer hover:bg-white/5 py-1 px-2 rounded-lg transition-colors group"
+                    className="flex items-center gap-3 pl-3 border-l border-white/10 cursor-pointer md:hover:bg-white/5 py-1 px-2 rounded-lg transition-colors group"
                 >
                     <div className="text-right leading-tight">
-                        <p className="text-sm font-semibold text-white group-hover:text-toast-orange transition-colors">
+                        <p className="text-sm font-semibold text-white group-md:hover:text-toast-orange transition-colors">
                             {staffName}
                         </p>
                         <p className="text-[10px] text-toast-blue uppercase font-bold tracking-wider">
                             {staffRole}
                         </p>
                     </div>
-                    <div className="w-9 h-9 bg-toast-charcoal-light ring-2 ring-white/10 group-hover:ring-toast-orange/50 rounded-full flex items-center justify-center font-bold text-xs transition-all">
+                    <div className="w-9 h-9 bg-toast-charcoal-light ring-2 ring-white/10 group-md:hover:ring-toast-orange/50 rounded-full flex items-center justify-center font-bold text-xs transition-all">
                         {staffName.charAt(0)}
                     </div>
                 </div>

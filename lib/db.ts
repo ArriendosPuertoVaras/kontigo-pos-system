@@ -351,6 +351,7 @@ export interface JournalEntry {
     status: 'draft' | 'posted';
     created_at: Date;
     restaurantId?: string;
+    deletedAt?: Date | null;
 }
 
 export interface SystemSetting {

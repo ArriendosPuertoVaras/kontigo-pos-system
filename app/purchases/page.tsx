@@ -163,9 +163,46 @@ export default function PurchasesPage() {
     const handleDeleteOrder = async (orderId: number) => {
         if (!confirm("¿Seguro que quieres eliminar este registro de compra? Esto no revertirá el stock si ya fue recibido, pero sí afectará los reportes contables futuros.")) return;
 
-        await db.purchaseOrders.update(orderId, { deletedAt: new Date() });
-        toast.info("Registro de compra eliminado.");
+        await db.transaction('rw', db.purchaseOrders, db.journalEntries, db.accounts, async () => {
+            // 1. Logical Delete Purchase Order
+            await db.purchaseOrders.update(orderId, { deletedAt: new Date() });
+
+            // 2. Logical Delete & Reverse Associated Journal Entries
+            const referenceId = `PURCHASE-${orderId}`;
+            const entries = await db.journalEntries.where('referenceId').equals(referenceId).toArray();
+
+            if (entries.length > 0) {
+                for (const entry of entries) {
+                    if (entry.deletedAt) continue; // Already reversed
+
+                    // Reverse Balances
+                    for (const move of entry.movements) {
+                        const account = await db.accounts.get(move.accountId);
+                        if (!account) continue;
+
+                        let change = 0;
+                        if (['ASSET', 'EXPENSE'].includes(account.type)) {
+                            // Reversing: If it was DEBIT (positive), subtract. If CREDIT (negative), add.
+                            change = move.type === 'DEBIT' ? -move.amount : move.amount;
+                        } else {
+                            // Reversing: If it was CREDIT (positive), subtract. If DEBIT (negative), add.
+                            change = move.type === 'CREDIT' ? -move.amount : move.amount;
+                        }
+
+                        await db.accounts.update(account.id!, {
+                            balance: (account.balance || 0) + change
+                        });
+                    }
+
+                    await db.journalEntries.update(entry.id!, { deletedAt: new Date() });
+                }
+            }
+        });
+
+        toast.info("Registro de compra y saldos contables actualizados.");
         syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
+        syncService.autoSync(db.journalEntries, 'journal_entries').catch(console.error);
+        syncService.autoSync(db.accounts, 'accounts').catch(console.error);
     };
 
     const handleTogglePaymentStatus = async (order: PurchaseOrder) => {

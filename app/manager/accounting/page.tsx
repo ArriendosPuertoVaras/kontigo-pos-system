@@ -10,7 +10,12 @@ import Header from '@/components/Header';
 
 export default function AccountingDashboard() {
     const accounts = useLiveQuery(() => db.accounts.toArray());
-    const journalEntries = useLiveQuery(() => db.journalEntries.orderBy('date').reverse().limit(50).toArray());
+    const journalEntries = useLiveQuery(() => db.journalEntries
+        .filter(e => !e.deletedAt)
+        .reverse()
+        .limit(50)
+        .toArray()
+    );
     const [initializing, setInitializing] = useState(false);
 
     useEffect(() => {

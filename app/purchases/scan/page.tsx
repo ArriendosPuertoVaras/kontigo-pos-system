@@ -34,13 +34,17 @@ export default function ScanPage() {
         try {
             await db.transaction('rw', db.suppliers, db.purchaseOrders, db.journalEntries, db.accounts, async () => {
                 // 1. Find or Create Supplier
-                // If it was manually selected or matched exactly
                 let supplier = await db.suppliers.where('name').equalsIgnoreCase(result.supplierName!.trim()).first();
+
+                // Also try matching by RUT if available
+                if (!supplier && result.rut) {
+                    supplier = await db.suppliers.where('rut').equals(result.rut).first();
+                }
 
                 if (!supplier) {
                     const newId = await db.suppliers.add({
                         name: result.supplierName!.trim(),
-                        rut: result.rut, // Persist RUT
+                        rut: result.rut,
                         category: 'General',
                         contactName: '',
                         email: '',
@@ -51,7 +55,6 @@ export default function ScanPage() {
                     toast.info(`Nuevo proveedor creado: ${result.supplierName}`);
                     syncService.autoSync(db.suppliers, 'suppliers').catch(console.error);
                 } else if (!supplier.rut && result.rut) {
-                    // Update RUT if missing in existing supplier
                     await db.suppliers.update(supplier.id!, { rut: result.rut });
                     syncService.autoSync(db.suppliers, 'suppliers').catch(console.error);
                 }
@@ -67,17 +70,17 @@ export default function ScanPage() {
                     folio: result.folio,
                     customerNumber: result.customerNumber,
                     items: result.items.map(item => ({
-                        ingredientId: 0, // Generic/AI Item placeholder
+                        ingredientId: 0,
                         quantity: 1,
                         unitCost: item.price || 0,
                         purchaseUnit: 'un'
                     }))
-                } as PurchaseOrder);
+                });
 
-                // 3. Record in Accounting
-                await KontigoFinance.recordPurchase(supplier!.name, result.total!, false, paymentStatus === 'Paid'); // false = expense, not asset by default for rapid scan
+                // 3. Record in Accounting with Order ID linkage
+                await KontigoFinance.recordPurchase(supplier!.name, result.total!, false, paymentStatus === 'Paid', orderId as number);
 
-                // 4. Syc
+                // 4. Sync
                 syncService.autoSync(db.purchaseOrders, 'purchase_orders').catch(console.error);
                 syncService.autoSync(db.journalEntries, 'journal_entries').catch(console.error);
             });
@@ -103,30 +106,46 @@ export default function ScanPage() {
     };
 
     const checkDuplicate = async (data: ExtractedData) => {
-        if (!data.folio && !data.total) return;
-
-        // 1. Check by Folio (Strongest signal)
+        // Strict Check: Supplier (by RUT if possible) + Folio
         if (data.folio) {
-            const byFolio = await db.purchaseOrders.where('folio').equals(data.folio).first();
-            if (byFolio) {
-                setIsDuplicate(true);
-                setDuplicateId(byFolio.id!);
-                return;
+            let supplierId: number | undefined;
+
+            if (data.rut) {
+                const s = await db.suppliers.where('rut').equals(data.rut).first();
+                if (s) supplierId = s.id;
+            }
+
+            if (!supplierId && data.supplierName) {
+                const s = await db.suppliers.where('name').equalsIgnoreCase(data.supplierName.trim()).first();
+                if (s) supplierId = s.id;
+            }
+
+            if (supplierId) {
+                const byFolio = await db.purchaseOrders
+                    .where('folio').equals(data.folio)
+                    .and(o => o.supplierId === supplierId && !o.deletedAt)
+                    .first();
+
+                if (byFolio) {
+                    setIsDuplicate(true);
+                    setDuplicateId(byFolio.id!);
+                    return;
+                }
             }
         }
 
-        // 2. Check by Supplier + Total + Date (Fuzzy signal)
+        // Fuzzy Check: Date + Total + Name (Fallback)
         if (data.supplierName && data.total && data.date) {
             const supplier = await db.suppliers.where('name').equalsIgnoreCase(data.supplierName.trim()).first();
             if (supplier) {
-                const sameDayRange = {
-                    start: new Date(data.date.setHours(0, 0, 0, 0)),
-                    end: new Date(data.date.setHours(23, 59, 59, 999))
-                };
+                const d = new Date(data.date);
+                const start = new Date(d.setHours(0, 0, 0, 0));
+                const end = new Date(d.setHours(23, 59, 59, 999));
+
                 const byFuzzy = await db.purchaseOrders
                     .where('date')
-                    .between(sameDayRange.start, sameDayRange.end, true, true)
-                    .filter(o => o.supplierId === supplier.id && o.totalCost === data.total)
+                    .between(start, end, true, true)
+                    .filter(o => o.supplierId === supplier.id && o.totalCost === data.total && !o.deletedAt)
                     .first();
 
                 if (byFuzzy) {

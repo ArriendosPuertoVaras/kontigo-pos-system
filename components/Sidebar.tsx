@@ -140,7 +140,7 @@ export default function Sidebar() {
                     {/* CLOCK IN/OUT BUTTON */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('open-attendance-modal'))}
-                        className="relative flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-400 hover:text-green-400 hover:bg-green-500/10 transition-all group cursor-pointer"
+                        className="relative flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-400 active:text-green-400 md:hover:text-green-400 active:bg-green-500/10 md:hover:bg-green-500/10 transition-all group cursor-pointer"
                     >
                         <div className="w-5 h-5 mb-0.5"><Users className="w-5 h-5" /></div>
                         <span className="w-full text-[9px] font-bold uppercase text-center">Fichar</span>
@@ -152,7 +152,7 @@ export default function Sidebar() {
                                 e.stopPropagation();
                                 setShowNotifications(!showNotifications);
                             }}
-                            className={`relative flex flex-col items-center justify-center w-full py-2 rounded-lg transition-all group cursor-pointer ${showNotifications ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            className={`relative flex flex-col items-center justify-center w-full py-2 rounded-lg transition-all group cursor-pointer ${showNotifications ? 'text-white bg-white/10' : 'text-gray-400 md:hover:text-white md:hover:bg-white/5'}`}
                         >
                             <Bell className="w-5 h-5 mb-0.5" />
                             <span className="w-full text-[9px] font-bold uppercase text-center">Alertas</span>
@@ -235,7 +235,7 @@ export default function Sidebar() {
                     <button
                         onClick={() => router.push('/settings')}
                         className={`relative flex flex-col items-center justify-center w-full py-2 rounded-lg transition-all duration-200 group
-                    ${pathname === '/settings' || pathname.startsWith('/settings/') ? 'bg-white/10 text-toast-orange' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                    ${pathname === '/settings' || pathname.startsWith('/settings/') ? 'bg-white/10 text-toast-orange' : 'text-gray-400 md:hover:text-white md:hover:bg-white/5'}`}
                     >
                         <Settings className="w-5 h-5 mb-0.5" />
                         <span className="w-full text-[9px] font-bold uppercase text-center">Ajustes</span>
@@ -243,7 +243,7 @@ export default function Sidebar() {
 
                     <button
                         onClick={handleLogout}
-                        className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all group">
+                        className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-gray-400 active:text-red-400 md:hover:text-red-400 active:bg-red-500/10 md:hover:bg-red-500/10 transition-all group">
                         <LogOut className="w-5 h-5 mb-0.5" />
                         <span className="w-full text-[9px] font-bold uppercase text-center">Salir</span>
                     </button>
@@ -271,8 +271,8 @@ function NavItem({ href, icon, label, isActive, danger = false, permission }: { 
               ${isActive
                 ? 'bg-gradient-to-b from-white/10 to-transparent text-toast-orange shadow-inner border border-white/5'
                 : danger
-                    ? 'text-gray-400 hover:text-red-400 hover:bg-red-500/10'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'text-gray-400 md:hover:text-red-400 md:hover:bg-red-500/10'
+                    : 'text-gray-400 md:hover:text-white md:hover:bg-white/5'
             }`}>
             <div className={`w-5 h-5 mb-0.5 transition-transform group-active:scale-90 ${isActive ? 'text-toast-orange drop-shadow-lg' : ''} ${danger ? 'group-hover:text-red-400' : ''}`}>{icon}</div>
             <span className={`w-full text-[9px] font-bold uppercase text-center ${isActive ? 'text-white' : 'text-gray-500'}`}>{label}</span>
