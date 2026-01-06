@@ -147,7 +147,7 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
             // We use a small epsilon for float safety, though we work with integers usually on CLP
             const isFullyPaid = newTotalPaid >= order.total;
 
-            await db.transaction('rw', [db.orders, db.dtes, db.printers, db.accounts, db.journalEntries], async () => {
+            await db.transaction('rw', [db.orders, db.restaurantTables, db.dtes, db.printers, db.accounts, db.journalEntries], async () => {
                 // 1. Update DB
                 await db.orders.update(order.id!, {
                     payments: updatedPayments,
@@ -155,6 +155,17 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                     status: isFullyPaid ? 'paid' : order.status,
                     closedAt: isFullyPaid ? new Date() : undefined,
                 });
+
+                // 1.5 RELEASE TABLES IF FULLY PAID
+                if (isFullyPaid) {
+                    const linkedTables = await db.restaurantTables.where('currentOrderId').equals(order.id!).toArray();
+                    for (const table of linkedTables) {
+                        await db.restaurantTables.update(table.id!, {
+                            status: 'available',
+                            currentOrderId: undefined
+                        });
+                    }
+                }
 
                 // 2. Generate Fiscal Document (Mock Logic)
                 // Only generate IF paying something meaningful and it's not just a tip
@@ -202,6 +213,7 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                 if (navigator.onLine) {
                     console.log("🦁 Nexus: Auto-Syncing Sale to Cloud...");
                     syncService.autoSync(db.orders, 'orders').catch(console.error);
+                    syncService.autoSync(db.restaurantTables, 'restaurant_tables').catch(console.error);
                     // Also sync finance since we just touched it
                     syncService.autoSync(db.journalEntries, 'journal_entries').catch(console.error);
                     syncService.autoSync(db.accounts, 'accounts').catch(console.error);
