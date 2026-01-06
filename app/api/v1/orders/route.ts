@@ -47,19 +47,52 @@ export async function POST(req: NextRequest) {
         }
 
         // 3. Construct Order Object compatible with Supabase Schema
+        // 3a. Find a valid Table ID (Critical for FK Constraints)
+        let targetTableId = body.tableId;
+
+        if (!targetTableId) {
+            // Find any valid table for this restaurant
+            const { data: tableData } = await supabase
+                .from('restaurant_tables')
+                .select('id')
+                .eq('restaurant_id', restaurantId)
+                .limit(1)
+                .maybeSingle(); // Use maybeSingle to avoid 406 if none found
+
+            if (tableData) {
+                targetTableId = tableData.id;
+            } else {
+                // If NO tables exist (rare), create a Virtual Delivery Table
+                const { data: newTable, error: tableError } = await supabase
+                    .from('restaurant_tables')
+                    .insert({
+                        name: "Mesa Delivery (Virtual)",
+                        status: 'occupied',
+                        x: 0,
+                        y: 0,
+                        restaurant_id: restaurantId
+                    })
+                    .select()
+                    .single();
+
+                if (tableError) {
+                    console.error("Failed to create virtual table:", tableError);
+                    return NextResponse.json({ error: 'Setup Error: No tables found' }, { status: 500 });
+                }
+                targetTableId = newTable.id;
+            }
+        }
+
+        // 3b. Construct Order Object compatible with Supabase Schema
         const newOrder = {
             restaurant_id: restaurantId,
             status: 'open', // New orders start as open
-            table_id: body.tableId || 9999, // 9999 could be "Delivery" table
+            table_id: targetTableId,
             created_at: new Date().toISOString(),
             subtotal: body.subtotal || 0,
             tip: body.tip || 0,
-            total: body.total || 0,
+            total: body.total || body.subtotal || 0,
             // JSONB Items mapping (critical for sync compatibility)
-            // The POS expects TicketItem[] structure.
-            // External systems might send simplified JSON. We might need a transformer here.
-            // Assuming "Passive" mode: We store what they send if it matches, or we wrap it.
-            // Let's assume the payload IS the TicketItem[] for now or close to it.
             items: body.items,
             delivered_sections: [],
             ready_sections: []
