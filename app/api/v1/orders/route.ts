@@ -2,12 +2,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Server-Side Supabase Client (Admin context if needed, but here using service key logic if env vars set, 
-// or standard client with RLS. Ideally we need a SERVICE_ROLE key for bypassing RLS if the API key is valid.)
-// For this MVP, we rely on the env vars used by the app.
+// Server-Side Supabase Client
+// We PRIORITIZE the Service Role Key to bypass RLS for API operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Debug Log (Server Side)
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn("⚠️ API Warning: SUPABASE_SERVICE_ROLE_KEY is missing. RLS might block inserts.");
+}
 
 export async function POST(req: NextRequest) {
     try {
