@@ -136,6 +136,22 @@ export async function POST(req: NextRequest) {
 
         console.log(`[API] ✅ Order Created: ID ${insertedOrder.id}`);
 
+        // 5. CRITICAL: Link Table to Order (Update Status)
+        // This ensures the Table View shows "Occupied"
+        const { error: linkError } = await supabase
+            .from('restaurant_tables')
+            .update({
+                status: 'occupied',
+                current_order_id: insertedOrder.id
+            })
+            .eq('id', targetTableId);
+
+        if (linkError) {
+            console.error("[API] ⚠️ Failed to update table status:", linkError);
+        } else {
+            console.log(`[API] Table ${targetTableId} marked as Occupied linked to Order ${insertedOrder.id}`);
+        }
+
         // 5. Connect to Inventory? 
         // Note: The POS Client (local device) is the "Brain" that processes inventory.
         // If we deduct inventory purely server-side, we might desync if logic is complex (recipes).
