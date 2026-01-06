@@ -55,35 +55,49 @@ export async function POST(req: NextRequest) {
         let targetTableId = body.tableId;
 
         if (!targetTableId) {
-            // Find any valid table for this restaurant
-            const { data: tableData } = await supabase
+            // STRATEGY: Find a dedicated "Delivery" table.
+            // Do NOT just pick the first random table (e.g. Mesa 1).
+            const { data: deliveryTable } = await supabase
                 .from('restaurant_tables')
                 .select('id')
                 .eq('restaurant_id', restaurantId)
+                .or('name.ilike.%Delivery%,name.ilike.%UberEats%,name.ilike.%Rappi%') // Look for "Delivery", "UberEats", "Rappi"
                 .limit(1)
-                .maybeSingle(); // Use maybeSingle to avoid 406 if none found
+                .maybeSingle();
 
-            if (tableData) {
-                targetTableId = tableData.id;
+            if (deliveryTable) {
+                targetTableId = deliveryTable.id;
             } else {
-                // If NO tables exist (rare), create a Virtual Delivery Table
+                // If NO Delivery table exists, create one strictly for this purpose
+                console.log(`[API] Creating new 'Delivery' table for Restaurant ${restaurantId}`);
                 const { data: newTable, error: tableError } = await supabase
                     .from('restaurant_tables')
                     .insert({
-                        name: "Mesa Delivery (Virtual)",
-                        status: 'occupied',
-                        x: 0,
-                        y: 0,
-                        restaurant_id: restaurantId
+                        name: "Delivery (App)",
+                        status: 'occupied', // Will be occupied by this order
+                        x: 10,
+                        y: 10,
+                        restaurant_id: restaurantId,
+                        is_virtual: true // If you have this flag, good. If not, it's just a regular table.
                     })
                     .select()
                     .single();
 
                 if (tableError) {
-                    console.error("Failed to create virtual table:", tableError);
-                    return NextResponse.json({ error: 'Setup Error: No tables found' }, { status: 500 });
+                    console.error("Failed to create delivery table:", tableError);
+                    // Fallback: NOW we use any table as a desperate measure
+                    const { data: fallbackTable } = await supabase
+                        .from('restaurant_tables')
+                        .select('id')
+                        .eq('restaurant_id', restaurantId)
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (!fallbackTable) return NextResponse.json({ error: 'Setup Error: No tables found' }, { status: 500 });
+                    targetTableId = fallbackTable.id;
+                } else {
+                    targetTableId = newTable.id;
                 }
-                targetTableId = newTable.id;
             }
         }
 
