@@ -158,7 +158,9 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
 
                 // 1.5 RELEASE TABLES IF FULLY PAID
                 if (isFullyPaid) {
-                    const linkedTables = await db.restaurantTables.where('currentOrderId').equals(order.id!).toArray();
+                    // Fix: Use filter instead of where because currentOrderId is not indexed
+                    const linkedTables = await db.restaurantTables.filter(t => t.currentOrderId === order.id!).toArray();
+
                     for (const table of linkedTables) {
                         await db.restaurantTables.update(table.id!, {
                             status: 'available',
