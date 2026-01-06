@@ -227,7 +227,8 @@ export default function ApiKeysSection() {
                                 if (res.ok) {
                                     toast.success("¡Éxito! Pedido en Cocina 👨‍🍳", { id: toastId });
                                 } else {
-                                    toast.error("Error API: " + (data.error || 'Desconocido'), { id: toastId });
+                                    // SHOW DETAILS: data.details contains the real SQL error from the server
+                                    toast.error(`Error API: ${data.error} (${data.details || ''})`, { id: toastId, duration: 8000 });
                                 }
                             } catch (e: any) {
                                 console.error(e);
