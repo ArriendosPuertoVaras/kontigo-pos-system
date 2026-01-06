@@ -134,8 +134,36 @@ export default function ApiKeysSection() {
                             const activeKey = apiKeys?.find(k => k.status === 'active');
                             if (!activeKey) return toast.error("Necesitas una llave activa para probar");
 
-                            const toastId = toast.loading("Enviando pedido de prueba...");
+                            const toastId = toast.loading("Verificando sistema...");
+
                             try {
+                                // 1. Check Cloud Sync First
+                                const { createClient } = await import('@supabase/supabase-js');
+                                const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+                                const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+                                const supabase = createClient(supabaseUrl, supabaseKey);
+
+                                const { data: cloudKey, error: cloudError } = await supabase
+                                    .from('api_keys')
+                                    .select('id')
+                                    .eq('key_hash', activeKey.key_hash)
+                                    .single();
+
+                                if (cloudError || !cloudKey) {
+                                    console.error("Cloud Check Failed:", cloudError);
+                                    toast.error("⚠️ La llave no existe en la nube. Ejecuta el script SQL 'master_api_fix' en Supabase.", { id: toastId, duration: 6000 });
+                                    return;
+                                }
+
+                                // 2. Get Real Product
+                                const realProduct = await db.products.filter(p => p.price > 0).first();
+                                if (!realProduct) {
+                                    toast.error("⚠️ Crea un producto en el menú para hacer la prueba.", { id: toastId });
+                                    return;
+                                }
+
+                                // 3. Send Request
+                                toast.loading(`Enviando pedido de: ${realProduct.name}...`, { id: toastId });
                                 const res = await fetch('/api/v1/orders', {
                                     method: 'POST',
                                     headers: {
@@ -144,28 +172,38 @@ export default function ApiKeysSection() {
                                     },
                                     body: JSON.stringify({
                                         source: "UberEats (Test)",
-                                        subtotal: 12900,
-                                        tip: 1000,
-                                        total: 13900,
+                                        subtotal: realProduct.price,
+                                        tip: 0,
+                                        total: realProduct.price,
                                         items: [
-                                            { product: { id: 999, name: "Hamburguesa Prueba UI", price: 12900 }, quantity: 1 }
+                                            {
+                                                product: {
+                                                    id: realProduct.id,
+                                                    name: realProduct.name,
+                                                    price: realProduct.price,
+                                                    code: realProduct.code || `GEN-${realProduct.id}`
+                                                },
+                                                quantity: 1,
+                                                notes: "Sin cebolla (Prueba API)"
+                                            }
                                         ]
                                     })
                                 });
 
                                 const data = await res.json();
                                 if (res.ok) {
-                                    toast.success("¡Éxito! Pedido inyectado a la cocina 👨‍🍳", { id: toastId });
+                                    toast.success("¡Éxito! Pedido en Cocina 👨‍🍳", { id: toastId });
                                 } else {
                                     toast.error("Error API: " + (data.error || 'Desconocido'), { id: toastId });
                                 }
                             } catch (e) {
-                                toast.error("Error de conexión con API", { id: toastId });
+                                console.error(e);
+                                toast.error("Error de conexión", { id: toastId });
                             }
                         }}
                         className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"
                     >
-                        🚀 Simular Pedido UberEats
+                        🚀 Simular Pedido con {apiKeys?.length ? "Producto Real" : "..."}
                     </button>
                 </div>
             </div>
