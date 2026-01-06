@@ -12,6 +12,14 @@ export const TableService = {
                 const sourceTable = await db.restaurantTables.get(sourceTableId);
                 const targetTable = await db.restaurantTables.get(targetTableId);
 
+                // SECURITY CHECK: Prevent Delivery mixing
+                const isSourceDelivery = sourceTable?.zone?.toLowerCase().includes('delivery');
+                const isTargetDelivery = targetTable?.zone?.toLowerCase().includes('delivery');
+
+                if (isSourceDelivery !== isTargetDelivery) {
+                    throw new Error("⛔ Acción Bloqueada: No se puede mover pedidos entre Delivery y Salón.");
+                }
+
                 if (!sourceTable || sourceTable.status !== 'occupied' || !sourceTable.currentOrderId) {
                     throw new Error("Mesa de origen no válida o sin orden activa.");
                 }
@@ -59,6 +67,14 @@ export const TableService = {
                 const targetTable = await db.restaurantTables.get(targetTableId);
 
                 if (!sourceTable || !targetTable) throw new Error("Mesa no encontrada");
+
+                // SECURITY CHECK: Prevent Delivery mixing
+                const isSourceDelivery = sourceTable.zone?.toLowerCase().includes('delivery');
+                const isTargetDelivery = targetTable.zone?.toLowerCase().includes('delivery');
+
+                if (isSourceDelivery !== isTargetDelivery) {
+                    throw new Error("⛔ Acción Bloqueada: No se pueden mezclar mesas de Delivery con Salón.");
+                }
                 if (!sourceTable.currentOrderId || !targetTable.currentOrderId) throw new Error("Ambas mesas deben tener ordenes activas");
 
                 const sourceOrder = await db.orders.get(sourceTable.currentOrderId);

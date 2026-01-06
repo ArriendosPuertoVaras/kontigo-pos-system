@@ -55,52 +55,58 @@ export async function POST(req: NextRequest) {
         let targetTableId = body.tableId;
 
         if (!targetTableId) {
-            // STRATEGY: Find a dedicated "Delivery" table.
-            // Do NOT just pick the first random table (e.g. Mesa 1).
-            const { data: deliveryTable } = await supabase
+            // STRATEGY: Enforce Strict 'Delivery' Zone Isolation
+
+            // 1. Try to find an AVAILABLE table in the 'Delivery' zone
+            const { data: availableDeliveryTable } = await supabase
                 .from('restaurant_tables')
-                .select('id')
+                .select('id, name')
                 .eq('restaurant_id', restaurantId)
-                .or('name.ilike.%Delivery%,name.ilike.%UberEats%,name.ilike.%Rappi%') // Look for "Delivery", "UberEats", "Rappi"
+                .ilike('zone', '%Delivery%') // Strict Zone Check
+                .eq('status', 'available')
                 .limit(1)
                 .maybeSingle();
 
-            if (deliveryTable) {
-                targetTableId = deliveryTable.id;
+            if (availableDeliveryTable) {
+                targetTableId = availableDeliveryTable.id;
+                console.log(`[API] Assigned to existing Delivery table: ${availableDeliveryTable.name}`);
             } else {
-                // If NO Delivery table exists, create one strictly for this purpose
-                console.log(`[API] Creating new 'Delivery' table for Restaurant ${restaurantId}`);
-                const { data: newTable, error: tableError } = await supabase
+                // 2. If no available space in Delivery Zone, create a overflow table
+                // This prevents hijacking 'Salon' tables
+
+                // Count existing delivery tables to allow naming "Delivery N"
+                const { count } = await supabase
+                    .from('restaurant_tables')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('restaurant_id', restaurantId)
+                    .ilike('zone', '%Delivery%');
+
+                const nextNum = (count || 0) + 1;
+                const newTableName = `Delivery ${nextNum}`;
+
+                console.log(`[API] Creating new table '${newTableName}' in Delivery zone`);
+
+                const { data: newTable, error: createError } = await supabase
                     .from('restaurant_tables')
                     .insert({
-                        name: "Delivery (App)",
-                        status: 'occupied', // Will be occupied by this order
-                        x: 10,
-                        y: 10,
+                        name: newTableName,
+                        status: 'occupied',
                         restaurant_id: restaurantId,
-                        is_virtual: true // If you have this flag, good. If not, it's just a regular table.
+                        zone: 'Delivery', // Explicitly set Zone
+                        x: 0, // Hidden/special coordinates
+                        y: 0
                     })
                     .select()
                     .single();
 
-                if (tableError) {
-                    console.error("Failed to create delivery table:", tableError);
-                    // Fallback: NOW we use any table as a desperate measure
-                    const { data: fallbackTable } = await supabase
-                        .from('restaurant_tables')
-                        .select('id')
-                        .eq('restaurant_id', restaurantId)
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (!fallbackTable) return NextResponse.json({ error: 'Setup Error: No tables found' }, { status: 500 });
-                    targetTableId = fallbackTable.id;
-                } else {
-                    targetTableId = newTable.id;
+                if (createError || !newTable) {
+                    console.error("Failed to create Delivery table:", createError);
+                    return NextResponse.json({ error: 'Infrastructure Error: Could not assign Delivery table' }, { status: 500 });
                 }
+
+                targetTableId = newTable.id;
             }
         }
-
         // 3b. Construct Order Object compatible with Supabase Schema
         const newOrder = {
             restaurant_id: restaurantId,
