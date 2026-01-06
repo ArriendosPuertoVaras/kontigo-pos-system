@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { Key, Copy, Plus, Trash2, Eye, EyeOff, ShieldAlert } from 'lucide-react';
+import { Key, Copy, Plus, Trash2, Eye, EyeOff, ShieldAlert, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ApiKeysSection() {
     const apiKeys = useLiveQuery(() => db.apiKeys.toArray());
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [showKey, setShowKey] = useState<number | null>(null);
 
     const generateKey = async () => {
@@ -40,6 +41,21 @@ export default function ApiKeysSection() {
         }
     };
 
+    const forceSync = async () => {
+        setIsSyncing(true);
+        const toastId = toast.loading("Forzando sincronización de llaves...");
+        try {
+            const { syncService } = await import('@/lib/sync_service');
+            await syncService.pushTable(db.apiKeys, 'api_keys');
+            toast.success("¡Sincronización Exitosa!", { id: toastId });
+        } catch (e: any) {
+            console.error(e);
+            toast.error("Error sincronizando: " + (e.message || "Desconocido"), { id: toastId });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const revokeKey = async (id: number) => {
         if (!confirm("¿Revocar esta llave? Dejará de funcionar inmediatamente.")) return;
         await db.apiKeys.update(id, { status: 'revoked' });
@@ -56,10 +72,13 @@ export default function ApiKeysSection() {
 
     return (
         <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                <Key className="w-5 h-5 text-green-400" />
-                Conectividad API & Delivery
-            </h3>
+            <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Key className="w-5 h-5 text-green-400" />
+                    Conectividad API & Delivery
+                </h3>
+            </div>
+
             <p className="text-sm text-gray-400 mb-6">Gestiona las llaves de acceso para integrar UberEats, Rappi o ERPs externos.</p>
 
             <div className="space-y-4">
@@ -108,14 +127,25 @@ export default function ApiKeysSection() {
                     </div>
                 )}
 
-                <button
-                    onClick={generateKey}
-                    disabled={isGenerating}
-                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-bold transition shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                    <Plus className="w-4 h-4" />
-                    Generar Nueva Llave API
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={generateKey}
+                        disabled={isGenerating}
+                        className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-bold transition shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Generar Nueva Llave
+                    </button>
+
+                    <button
+                        onClick={forceSync}
+                        disabled={isSyncing}
+                        className="w-12 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg flex items-center justify-center transition disabled:opacity-50"
+                        title="Forzar Sincronización"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
             </div>
 
             {/* INTEGRATED TESTER: No Terminal Needed */}
@@ -127,14 +157,13 @@ export default function ApiKeysSection() {
                 <div className="bg-black/40 rounded-lg p-4 border border-white/5">
                     <p className="text-xs text-gray-400 mb-4">
                         Prueba que la API esté recibiendo pedidos correctamente sin usar código.
-                        Esto simulará una orden entrante de "UberEats".
                     </p>
                     <button
                         onClick={async () => {
                             const activeKey = apiKeys?.find(k => k.status === 'active');
                             if (!activeKey) return toast.error("Necesitas una llave activa para probar");
 
-                            const toastId = toast.loading("Verificando sistema...");
+                            const toastId = toast.loading("Diagnóstico de Nube en curso...");
 
                             try {
                                 // 1. Check Cloud Sync First
@@ -151,7 +180,10 @@ export default function ApiKeysSection() {
 
                                 if (cloudError || !cloudKey) {
                                     console.error("Cloud Check Failed:", cloudError);
-                                    toast.error("⚠️ La llave no existe en la nube. Ejecuta el script SQL 'master_api_fix' en Supabase.", { id: toastId, duration: 6000 });
+                                    // SHOW EXACT ERROR TO USER FOR DEBUGGING
+                                    const errMsg = cloudError?.message || "No encontrada";
+                                    const errCode = cloudError?.code || "N/A";
+                                    toast.error(`❌ Error Cloud: ${errMsg} (Code: ${errCode}). Intenta el botón de Sincronizar.`, { id: toastId, duration: 8000 });
                                     return;
                                 }
 
@@ -197,9 +229,9 @@ export default function ApiKeysSection() {
                                 } else {
                                     toast.error("Error API: " + (data.error || 'Desconocido'), { id: toastId });
                                 }
-                            } catch (e) {
+                            } catch (e: any) {
                                 console.error(e);
-                                toast.error("Error de conexión", { id: toastId });
+                                toast.error("Error crítico: " + e.message, { id: toastId });
                             }
                         }}
                         className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"
