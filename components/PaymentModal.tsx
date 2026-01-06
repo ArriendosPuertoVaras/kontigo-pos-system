@@ -180,10 +180,16 @@ export default function PaymentModal({ isOpen, onClose, order, onPaymentSuccess 
                     await openCashDrawer();
                 }
 
-                // 4. FINANCIAL NEXUS (Auto-Accounting)
-                // Register the sale immediately
+            }); // End Transaction
+
+            // 1.5 FINANCIAL NEXUS (Auto-Accounting) - OUTSIDE Transaction
+            // Moved outside to avoid table scope errors (e.g. during auto-heal)
+            try {
                 await KontigoFinance.registerSale(newPayment, documentType === 'factura');
-            });
+            } catch (finError) {
+                console.error("🦁 Nexus Error: Failed to register sale in accounting:", finError);
+                // Non-fatal for the POS sale itself
+            }
 
             // 3. Trigger External Success Handler
             if (onPaymentSuccess) {
