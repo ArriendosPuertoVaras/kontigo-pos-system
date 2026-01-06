@@ -79,20 +79,26 @@ export default function TablesPage() {
 
         // Get Unique Zones
         const zones = new Set<string>();
+        // Add default/hardcoded ones to encourage usage
+        zones.add('GENERAL');
+        zones.add('TERRAZA');
+        zones.add('SALON');
+        zones.add('BAR');
+
         t.forEach(table => {
             if (table.zone) zones.add(table.zone.toUpperCase());
         });
 
-        // Ensure Delivery exists in zones if we have delivery tables
-        // Actually the set handles it. Default zones:
         const sortedZones = Array.from(zones).sort();
 
-        return { tables: t, orderMap: map, zones: ['TODAS', ...sortedZones] };
+        // Pass 'zones' explicitly for the dropdown to use
+        return { tables: t, orderMap: map, zones: ['TODAS', ...sortedZones], rawZones: sortedZones };
     }, [now]);
 
     const tables = data?.tables || [];
     const orderMap = data?.orderMap;
     const availableZones = data?.zones || ['TODAS'];
+    const rawZones = data?.rawZones || [];
 
     // Filter Tables by Zone
     const filteredTables = tables.filter(t => {
@@ -122,13 +128,17 @@ export default function TablesPage() {
 
     const handleAddTable = async () => {
         const nextNumber = tables.length + 1;
-        const currentZone = activeZone === 'TODAS' ? 'GENERAL' : activeZone;
+        const currentZone = activeZone === 'TODAS' ? 'General' : activeZone;
+
+        // Capitalize nicely for UX "General" not "GENERAL"
+        const formattedZone = currentZone.charAt(0).toUpperCase() + currentZone.slice(1).toLowerCase();
+
         await db.restaurantTables.add({
             name: `Mesa ${nextNumber}`,
             status: 'available',
             x: 0,
             y: 0,
-            zone: currentZone
+            zone: formattedZone
         });
     };
 
@@ -146,23 +156,24 @@ export default function TablesPage() {
         }
         setDraggedTableId(table.id!);
         e.dataTransfer.effectAllowed = 'move';
-        // Visually hide the ghost if needed or style it
+        // Optional: Custom ghost image
     };
 
     const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
+        e.preventDefault(); // Essential for 'drop' to fire
         e.dataTransfer.dropEffect = 'move';
     };
 
     const handleDrop = async (e: React.DragEvent, targetTable: RestaurantTable) => {
         e.preventDefault();
+
         if (!draggedTableId) return;
         if (draggedTableId === targetTable.id) return;
 
         try {
             if (targetTable.status === 'available') {
                 // MOVE
-                if (confirm(`¿Mover pedido a ${targetTable.name}?`)) {
+                if (confirm(`¿Mover pedido de la mesa origen a ${targetTable.name}?`)) {
                     await TableService.moveTable(draggedTableId, targetTable.id!);
                     toast.success("Mesa movida correctamente");
                 }
@@ -252,37 +263,39 @@ export default function TablesPage() {
                 {/* --- EDIT TABLE MODAL --- */}
                 {editingTableId && (
                     <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                        <div className="bg-toast-charcoal-dark p-6 rounded-2xl border border-white/10 w-full max-w-sm shadow-2xl">
+                        <div className="bg-toast-charcoal-dark p-6 rounded-2xl border border-white/10 w-full max-w-sm shadow-2xl relative">
                             <h3 className="text-xl font-bold mb-4">Editar Mesa</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-xs text-gray-400 font-bold uppercase">Nombre</label>
+                                    <label className="text-xs text-gray-400 font-bold uppercase mb-1 block">Nombre</label>
                                     <input
                                         value={editForm.name}
                                         onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none"
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none font-bold"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-400 font-bold uppercase">Zona (Ej: Salon, Terraza)</label>
-                                    <input
-                                        value={editForm.zone}
-                                        onChange={e => setEditForm({ ...editForm, zone: e.target.value })}
-                                        placeholder="General"
-                                        list="zones-list"
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none"
-                                    />
-                                    <datalist id="zones-list">
-                                        <option value="General" />
-                                        <option value="Terraza" />
-                                        <option value="Patio" />
-                                        <option value="Bar" />
-                                        <option value="Delivery" />
-                                    </datalist>
+                                    <label className="text-xs text-gray-400 font-bold uppercase mb-1 block">Zona (Ej: Salon, Terraza)</label>
+                                    <div className="relative">
+                                        <input
+                                            value={editForm.zone}
+                                            onChange={e => setEditForm({ ...editForm, zone: e.target.value })}
+                                            placeholder="Escribe o selecciona..."
+                                            list="zones-list"
+                                            className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none font-bold"
+                                        />
+                                        {/* Datalist for autocomplete */}
+                                        <datalist id="zones-list">
+                                            {rawZones.map(z => (
+                                                <option key={z} value={z}>{z}</option>
+                                            ))}
+                                        </datalist>
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 mt-1">Escribe un nombre nuevo para crear una zona nueva.</p>
                                 </div>
                                 <div className="flex gap-2 pt-2">
-                                    <button onClick={() => setEditingTableId(null)} className="flex-1 bg-white/5 py-3 rounded-lg font-bold hover:bg-white/10">Cancelar</button>
-                                    <button onClick={saveTableEdit} className="flex-1 bg-toast-orange py-3 rounded-lg font-bold text-white hover:bg-orange-600">Guardar</button>
+                                    <button onClick={() => setEditingTableId(null)} className="flex-1 bg-white/5 py-3 rounded-lg font-bold hover:bg-white/10 transition-all">Cancelar</button>
+                                    <button onClick={saveTableEdit} className="flex-1 bg-toast-orange py-3 rounded-lg font-bold text-white hover:bg-orange-600 transition-all">Guardar</button>
                                 </div>
                             </div>
                         </div>
@@ -292,7 +305,7 @@ export default function TablesPage() {
                 <Header title="Mapa de Mesas">
                     <div className="flex items-center gap-4 w-full justify-between">
                         <div className="hidden lg:flex gap-3 items-center">
-                            {/* STATUS PILLS (Existing) */}
+                            {/* STATUS PILLS */}
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
                                 <span className="text-xs font-bold text-gray-300">Libres: {availableTables}</span>
@@ -379,58 +392,70 @@ export default function TablesPage() {
 
                                 if (status === 'critical') {
                                     containerClass = 'bg-red-500/10 border-red-500/50 hover:bg-red-500/20 shadow-red-900/20';
-                                    iconClass = 'bg-red-600 text-white border-red-500';
+                                    iconClass = 'bg-red-600 text-white border-red-500 shadow-md';
                                     textClass = 'text-red-400 font-bold';
                                 } else if (status === 'warning') {
                                     containerClass = 'bg-yellow-500/10 border-yellow-500/50 hover:bg-yellow-500/20 shadow-yellow-900/20';
-                                    iconClass = 'bg-yellow-500 text-black border-yellow-400';
+                                    iconClass = 'bg-yellow-500 text-black border-yellow-400 shadow-md';
                                     textClass = 'text-yellow-400 font-bold';
                                 } else {
                                     containerClass = 'bg-green-500/10 border-green-500/50 hover:bg-green-500/20 shadow-green-900/20';
-                                    iconClass = 'bg-green-600 text-white border-green-500';
+                                    iconClass = 'bg-green-600 text-white border-green-500 shadow-md';
                                     textClass = 'text-green-400 font-bold';
                                 }
                             } else {
                                 label = 'Libre';
-                                containerClass = 'bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10 border-dashed';
-                                iconClass = 'bg-transparent text-gray-500 border-gray-600 group-hover:border-white group-hover:text-white border-dashed';
-                                textClass = 'text-gray-500 group-hover:text-white';
+                                // FIXED: cleaner look for empty tables, no dashed border unless edit mode
+                                containerClass = 'bg-[#1a1a1a] border-white/5 hover:border-white/20 hover:bg-white/5';
+                                iconClass = 'bg-white/5 text-gray-500 border-transparent group-hover:text-white group-hover:bg-white/10';
+                                textClass = 'text-gray-600 group-hover:text-gray-400';
+                            }
+
+                            // Highlight valid drop target if dragging
+                            const isDragTarget = draggedTableId && draggedTableId !== table.id && !isEditMode;
+
+                            // If table is AVAILABLE, it's a valid target for MOVE
+                            // If table is OCCUPIED, it's a valid target for MERGE
+                            const isValidTarget = isDragTarget;
+
+                            if (draggedTableId && isValidTarget) {
+                                containerClass += " ring-2 ring-dashed ring-toast-orange/50 scale-95";
                             }
 
                             return (
                                 <div key={table.id} className="relative group">
-                                    <button
+                                    <div
                                         draggable={!isEditMode && table.status === 'occupied'}
                                         onDragStart={(e) => handleDragStart(e, table)}
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDrop(e, table)}
                                         onClick={() => handleTableClick(table)}
-                                        className={`w-full aspect-square rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all overflow-hidden relative
-                                            ${containerClass} ${isEditMode ? 'animate-pulse cursor-context-menu' : 'cursor-pointer'}
-                                            ${draggedTableId === table.id ? 'opacity-50 scale-95' : ''}
+                                        className={`w-full aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 transition-all overflow-hidden relative
+                                            ${containerClass} ${isEditMode ? 'animate-pulse cursor-context-menu border-dashed border-toast-orange/30' : 'cursor-pointer'}
+                                            ${draggedTableId === table.id ? 'opacity-50 scale-95 grayscale' : ''}
                                             `}
                                     >
                                         {/* READY INDICATORS */}
                                         <div className="absolute top-2 left-2 flex gap-1">
-                                            {hasKitchenReady && <div className="w-3 h-3 rounded-full bg-yellow-400 animate-ping"></div>}
-                                            {hasBarReady && <div className="w-3 h-3 rounded-full bg-blue-500 animate-ping delay-150"></div>}
+                                            {hasKitchenReady && <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-ping"></div>}
+                                            {hasBarReady && <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping delay-150"></div>}
                                         </div>
 
-                                        {/* Drag Handle Icon for clarity */}
+                                        {/* Drag Handle Icon for clarity - Only show if draggable */}
                                         {!isEditMode && table.status === 'occupied' && (
-                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-50">
-                                                <GripHorizontal className="w-4 h-4 text-white" />
+                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-60 transition-opacity">
+                                                <GripHorizontal className="w-5 h-5 text-white drop-shadow-md" />
                                             </div>
                                         )}
 
                                         {/* EDIT ICON */}
                                         {isEditMode && (
-                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                                <Edit3 className="w-8 h-8 text-white" />
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                                                <Edit3 className="w-8 h-8 text-white drop-shadow-lg" />
                                             </div>
                                         )}
 
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border-2 mb-1 transition-transform group-hover:scale-110 ${iconClass}`}>
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border mb-1 transition-transform group-hover:scale-110 ${iconClass}`}>
                                             {table.name.replace(/\D/g, '') || table.name.charAt(0)}
                                         </div>
 
@@ -443,12 +468,12 @@ export default function TablesPage() {
 
                                         {/* Zone Label (Small) */}
                                         {table.zone && activeZone === 'TODAS' && (
-                                            <span className="absolute bottom-1 text-[8px] text-gray-600 font-mono items-center uppercase bg-black/30 px-1 rounded">
+                                            <span className="absolute bottom-2 text-[8px] text-gray-500 font-mono items-center uppercase bg-black/40 px-1.5 py-0.5 rounded border border-white/5">
                                                 {table.zone}
                                             </span>
                                         )}
 
-                                    </button>
+                                    </div>
 
                                     {/* DELETE BUTTON (EDIT MODE ONLY) */}
                                     {isEditMode && (
@@ -457,7 +482,7 @@ export default function TablesPage() {
                                                 e.stopPropagation();
                                                 handleDeleteTable(table.id!);
                                             }}
-                                            className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-10 hover:scale-110 transition-transform"
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-20 hover:scale-110 transition-transform"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
