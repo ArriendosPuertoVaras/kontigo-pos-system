@@ -363,6 +363,16 @@ export interface SystemSetting {
     restaurantId?: string;
 }
 
+export interface ApiKey {
+    id?: number; // Local ID
+    restaurantId: string;
+    name: string;
+    key_hash: string; // The full key
+    prefix: string;
+    created_at: Date;
+    status: 'active' | 'revoked';
+}
+
 // --- Database Definition ---
 export class KontigoDatabase extends Dexie {
     products!: Table<Product>;
@@ -388,6 +398,7 @@ export class KontigoDatabase extends Dexie {
     journalEntries!: Table<JournalEntry>;
     settings!: Table<SystemSetting>;
     productionLogs!: Table<ProductionLog>;
+    apiKeys!: Table<ApiKey>;
 
     constructor() {
         super('Kontigo_Final'); // Force final fresh DB
@@ -457,6 +468,11 @@ export class KontigoDatabase extends Dexie {
         // V13: Index Scheduled Shifs for Dashboard
         this.version(13).stores({
             shifts: '++id, staffId, startTime, scheduledStart, restaurantId'
+        });
+
+        // V14: API Keys Management
+        this.version(14).stores({
+            apiKeys: '++id, key_hash, restaurantId'
         });
 
         // Populate if empty - DISABLED to prevent Ghost Data

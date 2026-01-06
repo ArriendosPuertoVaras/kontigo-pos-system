@@ -1,6 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
+import ApiKeysSection from '@/components/ApiKeysSection';
 import Sidebar from '@/components/Sidebar';
 import { generateMockData } from '@/lib/mock_generator';
 import { db } from '@/lib/db';
@@ -126,6 +127,9 @@ export default function SettingsPage() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* API KEYS SECTION */}
+                        <ApiKeysSection />
 
                         {/* DATA MANAGEMENT SECTION */}
                         <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-6 shadow-xl">

@@ -263,6 +263,7 @@ class SyncService {
             onProgress?.("Sincronizando Menú y Recetas...");
             await this.pushTable(db.products, 'products');
             await this.pushTable(db.modifierTemplates, 'modifier_templates');
+            await this.pushTable(db.apiKeys, 'api_keys'); // Sync API Keys
 
             // 2. Suppliers & CRM
             onProgress?.("Sincronizando Proveedores y Clientes...");
@@ -435,6 +436,7 @@ class SyncService {
             onProgress?.("Restaurando Categorías y Plantillas...");
             await this.pullTable(db.categories, 'categories');
             await this.pullTable(db.modifierTemplates, 'modifier_templates');
+            await this.pullTable(db.apiKeys, 'api_keys');
 
             onProgress?.("Restaurando Proveedores y Clientes...");
             await this.pullTable(db.suppliers, 'suppliers');
