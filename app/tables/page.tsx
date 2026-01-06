@@ -3,11 +3,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seedDatabase, RestaurantTable, Order } from '@/lib/db';
 import Link from 'next/link';
-import { UtensilsCrossed, LayoutGrid, ClipboardList, Package, Truck, ShoppingCart, Trash2, Users, Bell, Settings, LogOut, Search, Filter } from 'lucide-react';
+import { UtensilsCrossed, LayoutGrid, ClipboardList, Package, Truck, ShoppingCart, Trash2, Users, Bell, Settings, LogOut, Search, Filter, Plus, Edit3, GripHorizontal } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { getOrderWaitTime, getWaitStatus, getOrderWaitTimeFormatted } from '@/lib/kds'; // Fixed import
+import { getOrderWaitTime, getWaitStatus, getOrderWaitTimeFormatted } from '@/lib/kds';
 
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
@@ -15,21 +15,39 @@ import ClockOutModal from '@/components/ClockOutModal';
 import GuestCountModal from '@/components/GuestCountModal';
 import { toast } from 'sonner';
 import { syncService } from '@/lib/sync_service';
-import { useAutoSync } from '@/components/providers/AutoSyncProvider'; // For Realtime Status
+import { useAutoSync } from '@/components/providers/AutoSyncProvider';
 import { RefreshCw } from 'lucide-react';
+import { TableService } from '@/lib/table_service';
 
-// --- COMPONENTS ---
+// --- NEW COMPONENTS ---
+
+function ZoneTab({ label, active, onClick, count }: { label: string, active: boolean, onClick: () => void, count?: number }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider transition-all border
+            ${active
+                    ? 'bg-toast-orange text-white border-toast-orange shadow-lg shadow-orange-900/40 transform scale-105'
+                    : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
+        >
+            {label}
+            {count !== undefined && <span className="ml-2 text-[10px] opacity-70 bg-black/20 px-1.5 py-0.5 rounded-full">{count}</span>}
+        </button>
+    );
+}
 
 export default function TablesPage() {
     const router = useRouter();
-
-    // --- STATE: Ticker for Time Updates (Every 30s) ---
     const [now, setNow] = useState(Date.now());
     const { status: autoSyncStatus } = useAutoSync();
     const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error' | 'timed_out'>('connecting');
     const [lastNexusError, setLastNexusError] = useState<string | null>(null);
 
-    // Monitor Realtime Status and Errors
+    // --- ZONE STATE ---
+    const [activeZone, setActiveZone] = useState<string>('TODAS');
+    const [draggedTableId, setDraggedTableId] = useState<number | null>(null);
+
+    // Monitor Realtime Status
     useEffect(() => {
         const interval = setInterval(() => {
             setRealtimeStatus(syncService.channelStatus as any);
@@ -39,78 +57,78 @@ export default function TablesPage() {
     }, []);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setNow(Date.now());
-        }, 30000); // Update every 30 seconds to keep times fresh
+        const interval = setInterval(() => setNow(Date.now()), 30000);
         return () => clearInterval(interval);
     }, []);
 
-    // --- REALTIME NEXUS: Listen for Shared State Changes ---
     useEffect(() => {
-        // Initialize subscriptions
         const initRealtime = async () => {
-            await syncService.subscribeToTable('restaurant_tables', db.restaurantTables, () => {
-                console.log("♻️ [UI] Refreshing Tables due to Realtime event...");
-                setNow(Date.now()); // Trigger useLiveQuery refresh
-            });
-            await syncService.subscribeToTable('orders', db.orders, () => {
-                console.log("♻️ [UI] Refreshing Orders due to Realtime event...");
-                setNow(Date.now());
-            });
+            await syncService.subscribeToTable('restaurant_tables', db.restaurantTables, () => setNow(Date.now()));
+            await syncService.subscribeToTable('orders', db.orders, () => setNow(Date.now()));
         };
-
         initRealtime();
     }, []);
 
     // Fetched Data
     const data = useLiveQuery(async () => {
         const t = await db.restaurantTables.toArray();
-        // Fetch both OPEN (active) and READY (waiting for delivery) orders
         const o = await db.orders.where('status').anyOf('open', 'ready').toArray();
-        const c = await db.categories.toArray();
 
         const map = new Map<number, Order>();
         o.forEach(ord => map.set(ord.id!, ord));
 
-        // Category Map for Destination Lookup
-        const catMap = new Map<number, string>();
-        c.forEach(cat => catMap.set(cat.id!, cat.destination || 'kitchen'));
+        // Get Unique Zones
+        const zones = new Set<string>();
+        t.forEach(table => {
+            if (table.zone) zones.add(table.zone.toUpperCase());
+        });
 
-        return { tables: t, orderMap: map, catMap };
+        // Ensure Delivery exists in zones if we have delivery tables
+        // Actually the set handles it. Default zones:
+        const sortedZones = Array.from(zones).sort();
+
+        return { tables: t, orderMap: map, zones: ['TODAS', ...sortedZones] };
     }, [now]);
 
-    const tables = data?.tables;
+    const tables = data?.tables || [];
     const orderMap = data?.orderMap;
-    const catMap = data?.catMap;
+    const availableZones = data?.zones || ['TODAS'];
 
-    // ... (Stats Logic Unchanged) ...
-    // Quick Stats
-    const totalTables = tables?.length || 0;
-    const occupiedTables = tables?.filter(t => t.status === 'occupied').length || 0;
-    const availableTables = tables?.filter(t => t.status === 'available').length || 0;
+    // Filter Tables by Zone
+    const filteredTables = tables.filter(t => {
+        if (activeZone === 'TODAS') return true;
+        return (t.zone || 'GENERAL').toUpperCase() === activeZone;
+    });
 
-    // ... (Guest Count Logic Unchanged) ...
+    // Stats
+    const totalTables = tables.length;
+    const occupiedTables = tables.filter(t => t.status === 'occupied').length;
+    const availableTables = tables.filter(t => t.status === 'available').length;
+
     const [selectedTableForGuestCount, setSelectedTableForGuestCount] = useState<RestaurantTable | null>(null);
     const [guestCount, setGuestCount] = useState(2);
     const [showClockOut, setShowClockOut] = useState(false);
 
-    // ... (Effect Unchanged) ...
     useEffect(() => {
         const handleClockOut = () => setShowClockOut(true);
         window.addEventListener('open-clock-out', handleClockOut);
         return () => window.removeEventListener('open-clock-out', handleClockOut);
     }, []);
 
-    // ... (Table Management Logic Unchanged) ...
+    // --- TABLE EDITING ---
     const [isEditMode, setIsEditMode] = useState(false);
+    const [editingTableId, setEditingTableId] = useState<number | null>(null); // Specific table being edited
+    const [editForm, setEditForm] = useState({ name: '', zone: '' });
 
     const handleAddTable = async () => {
-        const nextNumber = (tables?.length || 0) + 1;
+        const nextNumber = tables.length + 1;
+        const currentZone = activeZone === 'TODAS' ? 'GENERAL' : activeZone;
         await db.restaurantTables.add({
             name: `Mesa ${nextNumber}`,
             status: 'available',
             x: 0,
-            y: 0
+            y: 0,
+            zone: currentZone
         });
     };
 
@@ -120,23 +138,78 @@ export default function TablesPage() {
         }
     };
 
-    // --- ALERT LOGIC (Removed Global Toast in favor of Per-Table Blinking) ---
-    // (Keeping generic notification state if needed for other things, but disabling the auto-toast for Ready)
-    const [notification, setNotification] = useState<string | null>(null);
-
-    const handleTableClick = async (table: RestaurantTable) => {
-        if (table.status === 'available') {
-            setSelectedTableForGuestCount(table);
-            setGuestCount(2);
-        } else {
-            // Navigate to Order
-            router.push(`/?tableId=${table.id}`);
+    // --- DRAG AND DROP HANDLERS ---
+    const handleDragStart = (e: React.DragEvent, table: RestaurantTable) => {
+        if (table.status !== 'occupied') {
+            e.preventDefault(); // Only drag occupied tables
+            return;
         }
+        setDraggedTableId(table.id!);
+        e.dataTransfer.effectAllowed = 'move';
+        // Visually hide the ghost if needed or style it
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetTable: RestaurantTable) => {
+        e.preventDefault();
+        if (!draggedTableId) return;
+        if (draggedTableId === targetTable.id) return;
+
+        try {
+            if (targetTable.status === 'available') {
+                // MOVE
+                if (confirm(`¿Mover pedido a ${targetTable.name}?`)) {
+                    await TableService.moveTable(draggedTableId, targetTable.id!);
+                    toast.success("Mesa movida correctamente");
+                }
+            } else if (targetTable.status === 'occupied') {
+                // MERGE
+                if (confirm(`¿Juntar mesas? Se unirá el pedido de la mesa origen con ${targetTable.name}.`)) {
+                    await TableService.mergeTables(draggedTableId, targetTable.id!);
+                    toast.success("Mesas unidas correctamente");
+                }
+            }
+        } catch (err: any) {
+            toast.error(err.message);
+        } finally {
+            setDraggedTableId(null);
+        }
+    };
+
+    // --- CLICK HANDLER ---
+    const handleTableClick = (table: RestaurantTable) => {
+        if (isEditMode) {
+            // Edit Metadata
+            setEditingTableId(table.id!);
+            setEditForm({ name: table.name, zone: table.zone || 'General' });
+        } else {
+            // Normal Operations
+            if (table.status === 'available') {
+                setSelectedTableForGuestCount(table);
+                setGuestCount(2);
+            } else {
+                router.push(`/?tableId=${table.id}`);
+            }
+        }
+    };
+
+    const saveTableEdit = async () => {
+        if (!editingTableId) return;
+        await db.restaurantTables.update(editingTableId, {
+            name: editForm.name,
+            zone: editForm.zone
+        });
+        setEditingTableId(null);
+        // Sync
+        syncService.autoSync(db.restaurantTables, 'restaurant_tables');
     };
 
     const handleConfirmGuestCount = async (count: number) => {
         if (!selectedTableForGuestCount) return;
-
         try {
             const orderId = await db.orders.add({
                 tableId: selectedTableForGuestCount.id!,
@@ -146,7 +219,8 @@ export default function TablesPage() {
                 tip: 0,
                 total: 0,
                 createdAt: new Date(),
-                covers: count
+                covers: count,
+                restaurantId: '1' // Assuming singleton for now
             });
 
             await db.restaurantTables.update(selectedTableForGuestCount.id!, {
@@ -156,77 +230,69 @@ export default function TablesPage() {
 
             router.push(`/?tableId=${selectedTableForGuestCount.id}`);
 
-            // TRANSACTIONAL SYNC: Ensure cloud has this order NOW
-            toast.promise(
-                Promise.all([
-                    syncService.autoSync(db.orders, 'orders'),
-                    syncService.autoSync(db.restaurantTables, 'restaurant_tables')
-                ]),
-                {
-                    loading: 'Sincronizando mesa...',
-                    success: 'Mesa abierta y sincronizada',
-                    error: 'Error al sincronizar con la nube'
-                }
-            );
+            // Sync
+            syncService.autoSync(db.orders, 'orders');
+            syncService.autoSync(db.restaurantTables, 'restaurant_tables');
 
-        } catch (e) {
-            console.error("Error creating order:", e);
-        } finally {
-            setSelectedTableForGuestCount(null);
-        }
+        } catch (e) { console.error(e); } finally { setSelectedTableForGuestCount(null); }
     };
 
     return (
         <div className="flex h-screen w-full bg-toast-charcoal text-white font-sans selection:bg-toast-orange selection:text-white relative">
-
             <GuestCountModal
                 isOpen={!!selectedTableForGuestCount}
                 onClose={() => setSelectedTableForGuestCount(null)}
                 onConfirm={handleConfirmGuestCount}
                 tableName={selectedTableForGuestCount?.name || ''}
             />
-
             <Sidebar />
 
             <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#2a2a2a]">
 
-                <Header title="Mapa de Mesas">
-                    <div className="flex items-center gap-6 w-full justify-between">
-                        <div className="hidden lg:flex gap-3">
-                            <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1 min-w-[140px] transition-all">
-                                <div className="flex items-center gap-2">
-                                    <span className={`w-2 h-2 rounded-full shadow-[0_0_8px] 
-                                        ${realtimeStatus === 'connected' ? 'bg-blue-500 shadow-blue-500/50' :
-                                            realtimeStatus === 'error' ? 'bg-red-500 shadow-red-500/50' :
-                                                realtimeStatus === 'timed_out' ? 'bg-orange-500 shadow-orange-500/50' :
-                                                    'bg-gray-500 animate-pulse'}`}></span>
-                                    <span className="text-[10px] font-black text-white px-2 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 uppercase tracking-widest leading-none">
-                                        Nexus v3.2
-                                    </span>
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                                        {realtimeStatus === 'connected' ? 'Nexus Live' :
-                                            realtimeStatus === 'error' ? 'Nexus Error' :
-                                                realtimeStatus === 'timed_out' ? 'Nexus Timeout' :
-                                                    'Nexus Connecting...'}
-                                    </span>
+                {/* --- EDIT TABLE MODAL --- */}
+                {editingTableId && (
+                    <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                        <div className="bg-toast-charcoal-dark p-6 rounded-2xl border border-white/10 w-full max-w-sm shadow-2xl">
+                            <h3 className="text-xl font-bold mb-4">Editar Mesa</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs text-gray-400 font-bold uppercase">Nombre</label>
+                                    <input
+                                        value={editForm.name}
+                                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none"
+                                    />
                                 </div>
-
-                                {realtimeStatus === 'error' && lastNexusError && (
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-red-500 font-bold leading-tight line-clamp-2">
-                                            {lastNexusError}
-                                        </span>
-                                        {lastNexusError.includes('sesión') || lastNexusError.includes('Sesión') ? (
-                                            <button
-                                                onClick={() => router.push('/login')}
-                                                className="text-[8px] bg-red-500/20 text-red-400 hover:bg-red-500/40 px-2 py-0.5 rounded border border-red-500/30 font-bold transition-all w-fit mt-1"
-                                            >
-                                                RE-INICIAR SESIÓN
-                                            </button>
-                                        ) : null}
-                                    </div>
-                                )}
+                                <div>
+                                    <label className="text-xs text-gray-400 font-bold uppercase">Zona (Ej: Salon, Terraza)</label>
+                                    <input
+                                        value={editForm.zone}
+                                        onChange={e => setEditForm({ ...editForm, zone: e.target.value })}
+                                        placeholder="General"
+                                        list="zones-list"
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none"
+                                    />
+                                    <datalist id="zones-list">
+                                        <option value="General" />
+                                        <option value="Terraza" />
+                                        <option value="Patio" />
+                                        <option value="Bar" />
+                                        <option value="Delivery" />
+                                    </datalist>
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button onClick={() => setEditingTableId(null)} className="flex-1 bg-white/5 py-3 rounded-lg font-bold hover:bg-white/10">Cancelar</button>
+                                    <button onClick={saveTableEdit} className="flex-1 bg-toast-orange py-3 rounded-lg font-bold text-white hover:bg-orange-600">Guardar</button>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                <Header title="Mapa de Mesas">
+                    <div className="flex items-center gap-4 w-full justify-between">
+                        <div className="hidden lg:flex gap-3 items-center">
+                            {/* STATUS PILLS (Existing) */}
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
                                 <span className="text-xs font-bold text-gray-300">Libres: {availableTables}</span>
@@ -237,6 +303,7 @@ export default function TablesPage() {
                             </div>
                         </div>
 
+                        {/* EDIT MODE TOGGLE */}
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={() => setIsEditMode(!isEditMode)}
@@ -249,33 +316,15 @@ export default function TablesPage() {
                                 {isEditMode ? 'Finalizar Edición' : 'Editar Mesas'}
                             </button>
 
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar mesa..."
-                                    className="pl-10 pr-4 py-2 bg-black/20 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-toast-orange/50 w-32 md:w-48 transition-all"
-                                />
-                            </div>
-
                             <button
                                 onClick={async () => {
-                                    toast.loading("Refrescando datos y reconectando Nexus...");
-                                    try {
-                                        // 1. Full Pull truth from cloud
-                                        await syncService.restoreFromCloud((msg) => console.log(msg), true);
-                                        // 2. Re-kickstart Realtime Nexus
-                                        await syncService.retrySubscriptions();
-
-                                        toast.dismiss();
-                                        toast.success("Mapa de mesas actualizado y Nexus reiniciado");
-                                        setNow(Date.now());
-                                    } catch (e) {
-                                        toast.error("Fallo al refrescar");
-                                    }
+                                    toast.loading("Sincronizando...");
+                                    await syncService.restoreFromCloud(() => { }, true);
+                                    await syncService.retrySubscriptions();
+                                    toast.dismiss();
+                                    toast.success("Actualizado");
                                 }}
-                                className="p-2 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                                title="Fuerza actualización desde la nube"
+                                className="p-2 rounded-lg bg-white/5 text-gray-400 hover:text-white"
                             >
                                 <RefreshCw className="w-4 h-4" />
                             </button>
@@ -283,167 +332,153 @@ export default function TablesPage() {
                     </div>
                 </Header>
 
-                <div className="flex-1 overflow-y-auto p-8">
-                    {!tables ? (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-4">
-                            <span>Cargando mapa...</span>
-                        </div>
-                    ) : (
-
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-3 max-w-7xl mx-auto pb-20">
-                            {tables.map(table => {
-                                let containerClass = "";
-                                let iconClass = "";
-                                let textClass = "";
-                                let label = "";
-                                let waitTime = 0;
-                                let waitTimeLabel = "";
-
-                                // Ready Flags
-                                let hasKitchenReady = false;
-                                let hasBarReady = false;
-                                let hasParrillaReady = false;
-
-                                if (table.status === 'occupied') {
-                                    const order = orderMap?.get(table.currentOrderId!);
-                                    if (order) {
-                                        waitTime = getOrderWaitTime(order.createdAt);
-                                        waitTimeLabel = getOrderWaitTimeFormatted(order.createdAt);
-
-                                        // CHECK FOR READY STATUS & DELIVERY
-                                        // CHECK FOR READY STATUS per Section (Independent delivery)
-                                        const readySections = (order as any).readySections || [];
-                                        const deliveredSections = (order as any).deliveredSections || [];
-
-                                        readySections.forEach((s: string) => {
-                                            const section = s.toLowerCase();
-                                            if (deliveredSections.includes(section)) return; // Skip if already delivered
-
-                                            if (section === 'bar') hasBarReady = true;
-                                            else if (section === 'parrilla') hasParrillaReady = true;
-                                            else hasKitchenReady = true; // Default/Kitchen
-                                        });
-                                    }
-                                    const status = getWaitStatus(waitTime);
-
-                                    label = 'Ocupada';
-
-                                    if (status === 'critical') {
-                                        containerClass = 'bg-red-500/10 border-red-500/50 hover:bg-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]'; // Removed pulse, used for ready
-                                        iconClass = 'bg-red-600 text-white border-red-500 shadow-lg';
-                                        textClass = 'text-red-400 font-bold';
-                                    } else if (status === 'warning') {
-                                        containerClass = 'bg-yellow-500/10 border-yellow-500/50 hover:bg-yellow-500/20 shadow-[0_0_15px_rgba(234,179,8,0.2)]';
-                                        iconClass = 'bg-yellow-500 text-black border-yellow-400 shadow-md';
-                                        textClass = 'text-yellow-400 font-bold';
-                                    } else {
-                                        containerClass = 'bg-green-500/10 border-green-500/50 hover:bg-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.2)]';
-                                        iconClass = 'bg-green-600 text-white border-green-500 shadow-md';
-                                        textClass = 'text-green-400 font-bold';
-                                    }
-                                } else if (table.status === 'reserved') {
-                                    label = 'Reservada';
-                                    containerClass = 'bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/20 opacity-80';
-                                    iconClass = 'bg-purple-900/50 text-purple-300 border-purple-500/50';
-                                    textClass = 'text-purple-400';
-                                } else {
-                                    label = 'Libre';
-                                    containerClass = 'bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10';
-                                    iconClass = 'bg-transparent text-gray-500 border-gray-600 group-hover:border-white group-hover:text-white';
-                                    textClass = 'text-gray-500 group-hover:text-white';
-                                }
-
-                                return (
-                                    <div key={table.id} className="relative group">
-                                        <button
-                                            onClick={() => handleTableClick(table)}
-                                            className={`w-full aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 transition-all overflow-hidden ${containerClass} ${isEditMode ? 'animate-pulse' : ''}`}
-                                        >
-                                            {/* READY INDICATORS (BLINKING) */}
-                                            <div className="absolute top-2 left-2 flex gap-1">
-                                                {hasKitchenReady && (
-                                                    <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)] animate-[ping_1s_ease-in-out_infinite]" title="Cocina Lista"></div>
-                                                )}
-                                                {hasParrillaReady && (
-                                                    <div className="w-3 h-3 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)] animate-[ping_1s_ease-in-out_infinite] delay-150" title="Parrilla Lista"></div>
-                                                )}
-                                                {hasBarReady && (
-                                                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] animate-[ping_1s_ease-in-out_infinite] delay-300" title="Bar Listo"></div>
-                                                )}
-                                            </div>
-
-                                            {/* Table Icon / Number */}
-                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border-2 mb-1 transition-transform group-hover:scale-110 ${iconClass}`}>
-                                                {table.name.replace('Mesa ', '')}
-                                            </div>
-
-                                            <span className={`text-sm font-bold uppercase tracking-wider ${textClass}`}>
-                                                {label}
-                                            </span>
-
-                                            {/* Wait Time Badge for Occupied */}
-                                            {table.status === 'occupied' && (
-                                                <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-                                                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${waitTime >= 20 ? 'bg-red-500 text-white border-red-400' :
-                                                        waitTime >= 10 ? 'bg-yellow-500 text-black border-yellow-400' :
-                                                            'bg-green-500/20 text-green-400 border-green-500/30'
-                                                        }`}>
-                                                        {waitTimeLabel}
-                                                    </span>
-                                                </div>
-                                            )}
-
-                                        </button>
-
-                                        {/* DELETE BUTTON (EDIT MODE ONLY) */}
-                                        {isEditMode && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteTable(table.id!);
-                                                }}
-                                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-10 hover:scale-110 transition-transform"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                )
-                            })}
-
-                            {/* ADD NEW TABLE BUTTON (EDIT MODE ONLY) */}
-                            {isEditMode && (
-                                <button
-                                    onClick={handleAddTable}
-                                    className="aspect-square rounded-xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center gap-2 hover:bg-white/5 hover:border-toast-orange/50 hover:text-toast-orange text-gray-500 transition-colors group"
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-toast-orange/10 transition-colors">
-                                        <Users className="w-6 h-6" />
-                                    </div>
-                                    <span className="text-xs font-bold uppercase tracking-wider">Nueva Mesa</span>
-                                </button>
-                            )}
-                        </div>
-                    )}
+                {/* --- ZONE TABS --- */}
+                <div className="border-b border-white/5 bg-black/20 p-2 overflow-x-auto">
+                    <div className="flex items-center gap-2 min-w-max mx-auto max-w-7xl px-4">
+                        {availableZones.map(zone => (
+                            <ZoneTab
+                                key={zone}
+                                label={zone}
+                                active={activeZone === zone}
+                                onClick={() => setActiveZone(zone)}
+                                count={zone === 'TODAS' ? tables.length : tables.filter(t => (t.zone || 'GENERAL').toUpperCase() === zone).length}
+                            />
+                        ))}
+                    </div>
                 </div>
 
-                <ClockOutModal
-                    isOpen={showClockOut}
-                    onClose={() => setShowClockOut(false)}
-                />
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gradient-to-b from-[#2a2a2a] to-[#222]">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4 max-w-7xl mx-auto pb-20">
+                        {filteredTables.map(table => {
+                            let containerClass = "";
+                            let iconClass = "";
+                            let textClass = "";
+                            let label = "";
+                            let waitTime = 0;
+                            let waitTimeLabel = "";
 
-                {
-                    notification && (
-                        <div className="fixed top-24 right-8 bg-green-500 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] flex items-center gap-4 animate-bounce hover:animate-none cursor-pointer" onClick={() => setNotification(null)}>
-                            <Bell className="w-8 h-8 animate-pulse text-white fill-white" />
-                            <div>
-                                <p className="font-bold text-lg leading-none uppercase tracking-wider">Atención</p>
-                                <p className="font-medium">{notification}</p>
-                            </div>
-                        </div>
-                    )
-                }
-            </main >
-        </div >
+                            // Ready Flags
+                            let hasKitchenReady = false;
+                            let hasBarReady = false;
+
+                            if (table.status === 'occupied') {
+                                const order = orderMap?.get(table.currentOrderId!);
+                                if (order) {
+                                    waitTime = getOrderWaitTime(order.createdAt);
+                                    waitTimeLabel = getOrderWaitTimeFormatted(order.createdAt);
+                                    const readySections = (order as any).readySections || [];
+                                    const deliveredSections = (order as any).deliveredSections || [];
+                                    readySections.forEach((s: string) => {
+                                        if (deliveredSections.includes(s.toLowerCase())) return;
+                                        if (s.toLowerCase() === 'bar') hasBarReady = true;
+                                        else hasKitchenReady = true;
+                                    });
+                                }
+                                const status = getWaitStatus(waitTime);
+                                label = 'Ocupada';
+
+                                if (status === 'critical') {
+                                    containerClass = 'bg-red-500/10 border-red-500/50 hover:bg-red-500/20 shadow-red-900/20';
+                                    iconClass = 'bg-red-600 text-white border-red-500';
+                                    textClass = 'text-red-400 font-bold';
+                                } else if (status === 'warning') {
+                                    containerClass = 'bg-yellow-500/10 border-yellow-500/50 hover:bg-yellow-500/20 shadow-yellow-900/20';
+                                    iconClass = 'bg-yellow-500 text-black border-yellow-400';
+                                    textClass = 'text-yellow-400 font-bold';
+                                } else {
+                                    containerClass = 'bg-green-500/10 border-green-500/50 hover:bg-green-500/20 shadow-green-900/20';
+                                    iconClass = 'bg-green-600 text-white border-green-500';
+                                    textClass = 'text-green-400 font-bold';
+                                }
+                            } else {
+                                label = 'Libre';
+                                containerClass = 'bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10 border-dashed';
+                                iconClass = 'bg-transparent text-gray-500 border-gray-600 group-hover:border-white group-hover:text-white border-dashed';
+                                textClass = 'text-gray-500 group-hover:text-white';
+                            }
+
+                            return (
+                                <div key={table.id} className="relative group">
+                                    <button
+                                        draggable={!isEditMode && table.status === 'occupied'}
+                                        onDragStart={(e) => handleDragStart(e, table)}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, table)}
+                                        onClick={() => handleTableClick(table)}
+                                        className={`w-full aspect-square rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all overflow-hidden relative
+                                            ${containerClass} ${isEditMode ? 'animate-pulse cursor-context-menu' : 'cursor-pointer'}
+                                            ${draggedTableId === table.id ? 'opacity-50 scale-95' : ''}
+                                            `}
+                                    >
+                                        {/* READY INDICATORS */}
+                                        <div className="absolute top-2 left-2 flex gap-1">
+                                            {hasKitchenReady && <div className="w-3 h-3 rounded-full bg-yellow-400 animate-ping"></div>}
+                                            {hasBarReady && <div className="w-3 h-3 rounded-full bg-blue-500 animate-ping delay-150"></div>}
+                                        </div>
+
+                                        {/* Drag Handle Icon for clarity */}
+                                        {!isEditMode && table.status === 'occupied' && (
+                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-50">
+                                                <GripHorizontal className="w-4 h-4 text-white" />
+                                            </div>
+                                        )}
+
+                                        {/* EDIT ICON */}
+                                        {isEditMode && (
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                <Edit3 className="w-8 h-8 text-white" />
+                                            </div>
+                                        )}
+
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border-2 mb-1 transition-transform group-hover:scale-110 ${iconClass}`}>
+                                            {table.name.replace(/\D/g, '') || table.name.charAt(0)}
+                                        </div>
+
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5 max-w-[90%] truncate">
+                                            {table.name}
+                                        </p>
+                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${textClass}`}>
+                                            {label}
+                                        </span>
+
+                                        {/* Zone Label (Small) */}
+                                        {table.zone && activeZone === 'TODAS' && (
+                                            <span className="absolute bottom-1 text-[8px] text-gray-600 font-mono items-center uppercase bg-black/30 px-1 rounded">
+                                                {table.zone}
+                                            </span>
+                                        )}
+
+                                    </button>
+
+                                    {/* DELETE BUTTON (EDIT MODE ONLY) */}
+                                    {isEditMode && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteTable(table.id!);
+                                            }}
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg z-10 hover:scale-110 transition-transform"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            )
+                        })}
+
+                        {/* ADD BUTTON */}
+                        {isEditMode && (
+                            <button
+                                onClick={handleAddTable}
+                                className="aspect-square rounded-xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center gap-2 hover:bg-white/5 hover:border-toast-orange/50 hover:text-toast-orange text-gray-500 transition-colors"
+                            >
+                                <Plus className="w-8 h-8 opacity-50" />
+                                <span className="text-xs font-bold uppercase tracking-wider">Nueva</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </main>
+        </div>
     );
 }

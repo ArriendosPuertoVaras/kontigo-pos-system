@@ -160,6 +160,7 @@ export interface RestaurantTable {
     x: number;
     y: number;
     restaurantId?: string;
+    zone?: string; // e.g. 'Salon', 'Terraza', 'Delivery'
 }
 
 export interface Payment {
