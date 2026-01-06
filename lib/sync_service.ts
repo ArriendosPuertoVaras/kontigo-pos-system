@@ -201,6 +201,10 @@ class SyncService {
                 // derived field, not in supabase schema
                 delete converted.status;
             }
+            if (supabaseTableName === 'api_keys') {
+                // Local is number (1), Cloud is UUID. Let Cloud generate UUID on insert.
+                delete converted.id;
+            }
 
             // SAFETY: FORCE RESTAURANT_ID
             converted.restaurant_id = restaurantId;
@@ -216,6 +220,9 @@ class SyncService {
             }
             if (supabaseTableName === 'accounts') {
                 conflictTarget = 'code';
+            }
+            if (supabaseTableName === 'api_keys') {
+                conflictTarget = 'key_hash';
             }
             const { error } = await supabase
                 .from(supabaseTableName)
