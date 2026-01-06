@@ -25,13 +25,13 @@ function ZoneTab({ label, active, onClick, count }: { label: string, active: boo
     return (
         <button
             onClick={onClick}
-            className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider transition-all border
+            className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider transition-all border flex items-center gap-2
             ${active
-                    ? 'bg-toast-orange text-white border-toast-orange shadow-lg shadow-orange-900/40 transform scale-105'
+                    ? 'bg-toast-orange text-white border-toast-orange shadow-lg shadow-orange-900/40 transform scale-105 structure-active'
                     : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
         >
             {label}
-            {count !== undefined && <span className="ml-2 text-[10px] opacity-70 bg-black/20 px-1.5 py-0.5 rounded-full">{count}</span>}
+            {count !== undefined && <span className="text-[10px] opacity-70 bg-black/20 px-1.5 py-0.5 rounded-full">{count}</span>}
         </button>
     );
 }
@@ -77,28 +77,34 @@ export default function TablesPage() {
         const map = new Map<number, Order>();
         o.forEach(ord => map.set(ord.id!, ord));
 
-        // Get Unique Zones
+        // Get Unique Zones CLEANLY (No hardcodes)
         const zones = new Set<string>();
-        // Add default/hardcoded ones to encourage usage
-        zones.add('GENERAL');
-        zones.add('TERRAZA');
-        zones.add('SALON');
-        zones.add('BAR');
+        const rawZoneNames = new Set<string>();
 
-        t.forEach(table => {
-            if (table.zone) zones.add(table.zone.toUpperCase());
-        });
+        if (t.length > 0) {
+            t.forEach(table => {
+                const z = table.zone || 'General';
+                zones.add(z.toUpperCase());
+                rawZoneNames.add(z);
+            });
+        } else {
+            // Only if DB is completely empty show at least General
+            zones.add('GENERAL');
+            rawZoneNames.add('General');
+        }
 
         const sortedZones = Array.from(zones).sort();
+        const sortedRawZones = Array.from(rawZoneNames).sort();
 
         // Pass 'zones' explicitly for the dropdown to use
-        return { tables: t, orderMap: map, zones: ['TODAS', ...sortedZones], rawZones: sortedZones };
+        return { tables: t, orderMap: map, zones: ['TODAS', ...sortedZones], rawZones: sortedRawZones };
     }, [now]);
 
     const tables = data?.tables || [];
     const orderMap = data?.orderMap;
-    const availableZones = data?.zones || ['TODAS'];
-    const rawZones = data?.rawZones || [];
+    // Fallback to minimal state if loading
+    const availableZones = data?.zones || ['TODAS', 'GENERAL'];
+    const rawZones = data?.rawZones || ['General'];
 
     // Filter Tables by Zone
     const filteredTables = tables.filter(t => {
@@ -128,17 +134,20 @@ export default function TablesPage() {
 
     const handleAddTable = async () => {
         const nextNumber = tables.length + 1;
-        const currentZone = activeZone === 'TODAS' ? 'General' : activeZone;
-
-        // Capitalize nicely for UX "General" not "GENERAL"
-        const formattedZone = currentZone.charAt(0).toUpperCase() + currentZone.slice(1).toLowerCase();
+        // Default to current active zone if specific, else General
+        let defaultZone = 'General';
+        if (activeZone !== 'TODAS') {
+            // Find the raw spelling that matches this uppercase zone
+            const match = rawZones.find(z => z.toUpperCase() === activeZone);
+            if (match) defaultZone = match;
+        }
 
         await db.restaurantTables.add({
             name: `Mesa ${nextNumber}`,
             status: 'available',
             x: 0,
             y: 0,
-            zone: formattedZone
+            zone: defaultZone
         });
     };
 
@@ -210,9 +219,13 @@ export default function TablesPage() {
 
     const saveTableEdit = async () => {
         if (!editingTableId) return;
+
+        // Capitalize nicely if it's new
+        const finalZone = editForm.zone.trim() || 'General';
+
         await db.restaurantTables.update(editingTableId, {
             name: editForm.name,
-            zone: editForm.zone
+            zone: finalZone
         });
         setEditingTableId(null);
         // Sync
@@ -275,23 +288,34 @@ export default function TablesPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-400 font-bold uppercase mb-1 block">Zona (Ej: Salon, Terraza)</label>
+                                    <label className="text-xs text-gray-400 font-bold uppercase mb-1 block">Zona</label>
                                     <div className="relative">
                                         <input
                                             value={editForm.zone}
                                             onChange={e => setEditForm({ ...editForm, zone: e.target.value })}
-                                            placeholder="Escribe o selecciona..."
-                                            list="zones-list"
-                                            className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none font-bold"
+                                            placeholder="Ej: Salon, Terraza..."
+                                            className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:border-toast-orange outline-none font-bold mb-2"
                                         />
-                                        {/* Datalist for autocomplete */}
-                                        <datalist id="zones-list">
+
+                                        {/* Quick Select Chips */}
+                                        <div className="flex flex-wrap gap-2 mt-2">
                                             {rawZones.map(z => (
-                                                <option key={z} value={z}>{z}</option>
+                                                <button
+                                                    key={z}
+                                                    onClick={() => setEditForm({ ...editForm, zone: z })}
+                                                    className={`text-[10px] px-2 py-1 rounded-full border transition-colors font-bold uppercase
+                                                        ${editForm.zone === z
+                                                            ? 'bg-toast-orange border-toast-orange text-white'
+                                                            : 'cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-400'}`}
+                                                >
+                                                    {z}
+                                                </button>
                                             ))}
-                                        </datalist>
+                                            <div className="text-[10px] px-2 py-1 rounded-full border border-dashed border-white/20 text-gray-500">
+                                                + Crea nueva escribiendo arriba
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-[10px] text-gray-500 mt-1">Escribe un nombre nuevo para crear una zona nueva.</p>
                                 </div>
                                 <div className="flex gap-2 pt-2">
                                     <button onClick={() => setEditingTableId(null)} className="flex-1 bg-white/5 py-3 rounded-lg font-bold hover:bg-white/10 transition-all">Cancelar</button>
@@ -472,8 +496,10 @@ export default function TablesPage() {
 
                                         {/* BOTTOM: Zone Label (Only if needed) */}
                                         {table.zone && activeZone === 'TODAS' && (
-                                            <div className="mt-1 flex-shrink-0">
-                                                <span className="text-[8px] text-gray-500 font-mono uppercase bg-black/40 px-1.5 py-0.5 rounded border border-white/5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full block">
+                                            <div className="mt-1 flex-shrink-0 relative">
+                                                <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border whitespace-nowrap overflow-hidden text-ellipsis max-w-full block
+                                                    ${(table.zone.toLowerCase().includes('delivery')) ? 'bg-orange-500/20 text-orange-200 border-orange-500/30' : 'bg-black/40 text-gray-500 border-white/5'}
+                                                `}>
                                                     {table.zone}
                                                 </span>
                                             </div>
