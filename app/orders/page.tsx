@@ -216,9 +216,24 @@ export default function OrdersPage() {
                 return { ...item, category };
             }));
 
+            // Find ALL tables associated with this order (for merged/joined tables)
+            const linkedTables = tables.filter(t => t.currentOrderId === o.id);
+
+            let finalTableName = 'Mesa ?';
+            if (linkedTables.length > 0) {
+                // Sort by ID to stand stable
+                finalTableName = linkedTables
+                    .sort((a, b) => (a.id || 0) - (b.id || 0))
+                    .map(t => t.name)
+                    .join(' + ');
+            } else {
+                // Fallback to the ID stored in order if no table claims it (shouldn't happen active)
+                finalTableName = tables.find(t => t.id === o.tableId)?.name || `Mesa ${o.tableId}`;
+            }
+
             return {
                 ...o,
-                tableName: tables.find(t => t.id === o.tableId)?.name || 'Mesa ?',
+                tableName: finalTableName,
                 itemsWithCategory
             };
         }));
