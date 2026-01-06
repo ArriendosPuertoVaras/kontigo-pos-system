@@ -230,28 +230,58 @@ function POSContent() {
     }
   };
 
-  const addToTicket = (product: Product, modifiers: ModifierOption[] = []) => {
-    setTicket(prev => {
-      // Only group exactly same items (same ID AND same modifiers)
-      if (modifiers.length > 0) {
-        return [...prev, { product, quantity: 1, selectedModifiers: modifiers }];
-      }
+  // --- AUTO-SAVE LOGIC ---
+  const persistTicket = async (newTicket: TicketItem[]) => {
+    if (!activeTable?.currentOrderId) return;
 
-      // Group standard items
-      const existing = prev.find(item => item.product.id === product.id && (!item.selectedModifiers || item.selectedModifiers.length === 0));
-      if (existing) {
-        return prev.map(item =>
-          (item.product.id === product.id && (!item.selectedModifiers || item.selectedModifiers.length === 0))
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, { product, quantity: 1, selectedModifiers: [] }];
+    // Recalculate Totals
+    const newSubtotal = newTicket.reduce((sum, item) => {
+      const itemPrice = item.product.price;
+      const modifiersPrice = item.selectedModifiers?.reduce((acc, mod) => acc + mod.price, 0) || 0;
+      return sum + ((itemPrice + modifiersPrice) * item.quantity);
+    }, 0);
+    const newTotal = newSubtotal; // Tip is separate
+
+    await db.orders.update(activeTable.currentOrderId, {
+      items: newTicket,
+      subtotal: newSubtotal,
+      total: newTotal,
+      updatedAt: new Date()
     });
+
+    // Background Sync (Fire & Forget)
+    if (navigator.onLine) {
+      const { syncService } = await import('@/lib/sync_service');
+      syncService.autoSync(db.orders, 'orders').catch(console.error);
+    }
+  };
+
+  const addToTicket = (product: Product, modifiers: ModifierOption[] = []) => {
+    let newTicket = [...ticket];
+
+    // Only group exactly same items (same ID AND same modifiers)
+    if (modifiers.length > 0) {
+      newTicket = [...newTicket, { product, quantity: 1, selectedModifiers: modifiers }];
+    } else {
+      // Group standard items
+      const existingIndex = newTicket.findIndex(item => item.product.id === product.id && (!item.selectedModifiers || item.selectedModifiers.length === 0));
+
+      if (existingIndex >= 0) {
+        const item = newTicket[existingIndex];
+        newTicket[existingIndex] = { ...item, quantity: item.quantity + 1 };
+      } else {
+        newTicket = [...newTicket, { product, quantity: 1, selectedModifiers: [] }];
+      }
+    }
+
+    setTicket(newTicket);
+    persistTicket(newTicket); // Auto-save
   };
 
   const removeFromTicket = (index: number) => {
-    setTicket(prev => prev.filter((_, i) => i !== index));
+    const newTicket = ticket.filter((_, i) => i !== index);
+    setTicket(newTicket);
+    persistTicket(newTicket);
   };
 
   const confirmModifiers = () => {
