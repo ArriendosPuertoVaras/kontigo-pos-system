@@ -118,6 +118,58 @@ export default function ApiKeysSection() {
                 </button>
             </div>
 
+            {/* INTEGRATED TESTER: No Terminal Needed */}
+            <div className="mt-8 pt-6 border-t border-white/5">
+                <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-blue-400" />
+                    Probador de Integración
+                </h4>
+                <div className="bg-black/40 rounded-lg p-4 border border-white/5">
+                    <p className="text-xs text-gray-400 mb-4">
+                        Prueba que la API esté recibiendo pedidos correctamente sin usar código.
+                        Esto simulará una orden entrante de "UberEats".
+                    </p>
+                    <button
+                        onClick={async () => {
+                            const activeKey = apiKeys?.find(k => k.status === 'active');
+                            if (!activeKey) return toast.error("Necesitas una llave activa para probar");
+
+                            const toastId = toast.loading("Enviando pedido de prueba...");
+                            try {
+                                const res = await fetch('/api/v1/orders', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'x-api-key': activeKey.key_hash
+                                    },
+                                    body: JSON.stringify({
+                                        source: "UberEats (Test)",
+                                        subtotal: 12900,
+                                        tip: 1000,
+                                        total: 13900,
+                                        items: [
+                                            { product: { id: 999, name: "Hamburguesa Prueba UI", price: 12900 }, quantity: 1 }
+                                        ]
+                                    })
+                                });
+
+                                const data = await res.json();
+                                if (res.ok) {
+                                    toast.success("¡Éxito! Pedido inyectado a la cocina 👨‍🍳", { id: toastId });
+                                } else {
+                                    toast.error("Error API: " + (data.error || 'Desconocido'), { id: toastId });
+                                }
+                            } catch (e) {
+                                toast.error("Error de conexión con API", { id: toastId });
+                            }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"
+                    >
+                        🚀 Simular Pedido UberEats
+                    </button>
+                </div>
+            </div>
+
             <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-3">
                 <ShieldAlert className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-blue-200">
