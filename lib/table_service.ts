@@ -8,7 +8,7 @@ export const TableService = {
      */
     async moveTable(sourceTableId: number, targetTableId: number) {
         try {
-            return await db.transaction('rw', db.restaurantTables, db.orders, async () => {
+            await db.transaction('rw', db.restaurantTables, db.orders, async () => {
                 const sourceTable = await db.restaurantTables.get(sourceTableId);
                 const targetTable = await db.restaurantTables.get(targetTableId);
 
@@ -34,16 +34,13 @@ export const TableService = {
                     status: 'available',
                     currentOrderId: undefined
                 });
-
-                // 3. Trigger Sync
-                // We do this after transaction, but calling it here queues it/promises it
-                // We use setTimeout to break out of transaction for network ops if needed, 
-                // but syncService adds to a queue so it's fine.
-                syncService.autoSync(db.orders, 'orders');
-                syncService.autoSync(db.restaurantTables, 'restaurant_tables');
-
-                return true;
             });
+
+            // Sync OUTSIDE transaction to avoid "committed too early" errors
+            await syncService.autoSync(db.orders, 'orders');
+            await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+            return true;
+
         } catch (error: any) {
             console.error("Move Error:", error);
             toast.error("Error al mover mesa: " + error.message);
@@ -57,7 +54,7 @@ export const TableService = {
      */
     async mergeTables(sourceTableId: number, targetTableId: number) {
         try {
-            return await db.transaction('rw', db.restaurantTables, db.orders, async () => {
+            await db.transaction('rw', db.restaurantTables, db.orders, async () => {
                 const sourceTable = await db.restaurantTables.get(sourceTableId);
                 const targetTable = await db.restaurantTables.get(targetTableId);
 
@@ -101,12 +98,13 @@ export const TableService = {
                     status: 'available',
                     currentOrderId: undefined
                 });
-
-                // Trigger Sync
-                await syncService.autoSync(db.orders, 'orders');
-                await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
-                return true;
             });
+
+            // Trigger Sync OUTSIDE transaction
+            await syncService.autoSync(db.orders, 'orders');
+            await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+            return true;
+
         } catch (error: any) {
             console.error("Merge Error:", error);
             toast.error("Error al unir mesas: " + error.message);
@@ -117,7 +115,7 @@ export const TableService = {
     // JOIN: Add an empty table to an existing order (e.g., "Bring another table")
     async joinTableToOrder(emptyTableId: number, activeTableId: number) {
         try {
-            return await db.transaction('rw', db.restaurantTables, db.orders, async () => {
+            await db.transaction('rw', db.restaurantTables, db.orders, async () => {
                 const emptyTable = await db.restaurantTables.get(emptyTableId);
                 const activeTable = await db.restaurantTables.get(activeTableId);
 
@@ -135,10 +133,11 @@ export const TableService = {
                 });
 
                 // Optional: Update Order covers? Maybe asking user is better. kept simple for now.
-
-                await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
-                return true;
             });
+
+            await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+            return true;
+
         } catch (error: any) {
             console.error("Join Error:", error);
             toast.error("Error al unir mesa a orden: " + error.message);
@@ -149,7 +148,9 @@ export const TableService = {
     // LINK: Link two empty tables with a new shared order
     async linkEmptyTables(tableId1: number, tableId2: number) {
         try {
-            return await db.transaction('rw', db.restaurantTables, db.orders, async () => {
+            let newOrderId: number;
+
+            await db.transaction('rw', db.restaurantTables, db.orders, async () => {
                 const t1 = await db.restaurantTables.get(tableId1);
                 const t2 = await db.restaurantTables.get(tableId2);
 
@@ -157,7 +158,7 @@ export const TableService = {
                 if (t1.status !== 'available' || t2.status !== 'available') throw new Error("Ambas mesas deben estar libres");
 
                 // Create New Order
-                const newOrderId = await db.orders.add({
+                const id = await db.orders.add({
                     tableId: tableId1, // Primary table
                     items: [],
                     status: 'open',
@@ -168,16 +169,18 @@ export const TableService = {
                     covers: 4, // Default estimate
                     restaurantId: '1'
                 });
+                newOrderId = id as number;
 
                 // Assign to BOTH
-                await db.restaurantTables.update(tableId1, { status: 'occupied', currentOrderId: newOrderId as number });
-                await db.restaurantTables.update(tableId2, { status: 'occupied', currentOrderId: newOrderId as number });
-
-                await syncService.autoSync(db.orders, 'orders');
-                await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
-
-                return newOrderId;
+                await db.restaurantTables.update(tableId1, { status: 'occupied', currentOrderId: newOrderId });
+                await db.restaurantTables.update(tableId2, { status: 'occupied', currentOrderId: newOrderId });
             });
+
+            await syncService.autoSync(db.orders, 'orders');
+            await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+
+            return newOrderId!;
+
         } catch (error: any) {
             console.error("Link Error:", error);
             toast.error("Error al vincular mesas: " + error.message);
