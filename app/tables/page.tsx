@@ -430,7 +430,7 @@ export default function TablesPage() {
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDrop(e, table)}
                                         onClick={() => handleTableClick(table)}
-                                        className={`w-full aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 transition-all overflow-hidden relative
+                                        className={`w-full aspect-square rounded-xl border flex flex-col items-center justify-between p-2 transition-all overflow-hidden relative
                                             ${containerClass} ${isEditMode ? 'animate-pulse cursor-context-menu border-dashed border-toast-orange/30' : 'cursor-pointer'}
                                             ${draggedTableId === table.id ? 'opacity-50 scale-95 grayscale' : ''}
                                             `}
@@ -441,7 +441,7 @@ export default function TablesPage() {
                                             {hasBarReady && <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping delay-150"></div>}
                                         </div>
 
-                                        {/* Drag Handle Icon for clarity - Only show if draggable */}
+                                        {/* Drag Handle */}
                                         {!isEditMode && table.status === 'occupied' && (
                                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-60 transition-opacity">
                                                 <GripHorizontal className="w-5 h-5 text-white drop-shadow-md" />
@@ -455,22 +455,28 @@ export default function TablesPage() {
                                             </div>
                                         )}
 
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border mb-1 transition-transform group-hover:scale-110 ${iconClass}`}>
+                                        {/* TOP: Number/Icon */}
+                                        <div className={`mt-1 w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border mb-1 transition-transform group-hover:scale-110 flex-shrink-0 ${iconClass}`}>
                                             {table.name.replace(/\D/g, '') || table.name.charAt(0)}
                                         </div>
 
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5 max-w-[90%] truncate">
-                                            {table.name}
-                                        </p>
-                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${textClass}`}>
-                                            {label}
-                                        </span>
-
-                                        {/* Zone Label (Small) */}
-                                        {table.zone && activeZone === 'TODAS' && (
-                                            <span className="absolute bottom-2 text-[8px] text-gray-500 font-mono items-center uppercase bg-black/40 px-1.5 py-0.5 rounded border border-white/5">
-                                                {table.zone}
+                                        {/* MIDDLE: Name & Status */}
+                                        <div className="flex flex-col items-center justify-center w-full min-h-0 flex-1">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase leading-tight text-center line-clamp-2 w-full">
+                                                {table.name}
+                                            </p>
+                                            <span className={`text-[9px] font-bold uppercase tracking-wider ${textClass}`}>
+                                                {label}
                                             </span>
+                                        </div>
+
+                                        {/* BOTTOM: Zone Label (Only if needed) */}
+                                        {table.zone && activeZone === 'TODAS' && (
+                                            <div className="mt-1 flex-shrink-0">
+                                                <span className="text-[8px] text-gray-500 font-mono uppercase bg-black/40 px-1.5 py-0.5 rounded border border-white/5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full block">
+                                                    {table.zone}
+                                                </span>
+                                            </div>
                                         )}
 
                                     </div>
