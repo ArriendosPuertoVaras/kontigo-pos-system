@@ -61,55 +61,50 @@ export const TableService = {
                 const sourceTable = await db.restaurantTables.get(sourceTableId);
                 const targetTable = await db.restaurantTables.get(targetTableId);
 
-                if (!sourceTable?.currentOrderId || !targetTable?.currentOrderId) {
-                    throw new Error("Ambas mesas deben tener órdenes activas para unir.");
-                }
+                if (!sourceTable || !targetTable) throw new Error("Mesa no encontrada");
+                if (!sourceTable.currentOrderId || !targetTable.currentOrderId) throw new Error("Ambas mesas deben tener ordenes activas");
 
                 const sourceOrder = await db.orders.get(sourceTable.currentOrderId);
                 const targetOrder = await db.orders.get(targetTable.currentOrderId);
 
-                if (!sourceOrder || !targetOrder) throw new Error("Orden no encontrada.");
+                if (!sourceOrder || !targetOrder) throw new Error("Orden no encontrada");
 
-                // 1. Merge Items
-                const newItems = [...targetOrder.items];
+                // 1. Move items from Source to Target
+                const movedItems = sourceOrder.items.map(item => ({
+                    ...item,
+                    notes: `(Desde ${sourceTable.name}) ${item.notes || ''}`
+                }));
 
-                // Add source items with a note
-                sourceOrder.items.forEach(item => {
-                    newItems.push({
-                        ...item,
-                        notes: (item.notes ? item.notes + ' ' : '') + `(Mesa ${sourceTable.name})`
-                    });
-                });
+                const updatedItems = [...targetOrder.items, ...movedItems];
 
-                // 2. Recalculate Totals
-                const newSubtotal = newItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-                const newTotal = newSubtotal + targetOrder.tip; // Keep target tip, or sum both? Usually target.
+                // Recalculate totals
+                const totals = this.calculateOrderTotals(updatedItems);
 
-                // 3. Update Target Order
+                // Update Target Order
                 await db.orders.update(targetOrder.id!, {
-                    items: newItems,
-                    subtotal: newSubtotal,
-                    total: newTotal,
-                    covers: (targetOrder.covers || 0) + (sourceOrder.covers || 0)
+                    items: updatedItems,
+                    subtotal: totals.subtotal,
+                    total: totals.total,
+                    updatedAt: new Date()
                 });
 
-                // 4. Close/Cancel Source Order
+                // Close Source Order (Cancel/Merge status) or Soft Delete
                 await db.orders.update(sourceOrder.id!, {
-                    status: 'cancelled', // Or a new status 'merged'
-                    total: 0, // Zero out to avoid double counting sales if strictly summing closed orders
-                    deletedAt: new Date() // Soft delete effectively
+                    status: 'cancelled', // or 'merged' if supported
+                    total: 0,
+                    subtotal: 0,
+                    notes: `Fusionada con orden ${targetOrder.id} (${targetTable.name})`
                 });
 
-                // 5. Free Source Table
+                // Free Source Table
                 await db.restaurantTables.update(sourceTableId, {
                     status: 'available',
                     currentOrderId: undefined
                 });
 
-                // 6. Sync
-                syncService.autoSync(db.orders, 'orders');
-                syncService.autoSync(db.restaurantTables, 'restaurant_tables');
-
+                // Trigger Sync
+                await syncService.autoSync(db.orders, 'orders');
+                await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
                 return true;
             });
         } catch (error: any) {
@@ -117,5 +112,81 @@ export const TableService = {
             toast.error("Error al unir mesas: " + error.message);
             throw error;
         }
+    },
+
+    // JOIN: Add an empty table to an existing order (e.g., "Bring another table")
+    async joinTableToOrder(emptyTableId: number, activeTableId: number) {
+        try {
+            return await db.transaction('rw', db.restaurantTables, db.orders, async () => {
+                const emptyTable = await db.restaurantTables.get(emptyTableId);
+                const activeTable = await db.restaurantTables.get(activeTableId);
+
+                if (!emptyTable || !activeTable) throw new Error("Mesa no encontrada");
+                if (emptyTable.status !== 'available') throw new Error("La mesa a unir debe estar libre");
+                if (activeTable.status !== 'occupied' || !activeTable.currentOrderId) throw new Error("La mesa destino debe tener una orden activa");
+
+                const activeOrder = await db.orders.get(activeTable.currentOrderId);
+                if (!activeOrder) throw new Error("Orden activa no encontrada");
+
+                // Update Empty Table to point to same order
+                await db.restaurantTables.update(emptyTableId, {
+                    status: 'occupied',
+                    currentOrderId: activeOrder.id
+                });
+
+                // Optional: Update Order covers? Maybe asking user is better. kept simple for now.
+
+                await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+                return true;
+            });
+        } catch (error: any) {
+            console.error("Join Error:", error);
+            toast.error("Error al unir mesa a orden: " + error.message);
+            throw error;
+        }
+    },
+
+    // LINK: Link two empty tables with a new shared order
+    async linkEmptyTables(tableId1: number, tableId2: number) {
+        try {
+            return await db.transaction('rw', db.restaurantTables, db.orders, async () => {
+                const t1 = await db.restaurantTables.get(tableId1);
+                const t2 = await db.restaurantTables.get(tableId2);
+
+                if (!t1 || !t2) throw new Error("Mesa no encontrada");
+                if (t1.status !== 'available' || t2.status !== 'available') throw new Error("Ambas mesas deben estar libres");
+
+                // Create New Order
+                const newOrderId = await db.orders.add({
+                    tableId: tableId1, // Primary table
+                    items: [],
+                    status: 'open',
+                    subtotal: 0,
+                    tip: 0,
+                    total: 0,
+                    createdAt: new Date(),
+                    covers: 4, // Default estimate
+                    restaurantId: '1'
+                });
+
+                // Assign to BOTH
+                await db.restaurantTables.update(tableId1, { status: 'occupied', currentOrderId: newOrderId as number });
+                await db.restaurantTables.update(tableId2, { status: 'occupied', currentOrderId: newOrderId as number });
+
+                await syncService.autoSync(db.orders, 'orders');
+                await syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+
+                return newOrderId;
+            });
+        } catch (error: any) {
+            console.error("Link Error:", error);
+            toast.error("Error al vincular mesas: " + error.message);
+            throw error;
+        }
+    },
+
+    private calculateOrderTotals(items: any[]) {
+        const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+        return { subtotal, total: subtotal }; // Simplified
     }
 };

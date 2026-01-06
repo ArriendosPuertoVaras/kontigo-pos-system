@@ -159,17 +159,15 @@ export default function TablesPage() {
 
     // --- DRAG AND DROP HANDLERS ---
     const handleDragStart = (e: React.DragEvent, table: RestaurantTable) => {
-        if (table.status !== 'occupied') {
-            e.preventDefault(); // Only drag occupied tables
-            return;
-        }
+        // Now allows dragging 'available' tables correctly
+        if (isEditMode) return;
+
         setDraggedTableId(table.id!);
         e.dataTransfer.effectAllowed = 'move';
-        // Optional: Custom ghost image
     };
 
     const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // Essential for 'drop' to fire
+        e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
     };
 
@@ -179,20 +177,47 @@ export default function TablesPage() {
         if (!draggedTableId) return;
         if (draggedTableId === targetTable.id) return;
 
+        if (isEditMode) return;
+
         try {
-            if (targetTable.status === 'available') {
-                // MOVE
-                if (confirm(`¿Mover pedido de la mesa origen a ${targetTable.name}?`)) {
+            const sourceTable = tables.find(t => t.id === draggedTableId);
+            if (!sourceTable) return;
+
+            // CASE 1: Occupied -> Available = MOVE
+            if (sourceTable.status === 'occupied' && targetTable.status === 'available') {
+                if (confirm(`¿Mover pedido de ${sourceTable.name} a ${targetTable.name}?`)) {
                     await TableService.moveTable(draggedTableId, targetTable.id!);
                     toast.success("Mesa movida correctamente");
                 }
-            } else if (targetTable.status === 'occupied') {
-                // MERGE
-                if (confirm(`¿Juntar mesas? Se unirá el pedido de la mesa origen con ${targetTable.name}.`)) {
+            }
+            // CASE 2: Occupied -> Occupied = MERGE
+            else if (sourceTable.status === 'occupied' && targetTable.status === 'occupied') {
+                // Check if they are already the same order (linked)
+                if (sourceTable.currentOrderId === targetTable.currentOrderId) {
+                    toast.info("Estas mesas ya están unidas.");
+                    return;
+                }
+                if (confirm(`¿Fusionar cuentas? Se unirá el pedido de ${sourceTable.name} con ${targetTable.name}.`)) {
                     await TableService.mergeTables(draggedTableId, targetTable.id!);
-                    toast.success("Mesas unidas correctamente");
+                    toast.success("Mesas fusionadas correctamente");
                 }
             }
+            // CASE 3: Available -> Occupied = JOIN (Expand table)
+            else if (sourceTable.status === 'available' && targetTable.status === 'occupied') {
+                if (confirm(`¿Unir mesa vacía ${sourceTable.name} a la orden de ${targetTable.name}? (Más gente)`)) {
+                    await TableService.joinTableToOrder(sourceTable.id!, targetTable.id!);
+                    toast.success("Mesa añadida a la orden");
+                }
+            }
+            // CASE 4: Available -> Available = LINK (New Group)
+            else if (sourceTable.status === 'available' && targetTable.status === 'available') {
+                if (confirm(`¿Abrir cuenta compartida para ${sourceTable.name} y ${targetTable.name}?`)) {
+                    const newOrderId = await TableService.linkEmptyTables(sourceTable.id!, targetTable.id!);
+                    toast.success("Mesas unidas. Abriendo comanda...");
+                    router.push(`/?tableId=${targetTable.id}`);
+                }
+            }
+
         } catch (err: any) {
             toast.error(err.message);
         } finally {
@@ -437,19 +462,17 @@ export default function TablesPage() {
 
                             // Highlight valid drop target if dragging
                             const isDragTarget = draggedTableId && draggedTableId !== table.id && !isEditMode;
+                            // Almost all cross-table interactions are now valid actions (Move, Merge, Join, Link)
+                            // Except dropping on self (handled above)
 
-                            // If table is AVAILABLE, it's a valid target for MOVE
-                            // If table is OCCUPIED, it's a valid target for MERGE
-                            const isValidTarget = isDragTarget;
-
-                            if (draggedTableId && isValidTarget) {
+                            if (isDragTarget) {
                                 containerClass += " ring-2 ring-dashed ring-toast-orange/50 scale-95";
                             }
 
                             return (
                                 <div key={table.id} className="relative group">
                                     <div
-                                        draggable={!isEditMode && table.status === 'occupied'}
+                                        draggable={!isEditMode}
                                         onDragStart={(e) => handleDragStart(e, table)}
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDrop(e, table)}
