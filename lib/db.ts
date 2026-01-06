@@ -183,7 +183,9 @@ export interface Order {
     total: number;
     payments?: Payment[];
     createdAt: Date;
+    updatedAt?: Date;
     closedAt?: Date;
+    notes?: string;
     readySections?: string[]; // Tracking independent KDS station readiness
     deliveredSections?: string[]; // Tracking independent delivery per station
     restaurantId?: string;

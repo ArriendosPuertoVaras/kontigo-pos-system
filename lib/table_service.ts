@@ -185,7 +185,7 @@ export const TableService = {
         }
     },
 
-    private calculateOrderTotals(items: any[]) {
+    calculateOrderTotals(items: any[]) {
         const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
         return { subtotal, total: subtotal }; // Simplified
     }
