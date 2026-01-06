@@ -213,6 +213,7 @@ export default function ApiKeysSection() {
                                                     id: realProduct.id,
                                                     name: realProduct.name,
                                                     price: realProduct.price,
+                                                    categoryId: realProduct.categoryId, // CRITICAL FOR KDS ROUTING
                                                     // FIX: Type error bypass
                                                     code: (realProduct as any).code || `GEN-${realProduct.id}`
                                                 },
