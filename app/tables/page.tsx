@@ -96,8 +96,15 @@ export default function TablesPage() {
         const sortedZones = Array.from(zones).sort();
         const sortedRawZones = Array.from(rawZoneNames).sort();
 
+        // Refined Logic: If the only detected zone is "GENERAL" (default), DO NOT show it as a separate tab.
+        // The user prefers seeing ONLY "TODAS" in this case.
+        let finalZones = ['TODAS', ...sortedZones];
+        if (sortedZones.length === 1 && sortedZones[0] === 'GENERAL') {
+            finalZones = ['TODAS'];
+        }
+
         // Pass 'zones' explicitly for the dropdown to use
-        return { tables: t, orderMap: map, zones: ['TODAS', ...sortedZones], rawZones: sortedRawZones };
+        return { tables: t, orderMap: map, zones: finalZones, rawZones: sortedRawZones };
     }, [now]);
 
     const tables = data?.tables || [];
