@@ -143,12 +143,25 @@ export default function ManagerPage() {
         // HOURLY (00-23)
         chartTitle = "Ventas por Hora";
         const salesByHour = new Array(24).fill(0);
+
         sanitizedOrders.forEach(order => {
-            // Defensive check
-            if (!(order.createdAt instanceof Date) || isNaN(order.createdAt.getTime())) return;
-            const h = order.createdAt.getHours();
-            if (h >= 0 && h < 24) salesByHour[h] += order.total;
+            // Defensive Date Check
+            const d = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+            if (isNaN(d.getTime())) {
+                console.warn("Invalid Order Date in Chart:", order);
+                return;
+            }
+
+            // Defensive Total Check
+            const amount = Number(order.total);
+            if (isNaN(amount)) return;
+
+            const h = d.getHours();
+            if (h >= 0 && h < 24) {
+                salesByHour[h] += amount;
+            }
         });
+
         chartData = salesByHour.map((val, i) => ({
             label: `${i}:00`,
             value: val,
