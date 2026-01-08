@@ -292,8 +292,7 @@ function POSContent() {
       addToTicket(productForModifiers, pendingModifiers);
       setProductForModifiers(null);
       setPendingModifiers([]);
-      // Immediate persistence for UI agility
-      handleSaveOrder(false);
+      // Removed handleSaveOrder(false) to prevent race condition (addToTicket already persists)
     }
   };
 
@@ -301,8 +300,11 @@ function POSContent() {
     setPendingModifiers(prev => {
       const isSelected = prev.some(m => m.id === option.id);
 
+      // Safe Max Select (handle string/number)
+      const maxSelect = parseInt(String(group.maxSelect || 0), 10);
+
       // Radio logic (maxSelect = 1)
-      if (group.maxSelect === 1) {
+      if (maxSelect === 1) {
         if (isSelected && group.minSelect === 0) {
           // Toggle off if optional
           return prev.filter(m => m.id !== option.id);
@@ -311,10 +313,21 @@ function POSContent() {
         return [...prev.filter(m => !group.options.some(opt => opt.id === m.id)), option];
       }
 
-      // Checkbox logic
+      // Checkbox logic (Multi-select)
       if (isSelected) {
         return prev.filter(m => m.id !== option.id);
       } else {
+        // Enforce Limit
+        const currentInGroup = prev.filter(m => group.options.some(opt => opt.id === m.id));
+        if (maxSelect > 0 && currentInGroup.length >= maxSelect) {
+          // Limit reached: Do nothing or replace oldest? 
+          // Standard UX: Prevent adding more.
+          // Optional: Replace oldest? Let's just block for now, or replace first found?
+          // User expects "Select 4", so just blocking if 4 are selected is correct.
+          // However, better UX might be to allow changing my mind? 
+          // Let's just return prev to block.
+          return prev;
+        }
         return [...prev, option];
       }
     });
