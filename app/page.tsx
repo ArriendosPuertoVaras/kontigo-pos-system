@@ -436,13 +436,18 @@ function POSContent() {
     }
 
     try {
-      if (activeTable?.currentOrderId) {
+      // FETCH FRESH TABLE STATE (Vital to avoid race with Autosave/persistTicket)
+      const freshTable = await db.restaurantTables.get(tableId);
+      const currentOrderId = freshTable?.currentOrderId || activeTable?.currentOrderId;
+
+      if (currentOrderId) {
         // Update existing order
-        await db.orders.update(activeTable.currentOrderId, {
+        await db.orders.update(currentOrderId, {
           items: ticket,
           subtotal,
           tip,
-          total
+          total,
+          updatedAt: new Date()
         });
       } else {
         // Create new order
@@ -453,7 +458,9 @@ function POSContent() {
           subtotal,
           tip,
           total,
-          createdAt: new Date()
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          staffId: parseInt(sessionStorage.getItem('kontigo_staff_id') || '0'),
         });
         // Link to table
         await db.restaurantTables.update(tableId, { status: 'occupied', currentOrderId: newOrderId as number });
