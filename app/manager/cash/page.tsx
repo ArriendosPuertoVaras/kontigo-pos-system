@@ -39,7 +39,7 @@ export default function CashDashboardPage() {
                         </h2>
                         <p className="text-gray-400">
                             {activeSession
-                                ? `Sesión iniciada a las ${activeSession.startTime?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} con $${activeSession.openingCash?.toLocaleString()}`
+                                ? `Sesión iniciada a las ${new Date(activeSession.startTime || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} con $${activeSession.openingCash?.toLocaleString()}`
                                 : 'No hay un turno activo en este momento.'}
                         </p>
                     </div>
@@ -132,8 +132,8 @@ export default function CashDashboardPage() {
                                     {recentCloses?.map(close => (
                                         <tr key={close.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                             <td className="p-4 text-gray-300">
-                                                <div className="font-bold text-white">{close.date.toLocaleDateString()}</div>
-                                                <div className="text-xs text-gray-500">{close.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                <div className="font-bold text-white">{new Date(close.date).toLocaleDateString()}</div>
+                                                <div className="text-xs text-gray-500">{new Date(close.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                             </td>
                                             <td className="p-4 text-right font-mono text-white">
                                                 ${close.totalSales.toLocaleString()}
