@@ -109,7 +109,7 @@ export default function TablesPage() {
     // Filter Tables by Zone
     const filteredTables = tables.filter(t => {
         if (activeZone === 'TODAS') return true;
-        return (t.zone || 'GENERAL').toUpperCase() === activeZone;
+        return (t.zone || 'GENERAL').trim().toUpperCase() === activeZone;
     });
 
     // Stats

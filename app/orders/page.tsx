@@ -24,7 +24,7 @@ function OrderCard({ order, onStatusChange, viewMode }: { order: any, onStatusCh
     // 1. Filter Items based on View Mode
     const displayedItems = order.itemsWithCategory?.filter((item: any) => {
         const dest = item.category?.destination || 'kitchen'; // Default to kitchen
-        return dest === viewMode;
+        return dest.toLowerCase() === viewMode.toLowerCase();
     }) || [];
 
     if (displayedItems.length === 0) return null; // Don't show empty tickets for this station
@@ -202,10 +202,13 @@ export default function OrdersPage() {
         const categories = await db.categories.toArray();
 
         // Extract Unique Destinations for Tabs
+        // Extract Unique Destinations for Tabs
         const destinations = Array.from(new Set(categories.map(c => c.destination || 'kitchen')));
-        // Normalize strings
-        const distinctTabs = destinations.filter(Boolean).map(d => d!.trim());
-        if (distinctTabs.length === 0) distinctTabs.push('kitchen');
+
+        // Normalize strings to Lowercase Set to avoid duplicates like "Bar" vs "bar"
+        const distSet = new Set(destinations.filter(Boolean).map((d: string) => d.trim().toLowerCase()));
+        if (distSet.size === 0) distSet.add('kitchen');
+        const distinctTabs = Array.from(distSet);
 
         // Deep fetch for items -> product -> category
         const enrichedOrders = await Promise.all(activeOrders.map(async (o) => {
@@ -438,7 +441,7 @@ export default function OrdersPage() {
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                             {orders
-                                .filter(order => !(order.readySections || []).includes(viewMode))
+                                .filter(order => !(order.readySections || []).map((s: string) => s.toLowerCase()).includes(viewMode.toLowerCase()))
                                 .map(order => (
                                     <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} viewMode={viewMode} />
                                 ))}
