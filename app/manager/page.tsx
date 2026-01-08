@@ -187,16 +187,25 @@ export default function ManagerPage() {
     }
 
     // Filter visible data for Recharts
-    const visibleChartData = chartData.filter((_, i) => {
-        if (viewMode === 'day') return i >= 10; // Show from 10:00 onwards
-        return true;
-    }).map(d => ({
+    // Filter visible data for Recharts
+    // REMOVED FILTER: Show all hours to debug timezone shifts
+    const visibleChartData = chartData.map(d => ({
         hour: d.label, // mapped for chart
         total: d.value
     }));
 
     // Recharts defensive: Ensure at least empty array if undefined
     if (!visibleChartData) return null;
+
+    // DEBUG HELPERS
+    const debugOrders = sanitizedOrders.slice(0, 3).map(o => ({
+        id: o.id,
+        total: o.total,
+        totalType: typeof o.total,
+        date: o.createdAt?.toString(),
+        hour: o.createdAt instanceof Date ? o.createdAt.getHours() : 'invalid'
+    }));
+    const debugBuckets = chartData.filter(d => d.value > 0);
 
 
     // NAVIGATION HANDLERS
@@ -393,6 +402,23 @@ export default function ManagerPage() {
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
+
+                            {/* DEBUG PANEL */}
+                            <details className="mt-4 p-2 bg-black/40 rounded text-[10px] font-mono text-gray-400">
+                                <summary className="cursor-pointer text-orange-500 font-bold">Debug Data Chart (Click to expand)</summary>
+                                <div className="mt-2 space-y-2">
+                                    <p>Total Sales Card: ${totalSales}</p>
+                                    <p>Orders Count: {sanitizedOrders.length}</p>
+                                    <div>
+                                        <strong>Buckets with Data:</strong>
+                                        <pre>{JSON.stringify(debugBuckets, null, 2)}</pre>
+                                    </div>
+                                    <div>
+                                        <strong>Sample Orders:</strong>
+                                        <pre>{JSON.stringify(debugOrders, null, 2)}</pre>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
 
                         {/* RIGHT COLUMN: STAFF & ALERTS */}
