@@ -3,7 +3,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seedDatabase, RestaurantTable, Order } from '@/lib/db';
 import Link from 'next/link';
-import { UtensilsCrossed, LayoutGrid, ClipboardList, Package, Truck, ShoppingCart, Trash2, Users, Bell, Settings, LogOut, Search, Filter, Plus, Edit3, GripHorizontal } from 'lucide-react';
+import { UtensilsCrossed, LayoutGrid, ClipboardList, Package, Truck, ShoppingCart, Trash2, Users, Bell, Settings, LogOut, Search, Filter, Plus, Edit3, GripHorizontal, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -21,22 +21,71 @@ import { TableService } from '@/lib/table_service';
 
 // --- NEW COMPONENTS ---
 
-function ZoneTab({ label, active, onClick, count }: { label: string, active: boolean, onClick: () => void, count?: number }) {
+function ZoneTab({ label, active, onClick, count, onDelete, isEditMode }: { label: string, active: boolean, onClick: () => void, count?: number, onDelete?: () => void, isEditMode?: boolean }) {
     return (
-        <button
-            onClick={onClick}
-            className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider transition-all border flex items-center gap-2
-            ${active
-                    ? 'bg-toast-orange text-white border-toast-orange shadow-lg shadow-orange-900/40 transform scale-105 structure-active'
-                    : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
-        >
-            {label}
-            {count !== undefined && <span className="text-[10px] opacity-70 bg-black/20 px-1.5 py-0.5 rounded-full">{count}</span>}
-        </button>
+        <div className="relative group">
+            <button
+                onClick={onClick}
+                className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider transition-all border flex items-center gap-2
+                ${active
+                        ? 'bg-toast-orange text-white border-toast-orange shadow-lg shadow-orange-900/40 transform scale-105 structure-active'
+                        : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
+            >
+                {label}
+                {count !== undefined && <span className="text-[10px] opacity-70 bg-black/20 px-1.5 py-0.5 rounded-full">{count}</span>}
+            </button>
+
+            {/* DELETE ZONE BUTTON (Edit Mode Only) */}
+            {isEditMode && onDelete && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                    }}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white flex items-center justify-center shadow-md hover:scale-110 transition-transform z-10"
+                >
+                    <X className="w-3 h-3" />
+                </button>
+            )}
+        </div>
     );
 }
 
 export default function TablesPage() {
+    // ... (existing hooks) ...
+
+    // ... (existing handlers) ...
+
+    const handleDeleteZone = async (zoneName: string) => {
+        const tableCount = tables.filter(t => (t.zone || 'GENERAL').trim().toUpperCase() === zoneName).length;
+
+        if (!confirm(`¿Estás seguro de ELIMINAR el sector "${zoneName}"?\nSe borrarán ${tableCount} mesas permanentemente.`)) {
+            return;
+        }
+
+        // 1. Gather IDs to delete
+        // Note: We match loosely on trimmed upper case to be robust
+        const tablesToDelete = tables.filter(t => (t.zone || 'GENERAL').trim().toUpperCase() === zoneName);
+        const ids = tablesToDelete.map(t => t.id).filter(Boolean) as number[];
+
+        if (ids.length === 0) return;
+
+        // 2. Delete from Dexie
+        await db.restaurantTables.bulkDelete(ids);
+
+        // 3. Force Sync
+        // We trigger sync for each deletions or bulk if supported. 
+        // SyncService autoSync listens to Dexie hooks, so bulkDelete should trigger hooks or we can manually sync.
+        // Dexie's bulkDelete calls hooks for each key usually.
+        syncService.autoSync(db.restaurantTables, 'restaurant_tables');
+
+        // 4. Reset Zone if we were viewing the deleted one
+        if (activeZone === zoneName) {
+            setActiveZone('TODAS');
+        }
+
+        toast.success(`Sector ${zoneName} eliminado`);
+    };
     const router = useRouter();
     const [now, setNow] = useState(Date.now());
     const { status: autoSyncStatus } = useAutoSync();
@@ -410,7 +459,9 @@ export default function TablesPage() {
                                 label={zone}
                                 active={activeZone === zone}
                                 onClick={() => setActiveZone(zone)}
-                                count={zone === 'TODAS' ? tables.length : tables.filter(t => (t.zone || 'GENERAL').toUpperCase() === zone).length}
+                                count={zone === 'TODAS' ? tables.length : tables.filter(t => (t.zone || 'GENERAL').trim().toUpperCase() === zone).length}
+                                isEditMode={isEditMode}
+                                onDelete={isEditMode && zone !== 'TODAS' ? () => handleDeleteZone(zone) : undefined}
                             />
                         ))}
                     </div>
