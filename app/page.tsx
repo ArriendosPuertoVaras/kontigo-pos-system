@@ -220,7 +220,10 @@ function POSContent() {
     // Prevent adding out-of-stock items
     if (product.isAvailable === false) return;
 
-    if (product.modifiers && product.modifiers.length > 0) {
+    // Safety check: Ensure modifiers is a valid array
+    const hasModifiers = Array.isArray(product.modifiers) && product.modifiers.length > 0;
+
+    if (hasModifiers) {
       // Open Modifiers Modal
       setProductForModifiers(product);
       setPendingModifiers([]);

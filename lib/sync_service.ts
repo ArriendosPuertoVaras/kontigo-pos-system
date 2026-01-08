@@ -399,6 +399,17 @@ class SyncService {
                 if ('birthDate' in camelItem && typeof camelItem.birthDate === 'string') camelItem.birthDate = new Date(camelItem.birthDate);
             }
 
+            if (supabaseTableName === 'products') {
+                if ('modifiers' in camelItem && typeof camelItem.modifiers === 'string') {
+                    try {
+                        camelItem.modifiers = JSON.parse(camelItem.modifiers);
+                    } catch (e) {
+                        console.warn("Failed to parse modifiers JSON", e);
+                        camelItem.modifiers = [];
+                    }
+                }
+            }
+
             // Logically deleted items transformation
             if ('deletedAt' in camelItem && typeof camelItem.deletedAt === 'string') {
                 camelItem.deletedAt = new Date(camelItem.deletedAt);
