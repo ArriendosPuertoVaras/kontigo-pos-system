@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Category, Product, ModifierTemplate } from '@/lib/db';
-import { ArrowLeft, Plus, Trash2, Edit, Save, X, Package, LayoutGrid, Tag, Layers, Cloud, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit, Save, X, Package, LayoutGrid, Tag, Layers, Cloud, ShieldAlert, Search, CheckSquare, Square, Check } from 'lucide-react';
 import Link from 'next/link';
 import { usePermission } from '@/hooks/usePermission';
 import { Lock } from 'lucide-react';
@@ -722,6 +722,7 @@ function ModifiersView() {
 
     // View State
     const [editingTemplate, setEditingTemplate] = useState<ModifierTemplate | null>(null);
+    const [assignTemplate, setAssignTemplate] = useState<ModifierTemplate | null>(null);
 
     // Form State
     const [formData, setFormData] = useState<Partial<ModifierTemplate>>({
@@ -811,6 +812,7 @@ function ModifiersView() {
                             <h4 className="font-bold text-white text-lg">{tpl.name}</h4>
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onClick={() => openEdit(tpl)} className="text-blue-400"><Edit className="w-4 h-4" /></button>
+                                <button onClick={() => setAssignTemplate(tpl)} className="text-toast-orange" title="Asignar a Productos"><Tag className="w-4 h-4" /></button>
                                 <button onClick={() => handleDelete(tpl.id!)} className="text-red-400"><Trash2 className="w-4 h-4" /></button>
                             </div>
                         </div>
@@ -929,6 +931,210 @@ function ModifiersView() {
                     </div>
                 </div>
             )}
+            {/* ASSIGNMENT MODAL */}
+            {assignTemplate && (
+                <ModifierAssignmentModal template={assignTemplate} onClose={() => setAssignTemplate(null)} />
+            )}
+        </div>
+    )
+}
+
+function ModifierAssignmentModal({ template, onClose }: { template: ModifierTemplate, onClose: () => void }) {
+    const products = useLiveQuery(() => db.products.toArray());
+    const categories = useLiveQuery(async () => {
+        const cats = await db.categories.toArray();
+        return cats.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    });
+
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [search, setSearch] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Initial Load: Check which products ALREADY have this modifier
+    useEffect(() => {
+        if (!products) return;
+        const initialDetails = new Set<number>();
+        products.forEach(p => {
+            if (p.modifiers?.some(m => m.name === template.name)) {
+                initialDetails.add(p.id!);
+            }
+        });
+        setSelectedIds(initialDetails);
+    }, [products, template.name]); // Only run when products load or template changes
+
+    const toggleProduct = (id: number) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
+    };
+
+    const toggleCategory = (catId: number, catProducts: Product[]) => {
+        const next = new Set(selectedIds);
+        const allSelected = catProducts.every(p => next.has(p.id!));
+
+        if (allSelected) {
+            // Deselect all
+            catProducts.forEach(p => next.delete(p.id!));
+        } else {
+            // Select all
+            catProducts.forEach(p => next.add(p.id!));
+        }
+        setSelectedIds(next);
+    };
+
+    const handleSave = async () => {
+        if (!products) return;
+        setIsSaving(true);
+        try {
+            const updates: Product[] = [];
+
+            // 1. Calculate Changes
+            for (const p of products) {
+                const shouldHave = selectedIds.has(p.id!);
+                const hasIt = p.modifiers?.some(m => m.name === template.name);
+
+                if (shouldHave && !hasIt) {
+                    // ADD
+                    const newMod = {
+                        id: crypto.randomUUID(),
+                        name: template.name,
+                        minSelect: template.minSelect,
+                        maxSelect: template.maxSelect,
+                        options: template.options
+                    };
+                    const updatedP = { ...p, modifiers: [...(p.modifiers || []), newMod] };
+                    updates.push(updatedP);
+                    await db.products.update(p.id!, { modifiers: updatedP.modifiers });
+                } else if (!shouldHave && hasIt) {
+                    // REMOVE
+                    const updatedMods = p.modifiers?.filter(m => m.name !== template.name) || [];
+                    updates.push({ ...p, modifiers: updatedMods });
+                    await db.products.update(p.id!, { modifiers: updatedMods });
+                }
+            }
+
+            // 2. Sync if changes made
+            if (updates.length > 0) {
+                const { syncService } = await import('@/lib/sync_service');
+                await syncService.pushAll();
+                toast.success(`Actualizados ${updates.length} productos`);
+            } else {
+                toast.info("No hubo cambios");
+            }
+            onClose();
+
+        } catch (e) {
+            console.error(e);
+            alert("Error al guardar asignaciones");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Filter Logic
+    const filteredCats = categories?.filter(c => {
+        if (!search) return true;
+        // Show category if it matches OR if any if its products match
+        const catMatches = c.name.toLowerCase().includes(search.toLowerCase());
+        const prodMatches = products?.some(p => p.categoryId === c.id && p.name.toLowerCase().includes(search.toLowerCase()));
+        return catMatches || prodMatches;
+    });
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#1e1e1e] rounded-2xl w-full max-w-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col h-[80vh]">
+                <div className="p-6 border-b border-white/5 flex justify-between items-center shrink-0">
+                    <div>
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <Tag className="text-toast-orange" /> Asignar "{template.name}"
+                        </h3>
+                        <p className="text-sm text-gray-400">Selecciona los productos que llevarán este grupo.</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+                </div>
+
+                {/* SEARCH */}
+                <div className="p-4 border-b border-white/5 bg-black/20">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Buscar productos..."
+                            className="w-full bg-[#2a2a2a] border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-toast-orange outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {filteredCats?.map(cat => {
+                        const catProducts = products?.filter(p => p.categoryId === cat.id && p.name.toLowerCase().includes(search.toLowerCase())) || [];
+                        if (catProducts.length === 0) return null;
+
+                        const allSelected = catProducts.every(p => selectedIds.has(p.id!));
+                        const someSelected = catProducts.some(p => selectedIds.has(p.id!));
+
+                        return (
+                            <div key={cat.id} className="space-y-3">
+                                <div className="flex items-center justify-between sticky top-0 bg-[#1e1e1e] py-2 z-10 border-b border-white/5">
+                                    <h4 className="font-bold text-toast-orange uppercase text-sm tracking-wider">{cat.name}</h4>
+                                    <button
+                                        onClick={() => toggleCategory(cat.id!, catProducts)}
+                                        className="text-xs text-blue-400 hover:text-blue-300 font-bold"
+                                    >
+                                        {allSelected ? "Deseleccionar Todo" : "Seleccionar Todo"}
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {catProducts.map(prod => {
+                                        const isSelected = selectedIds.has(prod.id!);
+                                        return (
+                                            <div
+                                                key={prod.id}
+                                                onClick={() => toggleProduct(prod.id!)}
+                                                className={`
+                                                    flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all select-none
+                                                    ${isSelected
+                                                        ? 'bg-blue-500/10 border-blue-500/50 text-white'
+                                                        : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'}
+                                                `}
+                                            >
+                                                <div className={`
+                                                    w-5 h-5 rounded border flex items-center justify-center transition-colors
+                                                    ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-600'}
+                                                `}>
+                                                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                                                </div>
+                                                <span className="font-medium text-sm truncate">{prod.name}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+
+                <div className="p-6 border-t border-white/5 bg-black/20 shrink-0 flex justify-end gap-3 transition-all">
+                    <div className="mr-auto flex items-center gap-2 text-sm text-gray-400">
+                        <Tag className="w-4 h-4" />
+                        <span><b>{selectedIds.size}</b> productos seleccionados</span>
+                    </div>
+
+                    <button onClick={onClose} className="px-6 py-2 rounded-lg font-bold text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="px-6 py-2 rounded-lg font-bold bg-toast-orange text-white hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {isSaving ? "Guardando..." : "Guardar Cambios"}
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }
