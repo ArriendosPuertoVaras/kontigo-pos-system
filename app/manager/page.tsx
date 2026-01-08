@@ -43,11 +43,14 @@ export default function ManagerPage() {
 
     // 3. FETCH DATA (Filtered by Range)
     const selectedOrders = useLiveQuery(async () => {
-        return db.orders
-            .where('createdAt')
-            .between(start, end, true, true)
-            .filter(o => o.status !== 'cancelled')
-            .toArray();
+        const allOrders = await db.orders.toArray();
+        return allOrders.filter(o => {
+            if (o.status === 'cancelled') return false;
+            // Robust Date Check (Handle String vs Date)
+            const date = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
+            if (isNaN(date.getTime())) return false; // Invalid date
+            return date >= start && date <= end;
+        });
     }, [start, end]);
 
     const activeShifts = useLiveQuery(async () => {
