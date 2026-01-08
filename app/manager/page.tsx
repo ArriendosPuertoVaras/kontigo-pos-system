@@ -18,7 +18,7 @@ import { es } from 'date-fns/locale';
 // import { generateMockData } from '@/lib/mock_generator'; // DISABLED
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { usePermission } from '@/hooks/usePermission';
 import { Lock } from 'lucide-react';
@@ -372,34 +372,38 @@ export default function ManagerPage() {
                             </div>
                             <div className="flex-1 w-full min-h-[300px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={visibleChartData}>
-                                        <defs>
-                                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#f97316" stopOpacity={1} />
-                                                <stop offset="100%" stopColor="#ea580c" stopOpacity={0.8} />
-                                            </linearGradient>
-                                        </defs>
-                                        <XAxis
-                                            dataKey="hour"
-                                            stroke="#666"
-                                            fontSize={11}
-                                            tickLine={false}
-                                            axisLine={false}
-                                            dy={10}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: 'rgba(26,26,26,0.9)',
-                                                border: '1px solid rgba(255,255,255,0.1)',
-                                                borderRadius: '12px',
-                                                fontSize: '11px',
-                                                backdropFilter: 'blur(8px)',
-                                                boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
-                                            }}
-                                            cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                                        />
-                                        <Bar dataKey="total" fill="url(#barGradient)" radius={[6, 6, 0, 0]} barSize={24} />
-                                    </BarChart>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={visibleChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                            <XAxis
+                                                dataKey="hour"
+                                                stroke="#666"
+                                                fontSize={11}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                dy={10}
+                                            />
+                                            <YAxis
+                                                hide
+                                                domain={[0, 'auto']}
+                                            />
+                                            <Tooltip
+                                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                                contentStyle={{
+                                                    backgroundColor: '#1a1a1a',
+                                                    border: '1px solid rgba(255,255,255,0.1)',
+                                                    borderRadius: '8px',
+                                                    color: '#fff'
+                                                }}
+                                            />
+                                            <Bar
+                                                dataKey="total"
+                                                fill="#ea580c"
+                                                radius={[4, 4, 0, 0]}
+                                                barSize={32}
+                                                isAnimationActive={false}
+                                            />
+                                        </BarChart>
+                                    </ResponsiveContainer>
                                 </ResponsiveContainer>
                             </div>
 
