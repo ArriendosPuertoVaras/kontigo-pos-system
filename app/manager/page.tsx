@@ -53,10 +53,39 @@ export default function ManagerPage() {
         });
     }, [start, end]);
 
-    const activeShifts = useLiveQuery(async () => {
+    const activeStaffData = useLiveQuery(async () => {
         const now = new Date();
         const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        return db.shifts.filter(s => !s.endTime && new Date(s.startTime) > yesterday).toArray();
+
+        // 1. Get raw open shifts from last 24h
+        const openShifts = await db.shifts
+            .filter(s => !s.endTime && new Date(s.startTime) > yesterday)
+            .toArray();
+
+        // 2. Get all staff details (Optimize: only needed IDs? No, we need names)
+        const allStaff = await db.staff.toArray();
+        const staffMap = new Map(allStaff.map(s => [s.id, s]));
+
+        // 3. Deduplicate by Staff ID (Take the EARLIEST open shift to show when they started today)
+        const uniqueStaffShifts = new Map<number, typeof openShifts[0]>();
+
+        openShifts.forEach(shift => {
+            const existing = uniqueStaffShifts.get(shift.staffId);
+            if (!existing || new Date(shift.startTime) < new Date(existing.startTime)) {
+                uniqueStaffShifts.set(shift.staffId, shift);
+            }
+        });
+
+        // 4. Return enriched data
+        return Array.from(uniqueStaffShifts.values()).map(shift => {
+            const staffMember = staffMap.get(shift.staffId);
+            return {
+                ...shift,
+                staffName: staffMember?.name || `Staff #${shift.staffId}`,
+                staffRole: staffMember?.role || 'Personal',
+                // staffAvatar logic if needed, usually determined on frontend
+            };
+        });
     });
 
     const lowStockIngredients = useLiveQuery(async () => {
@@ -104,7 +133,7 @@ export default function ManagerPage() {
     const totalSales = sanitizedOrders.reduce((sum, o) => sum + o.total, 0);
     const ticketCount = sanitizedOrders.length;
     const avgTicket = ticketCount > 0 ? Math.round(totalSales / ticketCount) : 0;
-    const activeStaffCount = activeShifts?.length || 0;
+    const activeStaffCount = activeStaffData?.length || 0;
 
     // 5. CHART DATA PREPARATION
     let chartData: { label: string, value: number, active: boolean }[] = [];
@@ -360,23 +389,23 @@ export default function ManagerPage() {
                                 <div className="flex justify-between items-center mb-5">
                                     <h3 className="text-xs font-black text-white uppercase tracking-widest">Equipo en Piso</h3>
                                     <div className="px-2 py-0.5 bg-toast-orange/20 text-toast-orange rounded text-[10px] font-black uppercase">
-                                        {activeShifts?.length || 0}
+                                        {activeStaffData?.length || 0}
                                     </div>
                                 </div>
                                 <div className="space-y-4 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                                    {!activeShifts || activeShifts.length === 0 ? (
+                                    {!activeStaffData || activeStaffData.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center py-6 opacity-40">
                                             <Users className="w-8 h-8 mb-2" />
                                             <p className="text-[10px] font-bold">Sin personal en turno</p>
                                         </div>
                                     ) : (
-                                        activeShifts.map(shift => (
+                                        activeStaffData.map(shift => (
                                             <div key={shift.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-xl transition-colors border border-transparent hover:border-white/5">
                                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-toast-orange to-orange-700 flex items-center justify-center text-[10px] font-black text-white ring-2 ring-white/10">
-                                                    S{shift.staffId}
+                                                    {(shift.staffName || '?').charAt(0).toUpperCase()}
                                                 </div>
                                                 <div>
-                                                    <p className="text-[11px] font-black text-white">Staff #{shift.staffId}</p>
+                                                    <p className="text-[11px] font-black text-white">{shift.staffName}</p>
                                                     <div className="flex items-center gap-1.5 mt-0.5">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                                                         <p className="text-[9px] text-green-400 font-bold uppercase tracking-tight">
