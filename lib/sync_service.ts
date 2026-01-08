@@ -457,6 +457,17 @@ class SyncService {
 
     async restoreFromCloud(onProgress?: (msg: string) => void, preventReload: boolean = false) {
         try {
+            // STEP 0: SAFETY BACKUP (PUSH LOCAL CHANGES FIRST)
+            // Prevents wiping unsynced local work (e.g. just taken orders) when refreshing.
+            try {
+                onProgress?.("Guardando cambios locales...");
+                console.log("[Restore] 🛡️ Safety Push: Attempting to save local changes before restore...");
+                await this.pushAll((msg) => console.log(`[SafetyPush] ${msg}`));
+            } catch (pushError) {
+                console.warn("[Restore] ⚠️ Safety Push failed. Proceeding with restore anyway (Risk of data loss for unsynced items).", pushError);
+                // We continue, as the user likely initiated restore BECAYSE sync was broken.
+            }
+
             onProgress?.("Restaurando Categorías y Plantillas...");
             await this.pullTable(db.categories, 'categories');
             await this.pullTable(db.modifierTemplates, 'modifier_templates');
