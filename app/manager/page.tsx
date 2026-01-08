@@ -51,7 +51,9 @@ export default function ManagerPage() {
     }, [start, end]);
 
     const activeShifts = useLiveQuery(async () => {
-        return db.shifts.filter(s => !s.endTime).toArray();
+        const now = new Date();
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        return db.shifts.filter(s => !s.endTime && new Date(s.startTime) > yesterday).toArray();
     });
 
     const lowStockIngredients = useLiveQuery(async () => {
