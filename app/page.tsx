@@ -235,27 +235,51 @@ function POSContent() {
 
   // --- AUTO-SAVE LOGIC ---
   const persistTicket = async (newTicket: TicketItem[]) => {
-    if (!activeTable?.currentOrderId) return;
+    try {
+      if (activeTable?.currentOrderId) {
+        // Update existing order
+        await db.orders.update(activeTable.currentOrderId, {
+          items: newTicket,
+          subtotal: newTicket.reduce((sum, item) => sum + ((item.product.price + (item.selectedModifiers?.reduce((a, m) => a + m.price, 0) || 0)) * item.quantity), 0),
+          total: newTicket.reduce((sum, item) => sum + ((item.product.price + (item.selectedModifiers?.reduce((a, m) => a + m.price, 0) || 0)) * item.quantity), 0),
+          updatedAt: new Date()
+        });
 
-    // Recalculate Totals
-    const newSubtotal = newTicket.reduce((sum, item) => {
-      const itemPrice = item.product.price;
-      const modifiersPrice = item.selectedModifiers?.reduce((acc, mod) => acc + mod.price, 0) || 0;
-      return sum + ((itemPrice + modifiersPrice) * item.quantity);
-    }, 0);
-    const newTotal = newSubtotal; // Tip is separate
+        if (navigator.onLine) {
+          const { syncService } = await import('@/lib/sync_service');
+          syncService.autoSync(db.orders, 'orders').catch(console.error);
+        }
+      } else if (activeTable && newTicket.length > 0) {
+        // CREATE NEW ORDER (Fix for data loss / missing KDS)
+        const total = newTicket.reduce((sum, item) => sum + ((item.product.price + (item.selectedModifiers?.reduce((a, m) => a + m.price, 0) || 0)) * item.quantity), 0);
 
-    await db.orders.update(activeTable.currentOrderId, {
-      items: newTicket,
-      subtotal: newSubtotal,
-      total: newTotal,
-      updatedAt: new Date()
-    });
+        const newOrderId = await db.orders.add({
+          tableId: activeTable.id!,
+          restaurantId: localStorage.getItem('kontigo_restaurant_id') || 'demo',
+          status: 'open',
+          items: newTicket,
+          total: total,
+          subtotal: total,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          staffId: parseInt(sessionStorage.getItem('kontigo_staff_id') || '0'),
+          tip: 0,
+        });
 
-    // Background Sync (Fire & Forget)
-    if (navigator.onLine) {
-      const { syncService } = await import('@/lib/sync_service');
-      syncService.autoSync(db.orders, 'orders').catch(console.error);
+        // Link table to new order
+        await db.restaurantTables.update(activeTable.id!, {
+          status: 'occupied',
+          currentOrderId: newOrderId
+        });
+
+        if (navigator.onLine) {
+          const { syncService } = await import('@/lib/sync_service');
+          syncService.autoSync(db.orders, 'orders').catch(console.error);
+          syncService.autoSync(db.restaurantTables, 'restaurant_tables').catch(console.error);
+        }
+      }
+    } catch (e) {
+      console.error("Auto-save failed:", e);
     }
   };
 
