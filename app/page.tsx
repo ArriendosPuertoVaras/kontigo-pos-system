@@ -235,10 +235,24 @@ function POSContent() {
 
   // --- AUTO-SAVE LOGIC ---
   const persistTicket = async (newTicket: TicketItem[]) => {
+    if (!tableId) return; // Cannot save without table
+
     try {
-      if (activeTable?.currentOrderId) {
-        // Update existing order
-        await db.orders.update(activeTable.currentOrderId, {
+      // 1. Resolve Table State (Robustly)
+      let currentTable = activeTable;
+      if (!currentTable) {
+        // Fallback: Fetch manually if hook hasn't loaded (Vital for fast typing)
+        currentTable = await db.restaurantTables.get(tableId);
+      }
+
+      if (!currentTable) return; // Table clearly doesn't exist
+
+      // 2. Resolve Target Order
+      const currentOrderId = currentTable.currentOrderId;
+
+      if (currentOrderId) {
+        // A. Update existing order
+        await db.orders.update(currentOrderId, {
           items: newTicket,
           subtotal: newTicket.reduce((sum, item) => sum + ((item.product.price + (item.selectedModifiers?.reduce((a, m) => a + m.price, 0) || 0)) * item.quantity), 0),
           total: newTicket.reduce((sum, item) => sum + ((item.product.price + (item.selectedModifiers?.reduce((a, m) => a + m.price, 0) || 0)) * item.quantity), 0),
@@ -249,12 +263,12 @@ function POSContent() {
           const { syncService } = await import('@/lib/sync_service');
           syncService.autoSync(db.orders, 'orders').catch(console.error);
         }
-      } else if (activeTable && newTicket.length > 0) {
-        // CREATE NEW ORDER (Fix for data loss / missing KDS)
+      } else if (newTicket.length > 0) {
+        // B. CREATE NEW ORDER (Only if we have items)
         const total = newTicket.reduce((sum, item) => sum + ((item.product.price + (item.selectedModifiers?.reduce((a, m) => a + m.price, 0) || 0)) * item.quantity), 0);
 
         const newOrderId = await db.orders.add({
-          tableId: activeTable.id!,
+          tableId: currentTable.id!,
           restaurantId: localStorage.getItem('kontigo_restaurant_id') || 'demo',
           status: 'open',
           items: newTicket,
@@ -267,7 +281,7 @@ function POSContent() {
         });
 
         // Link table to new order
-        await db.restaurantTables.update(activeTable.id!, {
+        await db.restaurantTables.update(currentTable.id!, {
           status: 'occupied',
           currentOrderId: newOrderId
         });
