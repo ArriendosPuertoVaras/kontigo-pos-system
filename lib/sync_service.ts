@@ -431,9 +431,16 @@ class SyncService {
             return;
         }
 
-        // Strategy: Clear and Replace to ensure 100% sync (removes local ghosts)
-        await dexieTable.clear();
+        // Strategy: MERGE (Upsert) instead of Clear-Replace.
+        // This is CRITICAL for Offline-First. 
+        // 1. New local records (not in cloud yet) are PRESERVED because bulkPut only touches the IDs provided.
+        // 2. Existing records are updated with Cloud truth.
+        // 3. Deletions should be handled by 'soft deletes' logic elsewhere, but we prioritize DATA SAFETY over zombie deletion.
+
+        // await dexieTable.clear(); // <--- REMOVED: This was causing the "Refresh Wipe" bug.
         await dexieTable.bulkPut(transformedData);
+
+        console.log(`[Sync] Safe-Merged ${transformedData.length} records into ${dexieTable.name} (Local data preserved).`);
     }
 
 
