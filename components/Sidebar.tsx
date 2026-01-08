@@ -19,7 +19,8 @@ import {
     Upload,
     DollarSign,
     Wallet,
-    Lock
+    Lock,
+    X
 } from 'lucide-react';
 
 import { db } from '@/lib/db';
@@ -32,6 +33,39 @@ export default function Sidebar() {
     const [isOpen, setIsOpen] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
 
+    // --- NOTIFICATION STATE ---
+    const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+
+    // Load dismissed alerts from local storage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('kontigo_dismissed_alerts');
+        if (saved) {
+            try {
+                setDismissedIds(new Set(JSON.parse(saved)));
+            } catch (e) {
+                console.error("Failed to parse dismissed alerts", e);
+            }
+        }
+    }, []);
+
+    const handleDismiss = (id: string) => {
+        const newSet = new Set(dismissedIds);
+        newSet.add(id);
+        setDismissedIds(newSet);
+        localStorage.setItem('kontigo_dismissed_alerts', JSON.stringify(Array.from(newSet)));
+    };
+
+    const handleClearAll = () => {
+        const newSet = new Set(dismissedIds);
+        // Add all currently visible to dismissed
+        visibleLowStock?.forEach(i => newSet.add(`stock-${i.id}`));
+        visibleOrders?.forEach(i => newSet.add(`order-${i.id}`));
+        visibleShifts?.forEach(i => newSet.add(`shift-${i.id}`));
+
+        setDismissedIds(newSet);
+        localStorage.setItem('kontigo_dismissed_alerts', JSON.stringify(Array.from(newSet)));
+    };
+
     // --- REAL ALERTS DATA ---
     const lowStockItems = useLiveQuery(() => db.ingredients.filter(i => {
         if (i.isInfinite) return false;
@@ -43,7 +77,12 @@ export default function Sidebar() {
     // Let's just show all open shifts for visibility
     const openShifts = useLiveQuery(() => db.shifts.filter(s => !s.endTime).toArray());
 
-    const totalAlerts = (lowStockItems?.length || 0) + (activeOrders?.length || 0) + (openShifts?.length || 0);
+    // Filtered Views
+    const visibleLowStock = lowStockItems?.filter(i => !dismissedIds.has(`stock-${i.id}`));
+    const visibleOrders = activeOrders?.filter(o => !dismissedIds.has(`order-${o.id}`));
+    const visibleShifts = openShifts?.filter(s => !dismissedIds.has(`shift-${s.id}`));
+
+    const visibleTotal = (visibleLowStock?.length || 0) + (visibleOrders?.length || 0) + (visibleShifts?.length || 0);
 
     useEffect(() => {
         const toggle = () => setIsOpen(prev => !prev);
@@ -156,9 +195,9 @@ export default function Sidebar() {
                         >
                             <Bell className="w-5 h-5 mb-0.5" />
                             <span className="w-full text-[9px] font-bold uppercase text-center">Alertas</span>
-                            {totalAlerts > 0 && (
+                            {visibleTotal > 0 && (
                                 <span className="absolute top-1 right-1 bg-toast-red text-white text-[8px] font-bold w-3 h-3 rounded-full flex items-center justify-center border border-toast-charcoal-dark">
-                                    {totalAlerts}
+                                    {visibleTotal}
                                 </span>
                             )}
                         </button>
@@ -174,14 +213,31 @@ export default function Sidebar() {
                     <div className="absolute left-[85px] bottom-20 w-80 bg-[#252525] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-left-2 duration-200">
                         <div className="p-3 border-b border-white/5 bg-black/20 flex justify-between items-center">
                             <h3 className="font-bold text-sm text-gray-200">Notificaciones</h3>
-                            <span className="text-[10px] text-toast-orange font-bold px-2 py-0.5 bg-toast-orange/10 rounded-full">{
-                                (lowStockItems?.length || 0) + (activeOrders?.length || 0) + (openShifts?.length || 0)
-                            } Nuevas</span>
+                            <div className="flex gap-2 items-center">
+                                <span className="text-[10px] text-toast-orange font-bold px-2 py-0.5 bg-toast-orange/10 rounded-full">
+                                    {visibleTotal} Nuevas
+                                </span>
+                                {visibleTotal > 0 && (
+                                    <button
+                                        onClick={handleClearAll}
+                                        title="Limpiar Todo"
+                                        className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         <div className="max-h-[300px] overflow-y-auto">
                             {/* 1. Low Stock Alerts */}
-                            {lowStockItems?.map(ing => (
-                                <div key={`stock-${ing.id}`} className="p-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group">
+                            {visibleLowStock?.map(ing => (
+                                <div key={`stock-${ing.id}`} className="relative p-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group pr-8">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDismiss(`stock-${ing.id}`); }}
+                                        className="absolute right-2 top-2 p-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-xs font-bold text-red-400">Stock Crítico</span>
                                         <span className="text-[10px] text-gray-500">Ahora</span>
@@ -193,8 +249,14 @@ export default function Sidebar() {
                             ))}
 
                             {/* 2. Active Orders / "requests" */}
-                            {activeOrders?.map(order => (
-                                <div key={`order-${order.id}`} className="p-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group">
+                            {visibleOrders?.map(order => (
+                                <div key={`order-${order.id}`} className="relative p-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group pr-8">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDismiss(`order-${order.id}`); }}
+                                        className="absolute right-2 top-2 p-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-xs font-bold text-blue-400">Pedido Activo</span>
                                         <span className="text-[10px] text-gray-500">{new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -206,8 +268,14 @@ export default function Sidebar() {
                             ))}
 
                             {/* 3. System Alerts (Open Shifts > 12h or just open) */}
-                            {openShifts?.map(shift => (
-                                <div key={`shift-${shift.id}`} className="p-3 hover:bg-white/5 transition-colors cursor-pointer group">
+                            {visibleShifts?.map(shift => (
+                                <div key={`shift-${shift.id}`} className="relative p-3 hover:bg-white/5 transition-colors cursor-pointer group pr-8">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDismiss(`shift-${shift.id}`); }}
+                                        className="absolute right-2 top-2 p-1 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-xs font-bold text-yellow-400">Turno Abierto</span>
                                         <span className="text-[10px] text-gray-500">{new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -219,7 +287,7 @@ export default function Sidebar() {
                             ))}
 
                             {/* Empty State */}
-                            {(!lowStockItems?.length && !activeOrders?.length && !openShifts?.length) && (
+                            {(!visibleLowStock?.length && !visibleOrders?.length && !visibleShifts?.length) && (
                                 <div className="p-6 text-center text-gray-500 text-xs">
                                     No hay notificaciones nuevas.
                                 </div>
