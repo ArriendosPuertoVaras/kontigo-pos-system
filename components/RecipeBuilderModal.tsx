@@ -384,9 +384,9 @@ export function RecipeBuilderModal({
                     </button>
                 </div>
 
-                <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                     {/* LEFT SIDEBAR: INGREDIENTS & SECTIONS */}
-                    <div className="w-80 border-r border-white/10 flex flex-col bg-black/20">
+                    <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-white/10 flex flex-col bg-black/20 shrink-0 h-1/3 md:h-auto">
 
                         {/* EDIT MODE */}
                         {editingIngredient ? (

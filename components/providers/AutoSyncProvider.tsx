@@ -61,6 +61,28 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         initSyncHooks();
 
+        // GLOBAL SUBSCRIPTIONS (Listen everywhere, regardless of page)
+        const registerGlobalListeners = async () => {
+            // Dynamically import to ensure client-side execution
+            const { syncService } = await import('@/lib/sync_service');
+
+            // Critical Business Data (Must update in background)
+            await syncService.subscribeToTable('orders', db.orders, () => {
+                console.log("☁️ AutoSync: Background Order Update");
+                // Optional: Trigger a UI refresh event if needed
+            });
+            await syncService.subscribeToTable('restaurant_tables', db.restaurantTables);
+            try {
+                // If kdsTickets table exists (it might not in all schemas yet, catch error)
+                if ('kdsTickets' in db) {
+                    await syncService.subscribeToTable('kds_tickets', (db as any).kdsTickets);
+                }
+            } catch (e) { /* ignore */ }
+
+            await syncService.subscribeToTable('shifts', db.shifts);
+        };
+        registerGlobalListeners();
+
         // --- STARTUP HANDSHAKE: Cloud-First Protocol ---
         const handshake = async () => {
             if (typeof window === 'undefined') return;

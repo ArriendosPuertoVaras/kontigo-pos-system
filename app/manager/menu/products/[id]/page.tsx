@@ -2,10 +2,11 @@
 
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Product, ModifierTemplate, Category } from '@/lib/db';
-import { ArrowLeft, Save, Trash2, Tag, Layers, RefreshCw, ShieldCheck, Plus, X } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Tag, Layers, RefreshCw, ShieldCheck, Plus, X, ChefHat } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { RecipeBuilderModal } from '@/components/RecipeBuilderModal';
 
 export default function ProductDetailPage() {
     const params = useParams();
@@ -19,6 +20,7 @@ export default function ProductDetailPage() {
 
     const [formData, setFormData] = useState<Partial<Product>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
 
     useEffect(() => {
         if (product) setFormData(product);
@@ -202,8 +204,8 @@ export default function ProductDetailPage() {
                                         key={tpl.id}
                                         onClick={() => toggleModifier(tpl)}
                                         className={`flex items-center justify-between p-3 rounded-lg border transition-all text-left ${active
-                                                ? 'bg-blue-500/10 border-blue-500/50 text-white'
-                                                : 'bg-black/20 border-white/5 text-gray-400 hover:bg-white/5'
+                                            ? 'bg-blue-500/10 border-blue-500/50 text-white'
+                                            : 'bg-black/20 border-white/5 text-gray-400 hover:bg-white/5'
                                             }`}
                                     >
                                         <div>
@@ -252,10 +254,41 @@ export default function ProductDetailPage() {
                                 <span className="text-xs">Sin Imagen</span>
                             </div>
                         )}
+
+                        {/* RECIPE BUTTON */}
+                        <button
+                            onClick={() => setIsRecipeModalOpen(true)}
+                            className="w-full py-4 bg-gradient-to-r from-blue-900/40 to-blue-800/40 border border-blue-500/30 rounded-xl hover:from-blue-900/60 hover:to-blue-800/60 transition-all group flex items-center justify-between px-4"
+                        >
+                            <div className="text-left">
+                                <p className="text-blue-200 font-bold flex items-center gap-2">
+                                    <ChefHat className="w-5 h-5" /> Ficha Técnica
+                                </p>
+                                <p className="text-[10px] text-blue-300/70 mt-0.5">Define ingredientes y pasos</p>
+                            </div>
+                            <ArrowLeft className="w-4 h-4 text-blue-400 rotate-180 group-hover:translate-x-1 transition-transform" />
+                        </button>
+
                     </div>
                 </div>
 
             </div>
+
+            {/* RECIPE MODAL */}
+            {isRecipeModalOpen && id && (
+                <RecipeBuilderModal
+                    entityId={id}
+                    entityType="product"
+                    onClose={() => setIsRecipeModalOpen(false)}
+                    onSave={() => {
+                        setIsRecipeModalOpen(false);
+                        // Refresh data just in case
+                        db.products.get(id).then(p => {
+                            if (p) setFormData(p);
+                        });
+                    }}
+                />
+            )}
         </div>
     );
 }
