@@ -111,16 +111,22 @@ class SyncService {
             });
         }
 
+
         // ORPHAN CHECK: DTES -> ORDERS (Fix for "FK Violation" error)
         if (dexieTable.name === 'dtes') {
-            const validOrders = await db.orders.toArray();
+            // CRITICAL FIX: Only consider orders that are VALID FOR THIS SYNC (Same Restaurant)
+            // If an order belongs to another restaurant, it won't be in the cloud, so we can't ref it.
+            const validOrders = await db.orders
+                .filter(o => !o.restaurantId || o.restaurantId === restaurantId)
+                .toArray();
+
             const validOrderIds = new Set(validOrders.map(o => o.id));
 
             const originalCount = localData.length;
             localData = localData.filter(dte => validOrderIds.has(dte.orderId));
 
             if (localData.length < originalCount) {
-                console.warn(`[Sync] ⚠️ Skipped ${originalCount - localData.length} Orphan DTEs (Invalid Order ID).`);
+                console.warn(`[Sync] ⚠️ Skipped ${originalCount - localData.length} Orphan DTEs (Invalid or Cross-Restaurant Order ID).`);
             }
         }
         // --------------------------------
