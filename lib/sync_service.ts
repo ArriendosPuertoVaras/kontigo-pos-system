@@ -1028,31 +1028,37 @@ class SyncService {
             if (restaurant && restaurant.id) {
                 const localId = localStorage.getItem('kontigo_restaurant_id');
 
-                // If ID mismatch (or missing locally), HEAL IT.
+                // ALWAYS HEAL/VERIFY Local Records
+                // Even if localId matches restaurant.id, the RECORDS might be orphaned.
+                // We force a check on all tables.
+
+                // 1. Ensure Storage is correct
                 if (localId !== restaurant.id) {
-                    console.log(`[Sync] 🚑 ID MISMATCH DETECTED! Local: ${localId} vs Cloud: ${restaurant.id}`);
-                    console.log(`[Sync] 🚑 Healing Local Restaurant ID...`);
-
-                    // 1. Update Storage
+                    console.log(`[Sync] 🚑 ID MISMATCH DETECTED! Updating Storage to ${restaurant.id}`);
                     localStorage.setItem('kontigo_restaurant_id', restaurant.id);
+                }
 
-                    // 2. Update/Heal Local Records (So they sync correctly)
-                    // We update ALL tables to the new ID
-                    const tables = [
-                        db.products, db.categories, db.ingredients, db.suppliers,
-                        db.orders, db.staff, db.shifts, db.dtes, db.cashCounts,
-                        db.dailyCloses, db.restaurantTables
-                    ];
+                // 2. Heal Local Records (The "Deep Clean")
+                const tables = [
+                    db.products, db.categories, db.ingredients, db.suppliers,
+                    db.orders, db.staff, db.shifts, db.dtes, db.cashCounts,
+                    db.dailyCloses, db.restaurantTables
+                ];
 
-                    for (const table of tables) {
-                        const items = await table.toArray();
-                        for (const item of items) {
-                            if (item.restaurantId !== restaurant.id) {
-                                await table.update(item.id, { restaurantId: restaurant.id });
-                            }
+                let healedCount = 0;
+                for (const table of tables) {
+                    const items = await table.toArray();
+                    for (const item of items) {
+                        // If item holds a different ID (or null), update it to the authoritative one
+                        if (item.restaurantId !== restaurant.id) {
+                            await table.update(item.id, { restaurantId: restaurant.id });
+                            healedCount++;
                         }
                     }
-                    console.log(`[Sync] ✅ Local Data Re-homed to ${restaurant.id}`);
+                }
+
+                if (healedCount > 0) {
+                    console.log(`[Sync] 🚑 Self-Healing: Re-homed ${healedCount} orphaned records to ${restaurant.id}`);
                 }
             }
 
