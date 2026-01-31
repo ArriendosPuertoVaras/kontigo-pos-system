@@ -6,7 +6,8 @@ import DteConfigSection from '@/components/DteConfigSection';
 import Sidebar from '@/components/Sidebar';
 import { generateMockData } from '@/lib/mock_generator';
 import { db } from '@/lib/db';
-import { Trash2, Database, AlertTriangle } from 'lucide-react';
+import { syncService } from '@/lib/sync_service';
+import { Trash2, Database, AlertTriangle, CloudUpload, Cloud } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { usePermission } from '@/hooks/usePermission';
 import { useEffect, useState } from 'react';
@@ -16,6 +17,20 @@ export default function SettingsPage() {
     const canAccess = usePermission('admin:settings');
     const [isSimulating, setIsSimulating] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    const handleForceSync = async () => {
+        setIsSyncing(true);
+        try {
+            await syncService.pushAll((msg) => console.log(msg));
+            alert("✅ Respaldo en Nube completado con éxito.");
+        } catch (e: any) {
+            console.error("Sync error:", e);
+            alert("❌ Error al respaldar: " + e.message);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     useEffect(() => {
         if (canAccess === false) { // Check explicitly for false (loading is undefined)
@@ -134,6 +149,31 @@ export default function SettingsPage() {
 
                         {/* API KEYS SECTION */}
                         <ApiKeysSection />
+
+
+                        {/* EMERGENCY CLOUD PUSH */}
+                        <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-6 shadow-xl">
+                            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                                <Cloud className="w-5 h-5 text-blue-400" />
+                                Respaldo en Nube (Emergencia)
+                            </h3>
+                            <p className="text-sm text-gray-400 mb-6">Si ves las tablas vacías en Supabase, usa este botón para enviar tus datos locales ahora.</p>
+
+                            <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/20 flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div>
+                                    <h4 className="font-bold text-blue-400 mb-1">Forzar Sincronización Manual</h4>
+                                    <p className="text-xs text-gray-400">Envía todo tu Menú, Inventario, Ventas y Configuración a la nube.</p>
+                                </div>
+                                <button
+                                    onClick={handleForceSync}
+                                    disabled={isSyncing}
+                                    className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-blue-900/20 disabled:opacity-50 transition-all whitespace-nowrap"
+                                >
+                                    {isSyncing ? <CloudUpload className="w-5 h-5 animate-bounce" /> : <CloudUpload className="w-5 h-5" />}
+                                    {isSyncing ? 'Subiendo...' : 'Subir Todo Ahora'}
+                                </button>
+                            </div>
+                        </div>
 
                         {/* DATA MANAGEMENT SECTION */}
                         <div className="bg-[#2a2a2a] border border-white/5 rounded-xl p-6 shadow-xl">
