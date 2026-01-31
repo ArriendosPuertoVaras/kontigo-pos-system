@@ -12,6 +12,7 @@ interface QuickProfileModalProps {
 export default function QuickProfileModal({ onClose }: QuickProfileModalProps) {
     const [staff, setStaff] = useState<Staff | null>(null);
     const [newPin, setNewPin] = useState('');
+    const [restaurantId, setRestaurantId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
@@ -21,6 +22,9 @@ export default function QuickProfileModal({ onClose }: QuickProfileModalProps) {
                 if (s) setStaff(s);
             });
         }
+        // FETCH RESTAURANT ID
+        const restId = localStorage.getItem('kontigo_restaurant_id');
+        if (restId) setRestaurantId(restId);
     }, []);
 
     const handleSave = async () => {
@@ -105,6 +109,16 @@ export default function QuickProfileModal({ onClose }: QuickProfileModalProps) {
                     <p className="text-xs text-gray-500 text-center">
                         Tu PIN actual: <span className="font-mono text-white">****</span> (Oculto)
                     </p>
+
+                    {/* TECH INFO */}
+                    {restaurantId && (
+                        <div className="pt-4 border-t border-white/5 text-center">
+                            <p className="text-[9px] uppercase font-bold text-gray-600 mb-1">ID del Restaurante (Soporte)</p>
+                            <code className="bg-black/40 px-2 py-1 rounded text-[10px] text-gray-400 font-mono select-all block break-all">
+                                {restaurantId}
+                            </code>
+                        </div>
+                    )}
 
                     <button
                         onClick={handleSave}
