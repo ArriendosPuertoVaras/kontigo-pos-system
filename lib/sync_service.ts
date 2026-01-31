@@ -110,6 +110,19 @@ class SyncService {
                 return shiftOk && staffOk;
             });
         }
+
+        // ORPHAN CHECK: DTES -> ORDERS (Fix for "FK Violation" error)
+        if (dexieTable.name === 'dtes') {
+            const validOrders = await db.orders.toArray();
+            const validOrderIds = new Set(validOrders.map(o => o.id));
+
+            const originalCount = localData.length;
+            localData = localData.filter(dte => validOrderIds.has(dte.orderId));
+
+            if (localData.length < originalCount) {
+                console.warn(`[Sync] ⚠️ Skipped ${originalCount - localData.length} Orphan DTEs (Invalid Order ID).`);
+            }
+        }
         // --------------------------------
 
         // 2. Convert to snake_case
