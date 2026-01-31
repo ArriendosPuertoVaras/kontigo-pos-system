@@ -34,11 +34,17 @@ async function migrateTable(tableName) {
 
     console.log(`   -> Encontrados ${rows.length} registros. Subiendo...`);
 
-    // 3. Clean Data (Strict Schema Matching)
-    // The new DB seems to lack created_at/updated_at in some tables, or they are auto-generated.
-    // We strip them to avoid "Column not found" errors.
+    // 3. Clean Data (Strict Schema Matching - AGGRESSIVE)
+    // Stripping ALL columns that don't exist in the bare-bones new schema.
     const cleanRows = rows.map(row => {
-        const { created_at, updated_at, ...rest } = row;
+        const {
+            created_at, updated_at, deleted_at, // Timestamps
+            sort_order, type,                   // Categories
+            recipe, image_url,                  // Products
+            family, sub_family, storage, cost, supplier_id, instructions, chef_note, prep_time, cook_time, total_time, // Ingredients
+            contact_name, email, phone,         // Suppliers
+            ...rest
+        } = row;
         return rest;
     });
 
