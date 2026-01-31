@@ -838,10 +838,7 @@ class SyncService {
     }
 
     // --- GATEKEEPER ---
-    async checkSubscriptionStatus(): Promise<boolean> {
-        // BYPASS: Always allow sync for emergency restore scenarios
-        return true;
-    }
+
 
     // --- REALTIME NEXUS ---
     /**
