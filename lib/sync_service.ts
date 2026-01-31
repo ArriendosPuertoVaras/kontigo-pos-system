@@ -1019,6 +1019,58 @@ class SyncService {
             this.lastError = "Fallo en diagnóstico Nexus";
         }
     }
+    async checkSubscriptionStatus(): Promise<boolean> {
+        try {
+            // 1. HEALER: Fetch authoritative ID from Cloud using Commerce Code
+            const { data: restaurant, error } = await supabase
+                .from('restaurants')
+                .select('id, active, commerce_code')
+                .eq('commerce_code', 'MJ-LEGACY-001') // HARDCODED FOR THIS USER'S CONTEXT
+                .single();
+
+            if (restaurant && restaurant.id) {
+                const localId = localStorage.getItem('kontigo_restaurant_id');
+
+                // If ID mismatch (or missing locally), HEAL IT.
+                if (localId !== restaurant.id) {
+                    console.log(`[Sync] 🚑 ID MISMATCH DETECTED! Local: ${localId} vs Cloud: ${restaurant.id}`);
+                    console.log(`[Sync] 🚑 Healing Local Restaurant ID...`);
+
+                    // 1. Update Storage
+                    localStorage.setItem('kontigo_restaurant_id', restaurant.id);
+
+                    // 2. Update/Heal Local Records (So they sync correctly)
+                    // We update ALL tables to the new ID
+                    const tables = [
+                        db.products, db.categories, db.ingredients, db.suppliers,
+                        db.orders, db.staff, db.shifts, db.dtes, db.cashCounts,
+                        db.dailyCloses, db.restaurantTables
+                    ];
+
+                    for (const table of tables) {
+                        const items = await table.toArray();
+                        for (const item of items) {
+                            if (item.restaurantId !== restaurant.id) {
+                                await table.update(item.id, { restaurantId: restaurant.id });
+                            }
+                        }
+                    }
+                    console.log(`[Sync] ✅ Local Data Re-homed to ${restaurant.id}`);
+                }
+            }
+
+            if (error || !restaurant) {
+                // Determine if offline or really missing
+                if (!navigator.onLine) return true; // Optimistic offline
+                return false;
+            }
+
+            return restaurant.active;
+        } catch (e) {
+            console.error("[Sync] Subscription check failed", e);
+            return true; // Fail open to allow offline usage
+        }
+    }
 }
 
 export const syncService = new SyncService();
