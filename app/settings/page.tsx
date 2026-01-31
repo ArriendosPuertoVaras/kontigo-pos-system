@@ -2,6 +2,7 @@
 
 import Header from '@/components/Header';
 import ApiKeysSection from '@/components/ApiKeysSection';
+import DteConfigSection from '@/components/DteConfigSection';
 import Sidebar from '@/components/Sidebar';
 import { generateMockData } from '@/lib/mock_generator';
 import { db } from '@/lib/db';
@@ -103,6 +104,9 @@ export default function SettingsPage() {
 
                 <div className="flex-1 overflow-y-auto p-8">
                     <div className="max-w-4xl mx-auto space-y-8">
+
+                        {/* CONFIG SII (NEW PHASE 1) */}
+                        <DteConfigSection />
 
 
 

@@ -278,6 +278,13 @@ class SyncService {
                 console.warn("⚠️ API Keys Sync Skipped (Cloud table missing or permission denied, skipping safely)", error);
             }
 
+            // Safe Sync for Restaurant Config (SII/PAGO)
+            try {
+                await this.pushTable(db.restaurantConfig, 'restaurant_config');
+            } catch (error) {
+                console.warn("⚠️ Restaurant Config Sync Skipped (Cloud table missing, skipping safely)", error);
+            }
+
             // 2. Suppliers & CRM
             onProgress?.("Sincronizando Proveedores y Clientes...");
             await this.pushTable(db.suppliers, 'suppliers');
@@ -483,6 +490,12 @@ class SyncService {
                 await this.pullTable(db.apiKeys, 'api_keys');
             } catch (e) {
                 console.warn("⚠️ API Keys Pull Skipped (Safe Mode)");
+            }
+
+            try {
+                await this.pullTable(db.restaurantConfig, 'restaurant_config');
+            } catch (e) {
+                console.warn("⚠️ Restaurant Config Pull Skipped (Safe Mode)");
             }
 
             onProgress?.("Restaurando Proveedores y Clientes...");

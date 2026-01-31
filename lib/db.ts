@@ -16,6 +16,29 @@ export interface ModifierGroup {
     options: ModifierOption[];
 }
 
+export interface RestaurantConfig {
+    id?: number;
+    restaurantId: string;
+
+    // Identity
+    fantasyName?: string;
+    businessName: string; // Razón Social
+    rut: string;          // RUT Empresa
+    address: string;
+    phone?: string;
+    email?: string;
+
+    // SII / DTE Credentials
+    siiEnvironment: 'certificacion' | 'produccion';
+    siiCertificateP12?: string; // Base64 encoded (Keep it secure!)
+    siiCertificatePassword?: string;
+    siiApiKey?: string; // For intermediate providers like Haulmer/SimpleFactura
+
+    // Payment
+    paymentProvider?: 'mercadopago' | 'transbank' | 'sumup';
+    paymentTerminalId?: string; // Linked Terminal ID
+}
+
 export interface Product {
     id?: number;
     name: string;
@@ -402,6 +425,7 @@ export class KontigoDatabase extends Dexie {
     settings!: Table<SystemSetting>;
     productionLogs!: Table<ProductionLog>;
     apiKeys!: Table<ApiKey>;
+    restaurantConfig!: Table<RestaurantConfig>; // New Table
 
     constructor() {
         super('Kontigo_Final'); // Force final fresh DB
@@ -476,6 +500,11 @@ export class KontigoDatabase extends Dexie {
         // V14: API Keys Management
         this.version(14).stores({
             apiKeys: '++id, key_hash, restaurantId'
+        });
+
+        // V15: Restaurant Configuration (SII, Branding, Terminals)
+        this.version(15).stores({
+            restaurantConfig: '++id, restaurantId' // Singleton per restaurant usually, but ID indexed just in case
         });
 
         // Populate if empty - DISABLED to prevent Ghost Data
