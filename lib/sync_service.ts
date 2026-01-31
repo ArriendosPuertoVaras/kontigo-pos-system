@@ -1022,7 +1022,7 @@ class SyncService {
             const { data: restaurant, error } = await supabase
                 .from('restaurants')
                 .select('id, active, commerce_code')
-                .eq('commerce_code', 'MJ-LEGACY-001') // HARDCODED FOR THIS USER'S CONTEXT
+                .eq('commerce_code', 'KONTIGO-STGO') // RESTORED FOR LEGACY DB
                 .single();
 
             if (restaurant && restaurant.id) {
