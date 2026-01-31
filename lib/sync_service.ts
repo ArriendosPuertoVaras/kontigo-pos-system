@@ -40,7 +40,16 @@ class SyncService {
             return;
         }
 
+
         console.log(`[Sync] Syncing ${dexieTable.name} to ${supabaseTableName} for Restaurant: ${restaurantId}...`);
+
+        // --- DEPENDENCY GUARD: SERIALIZATION FIX ---
+        // If we are sending DTEs, we MUST ensure Orders are there first.
+        // This fixes the Race Condition where DTEs arrive before Orders during Auto-Sync.
+        if (dexieTable.name === 'dtes') {
+            console.log("[Sync] ⛓️ Enforcing Dependency: Syncing Orders before DTEs...");
+            await this.pushTable(db.orders, 'orders');
+        }
 
         // 1. Get all local data
         // FILTER: Only push data belonging to this restaurant (Safety measure)
