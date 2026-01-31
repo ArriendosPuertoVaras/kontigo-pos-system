@@ -234,6 +234,11 @@ class SyncService {
                 delete converted.id;
             }
 
+            if (supabaseTableName === 'orders') {
+                if ('updated_at' in converted) delete converted.updated_at;
+                if ('updatedAt' in converted) delete converted.updatedAt;
+            }
+
             // SAFETY: FORCE RESTAURANT_ID
             converted.restaurant_id = restaurantId;
 
