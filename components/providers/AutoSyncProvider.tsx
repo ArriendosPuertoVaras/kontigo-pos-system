@@ -23,6 +23,7 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
     const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
     const [pendingChanges, setPendingChanges] = useState(false);
     const [isInitializing, setIsInitializing] = useState(false);
+    const [showResetButton, setShowResetButton] = useState(false);
 
     // Ref to hold the timer ID so we can clear it
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,11 +102,16 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
             if (navigator.onLine) {
                 console.log("☁️ Cloud-First: Checking Startup Handshake...");
 
+                let handshakeTimeout: NodeJS.Timeout | null = null;
+
                 // Only show overlay if handshake wasn't done in this session
                 if (!isHandshakeDone) {
                     setIsInitializing(true);
                     setStatus('saving');
                     console.log("☁️ Cloud-First: Initiating Visual Handshake...");
+                    handshakeTimeout = setTimeout(() => {
+                        setShowResetButton(true);
+                    }, 15000); // 15 seconds limit
                 } else {
                     console.log("☁️ Cloud-First: Handshake already done. Syncing in background.");
                 }
@@ -142,6 +148,7 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
                     syncService.isReady = true;
                 } finally {
                     setIsInitializing(false);
+                    if (handshakeTimeout) clearTimeout(handshakeTimeout);
                 }
             } else {
                 console.log("📡 Offline: Enabling local mode.");
@@ -218,6 +225,24 @@ export function AutoSyncProvider({ children }: { children: React.ReactNode }) {
                         <ShieldCheck className="w-4 h-4 text-green-500" />
                         Protocolo de Integridad Perfecto Activo
                     </div>
+
+                    {showResetButton && (
+                        <div className="mt-6 flex flex-col items-center animate-in fade-in duration-500">
+                            <p className="text-red-400 text-xs mb-3 text-center max-w-xs font-medium">
+                                Parece que una sesión de una versión anterior o error de red está bloqueando la conexión.
+                            </p>
+                            <button
+                                onClick={() => {
+                                    localStorage.clear();
+                                    sessionStorage.clear();
+                                    window.location.reload();
+                                }}
+                                className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-red-500/20"
+                            >
+                                Forzar Reinicio del Sistema
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
             {children}
